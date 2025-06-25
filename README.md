@@ -1,50 +1,80 @@
-# Welcome to your Expo app 👋
+# Malet - Financial Dashboard
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Malet is a modern financial dashboard application designed to help users manage their accounts, track transactions, and monitor their financial health in real-time.
 
-## Get started
+## Features
 
-1. Install dependencies
+- 📊 Interactive dashboard with financial overview
+- 💳 Account management
+- 💰 Transaction tracking and history
+- 📱 Responsive design for all devices
+- 💼 Real-time financial insights
 
+## Tech Stack
+
+- **Frontend**: React Native using Expo with TypeScript
+- **State Management**: Zustand
+- **UI Components**: Custom components with modern design
+- **Type Safety**: TypeScript
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or later)
+- npm or yarn
+- Expo CLI (https://docs.expo.dev/guides/installation/)
+
+### Installation
+
+1. Clone the repository:
    ```bash
-   npm install
+   git clone https://github.com/anthonycursewl/malet-app.git
+   cd malet-app
    ```
 
-2. Start the app
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
+3. Start the development server:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. Open the app on your device or emulator.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+malet-app/
+├── app/                  # Expo app directory
+├── assets/               # Static assets
+│   └── images/           # Static images
+│   └── fonts/            # Static fonts
+├── components/           # Reusable UI components
+│   └── dashboard/        # Dashboard specific components
+│   └── Modals/           # Modal components
+├── shared/               # Shared utilities and hooks
+│   └── config/           # Configuration files
+│   └── entities/         # Data models
+│   └── http/             # HTTP utilities
+│   └── stores/           # State management
+├── svgs/                 # SVG icons
+└── ...
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Contributing
 
-## Learn more
+There's no contribution guide at the moment. This is just a personal project.
 
-To learn more about developing your project with Expo, look at the following resources:
+## License
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Join the community
+## Support
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+For support, please open an issue in the GitHub repository.

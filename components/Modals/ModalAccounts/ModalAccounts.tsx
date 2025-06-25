@@ -1,5 +1,3 @@
-// src/components/Modals/ModalAccounts/ModalAccounts.js
-
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import IconAt from "@/svgs/dashboard/IconAt";
@@ -31,7 +29,6 @@ const ModalAccounts = forwardRef((props, ref) => {
         }
     }, [modalVisible]);
 
-    // Maneja errores específicos de esta acción
     useEffect(() => {
         if (error) {
             Alert.alert('Error al cargar cuentas', error);
@@ -41,7 +38,7 @@ const ModalAccounts = forwardRef((props, ref) => {
     const openModal = () => {
         setModalVisible(true);
         Animated.spring(translateY, {
-            toValue: 0, // Animar hasta la posición final
+            toValue: 0,
             useNativeDriver: true,
         }).start();
     };
@@ -56,17 +53,13 @@ const ModalAccounts = forwardRef((props, ref) => {
         });
     };
 
-    // Expone la función `openModal` al componente padre
     useImperativeHandle(ref, () => ({
         openModal,
     }));
-
-    // PanResponder para permitir cerrar el modal deslizando hacia abajo
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onPanResponderMove: (_, gestureState) => {
-                // Solo mover si el gesto es hacia abajo
                 if (gestureState.dy > 0) {
                     translateY.setValue(gestureState.dy);
                 }
@@ -75,7 +68,6 @@ const ModalAccounts = forwardRef((props, ref) => {
                 if (gestureState.dy > 100 || gestureState.vy > 0.5) {
                     closeModal();
                 } else {
-                    // Volver a la posición original si el gesto no fue suficiente
                     Animated.spring(translateY, {
                         toValue: 0,
                         useNativeDriver: true,
@@ -85,7 +77,6 @@ const ModalAccounts = forwardRef((props, ref) => {
         })
     ).current;
 
-    // Contenido a renderizar dentro del modal
     const renderContent = () => {
         if (loading) {
             return (
