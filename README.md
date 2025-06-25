@@ -12,7 +12,9 @@
 <h1 align="center">Malet - Your Modern Financial Dashboard 💰</h1>
 
 <p align="center">
-  <strong>A sleek, modern financial dashboard to manage accounts, track transactions, and gain real-time insights into your financial health.</strong>
+  <strong>
+    A sleek, modern financial dashboard to manage accounts, track transactions, and gain real-time insights into your financial health.
+  </strong>
 </p>
 
 <p align="center">
