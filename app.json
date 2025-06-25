@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "malet-app",
+    "name": "Malet",
     "slug": "malet-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -33,7 +33,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
