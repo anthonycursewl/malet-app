@@ -1,80 +1,93 @@
-# Malet - Financial Dashboard
+<div align="center">
+<pre>
+███╗   ███╗ █████╗ ██╗     ███████╗████████╗
+████╗ ████║██╔══██╗██║     ██╔════╝╚══██╔══╝
+██╔████╔██║███████║██║     █████╗     ██║   
+██║╚██╔╝██║██╔══██║██║     ██╔══╝     ██║   
+██║ ╚═╝ ██║██║  ██║███████╗███████╗   ██║   
+╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝
+</pre>
+</div>
 
-Malet is a modern financial dashboard application designed to help users manage their accounts, track transactions, and monitor their financial health in real-time.
+<h1 align="center">Malet - Your Modern Financial Dashboard 💰</h1>
 
-## Features
+<p align="center">
+  <strong>A sleek, modern financial dashboard to manage accounts, track transactions, and gain real-time insights into your financial health.</strong>
+</p>
 
-- 📊 Interactive dashboard with financial overview
-- 💳 Account management
-- 💰 Transaction tracking and history
-- 📱 Responsive design for all devices
-- 💼 Real-time financial insights
+<p align="center">
+  <img alt="React Native" src="https://img.shields.io/badge/React%20Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB"/>
+  <img alt="Expo" src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white"/>
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white"/>
+  <img alt="Zustand" src="https://img.shields.io/badge/Zustand-BA764B?style=for-the-badge"/>
+</p>
 
-## Tech Stack
+## ✨ Features
 
-- **Frontend**: React Native using Expo with TypeScript
-- **State Management**: Zustand
-- **UI Components**: Custom components with modern design
-- **Type Safety**: TypeScript
+- 📊 **Interactive Dashboard**: A comprehensive overview of your finances at a glance.
+- 💳 **Account Management**: Easily add, view, and manage your financial accounts.
+- 💸 **Transaction Tracking**: Keep a detailed history of your income and expenses.
+- 📱 **Responsive Design**: A seamless experience on any device.
+- 💡 **Real-time Insights**: Make informed decisions with up-to-date financial data.
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or later)
-- npm or yarn
-- Expo CLI (https://docs.expo.dev/guides/installation/)
+- [Node.js](https://nodejs.org/) (v18 or later)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+- [Expo CLI](https://docs.expo.dev/guides/installation/)
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/anthonycursewl/malet-app.git
-   cd malet-app
-   ```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/anthonycursewl/malet-app.git
+    cd malet-app
+    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+    _or_
+    ```bash
+    yarn install
+    ```
 
-3. Start the development server:
-   ```bash
-   npx expo start
-   ```
+3.  **Run the development server:**
+    ```bash
+    npx expo start
+    ```
 
-4. Open the app on your device or emulator.
+4.  Open the app on your device or emulator and enjoy!
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 malet-app/
-├── app/                  # Expo app directory
-├── assets/               # Static assets
-│   └── images/           # Static images
-│   └── fonts/            # Static fonts
+├── app/                  # Expo app directory (screens & routes)
+├── assets/               # Fonts, images, and other static assets
 ├── components/           # Reusable UI components
-│   └── dashboard/        # Dashboard specific components
-│   └── Modals/           # Modal components
-├── shared/               # Shared utilities and hooks
-│   └── config/           # Configuration files
-│   └── entities/         # Data models
-│   └── http/             # HTTP utilities
-│   └── stores/           # State management
-├── svgs/                 # SVG icons
+├── shared/               # Shared logic, hooks, and state
+│   ├── config/           # App configuration
+│   ├── entities/         # Data models/types
+│   ├── http/             # HTTP client setup
+│   └── stores/           # Zustand state management stores
+├── svgs/                 # SVG icon components
 └── ...
 ```
 
-## Contributing
+## 🤝 Contributing
 
-There's no contribution guide at the moment. This is just a personal project.
+This is currently a personal project, but feel free to open an issue for any suggestions or bugs you find!
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## Support
+---
 
-For support, please open an issue in the GitHub repository.
+<p align="center">
+  Made with ❤️
+</p>
