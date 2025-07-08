@@ -3,10 +3,11 @@ import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconWallet from "@/svgs/auth/IconWallet";
+import IconAt from "@/svgs/dashboard/IconAt";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
@@ -16,7 +17,7 @@ export default function Index() {
   })
 
   // Auth store
-  const { login, loading, error } = useAuthStore();
+  const { login, loading, setError } = useAuthStore();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -27,13 +28,11 @@ export default function Index() {
     }
     
     checkAuth();
-  }, [])
 
-  useEffect(() => {
-    if (error) {
-      Alert.alert('Malet | Error', error);
+    return () => {
+      setError(null);
     }
-  }, [error]);
+  }, [])
 
   const handleSubmit = async () => {
     const r = await login(credentials);
@@ -52,10 +51,8 @@ export default function Index() {
         width: '100%',
       }}
     >
-      <View style={{ marginBottom: 30 }}>
-        <TextMalet style={{ fontSize: 24 }}>
-          @Malet
-        </TextMalet>
+      <View style={{ marginBottom: 40 }}>
+        <IconAt style={{ width: 80, height: 80 }} />
       </View>
 
       <View style={{ width: '85%', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
