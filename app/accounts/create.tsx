@@ -9,6 +9,7 @@ import { Account } from "@/shared/entities/Account";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useEffect, useState } from "react";
 // svgs
+import { parseAccountNumber } from "@/shared/services/wallet/parseAccountNumber";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import IconAt from "@/svgs/dashboard/IconAt";
 
@@ -31,11 +32,6 @@ export default function Create() {
     }, [error])
     
     let accountNumber = '123456789012';
-
-    const parseAccountNumber = (number: string): string => {
-        if (!number) return '';
-        return number.replace(/(\d{4})/g, '$1 ').trim();
-    };
 
     const handleTextChange = (field: 'name' | 'currency', value: string) => {
         setAccountDetails(prev => ({ ...prev, [field]: value }));

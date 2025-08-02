@@ -3,6 +3,7 @@ import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { UserPrimitives } from "@/shared/entities/User";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
+import IconAt from "@/svgs/dashboard/IconAt";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
@@ -201,9 +202,7 @@ export default function Register() {
           borderRadius: 10,
         }}>
           <View style={{ alignItems: 'center', marginBottom: 30 }}>
-            <TextMalet style={{ fontSize: 24 }}>
-              @Malet
-            </TextMalet>
+            <IconAt style={{ width: 80, height: 80 }} />
           </View>
 
           <View style={{ gap: 24 }}>
