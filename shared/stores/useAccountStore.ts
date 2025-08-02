@@ -15,7 +15,9 @@ interface AccountStore {
     
     // Methods
     createAccount: (account: Omit<Account, 'created_at' | 'updated_at' | 'id'>) => Promise<Account>
-    getAllAccountsByUserId: () => Promise<void>
+    getAllAccountsByUserId: (user_id: string) => Promise<void>
+    updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => void
+    logoutAccount: () => void
 }
 
 export const useAccountStore = create<AccountStore>((set, get) => ({
@@ -28,6 +30,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     selectedAccount: null,
     setSelectedAccount: (account: Account | null) => set({ selectedAccount: account }),
 
+    
     createAccount: async (account: Omit<Account, 'created_at' | 'updated_at' | 'id'>) => {
         const { error, response } = await secureFetch({
             url: MALET_API_URL + '/accounts/create',
@@ -46,10 +49,10 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         return response;
     },
 
-    getAllAccountsByUserId: async () => {
+    getAllAccountsByUserId: async (user_id: string) => {
         get().setError(null)
         const { error, response } = await secureFetch({
-            url: MALET_API_URL + '/accounts/get/all',
+            url: `${MALET_API_URL}/accounts/get/all/${user_id}`,
             method: 'GET',
             setLoading: get().setLoading
         }) 
@@ -62,6 +65,35 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         set({
             accounts: response
         });
+    },
+
+    updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => {
+        const { accounts } = get()
+        const updatedAccounts = accounts.map(acc => {
+            if (acc.id === account_id) {
+
+            set({
+                selectedAccount: {
+                    ...acc,
+                    balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
+                }
+            })
+            return {
+                ...acc,
+                balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
+            }
+            }
+            return acc;
+        })
+        set({ accounts: updatedAccounts })
+    },
+
+    logoutAccount: () => {
+        set({
+            error: null,
+            accounts: [],
+            selectedAccount: null,
+        })
     }
 
 }))

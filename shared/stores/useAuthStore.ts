@@ -15,6 +15,7 @@ interface AuthStore {
     // Auth methods
     register: (user: Omit<UserPrimitives, 'id' | 'role' | 'created_at'>) => Promise<boolean>;
     login: (credentials: { email: string; password: string }) => Promise<boolean>;
+    logout: () => Promise<boolean>;
     verifySession: () => Promise<boolean>;
 }
 
@@ -70,10 +71,25 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         return true;
     },
 
+    logout: async () => {
+        await AsyncStorage.removeItem('token');
+        set({
+            user: {
+                id: '',
+                name: '',
+                username: '',
+                email: '',
+                created_at: new Date(),
+                password: '',
+            },
+            error: null
+        });
+        return true;
+    },
+
     verifySession: async () => {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-            
             return false;
         }
 
@@ -84,15 +100,15 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         }) 
 
         if (error) {
-            console.log(error)
             await AsyncStorage.removeItem('token');
             get().setError(error);
             return false;
         }
 
-        console.log(`Respuesta del back:`)
-        console.log(response)
         get().setUser(response);
+        set({
+            error: null
+        })
         return true;
     }
     
