@@ -5,9 +5,10 @@ import TextMalet from "@/components/TextMalet/TextMalet";
 import { Account } from "@/shared/entities/Account";
 import { TransactionItem } from "@/shared/entities/TransactionItem";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
+import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useGlobalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface FormErrors {
@@ -17,21 +18,23 @@ interface FormErrors {
 }
 
 export default function AddWallet() {
-  const { addTrasanction, loading } = useWalletStore();
+  const { type } = useGlobalSearchParams()
+
+  // stores
+  const { addTransaction, loading } = useWalletStore();
+  const { user } = useAuthStore() 
+  const { accounts, getAllAccountsByUserId, updateBalanceInMemory } = useAccountStore()
   const router = useRouter();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [formData, setFormData] = useState<Omit<TransactionItem, 'id' | 'issued_at'>>({
     name: '',
     amount: '',
-    type: 'expense',
+    type: type as 'expense' | 'saving',
     account_id: '',
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-
-  const { accounts } = useAccountStore()
-
   const selectedAccount = accounts.find(acc => acc.id === formData.account_id);
 
   const handleInputChange = (field: keyof Omit<TransactionItem, 'id' | 'issued_at'>, value: string) => {
@@ -77,7 +80,7 @@ export default function AddWallet() {
 
   const parseAmount = (amountString: string): number => {
     const normalizedString = amountString.replace(/,/g, '.');
-    return Math.round(parseFloat(normalizedString) * 100) / 100;
+    return parseFloat(normalizedString);
   };
 
   const handleSubmit = async () => {
@@ -87,12 +90,22 @@ export default function AddWallet() {
 
     const amount = parseAmount(formData.amount);
     
-    await addTrasanction({
+    const transaction = await addTransaction({
       ...formData,
       amount: amount.toString(),
     });
-    router.back();
+    
+    if (transaction) {
+      updateBalanceInMemory(formData.account_id, amount, formData.type === 'expense' ? 'expense' : 'saving');
+      router.back();
+    }
   };
+
+  useEffect(() => {
+    if (accounts && accounts.length === 0) {
+      getAllAccountsByUserId(user.id)
+    }
+  }, [user.id, accounts])
 
   return (
     <LayoutAuthenticated>
@@ -124,7 +137,7 @@ export default function AddWallet() {
                   <TextMalet style={
                     formData.type === 'expense' ? styles.typeButtonTextExpense : styles.typeButtonTextInactive
                   }>
-                    Gasto
+                    Egreso
                   </TextMalet>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -137,7 +150,7 @@ export default function AddWallet() {
                   <TextMalet style={
                     formData.type === 'saving' ? styles.typeButtonTextSaving : styles.typeButtonTextInactive
                   }>
-                    Ahorro
+                    Ingreso
                   </TextMalet>
                 </TouchableOpacity>
               </View>
