@@ -1,5 +1,6 @@
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
+import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { router } from "expo-router";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -18,16 +19,24 @@ import {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const ModalAccounts = forwardRef((props, ref) => {
-    const { loading, error, getAllAccountsByUserId, accounts, setSelectedAccount } = useAccountStore();
+    const { 
+        loading, 
+        error, 
+        getAllAccountsByUserId, 
+        accounts, 
+        setSelectedAccount 
+    } = useAccountStore();
+    const { user } = useAuthStore()
 
     const [modalVisible, setModalVisible] = useState(false);
+    const [contentVisible, setContentVisible] = useState(false);
     const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
     useEffect(() => {
-        if (modalVisible) {
-            getAllAccountsByUserId();
+        if (modalVisible && accounts.length === 0) {
+            getAllAccountsByUserId(user.id);
         }
-    }, [modalVisible]);
+    }, [modalVisible, user.id]);
 
     useEffect(() => {
         if (error) {
@@ -37,20 +46,34 @@ const ModalAccounts = forwardRef((props, ref) => {
 
     const openModal = () => {
         setModalVisible(true);
+        setTimeout(() => {
+            setContentVisible(true);
+        }, 100)
+        translateY.setValue(SCREEN_HEIGHT);
+        
+        
         Animated.spring(translateY, {
             toValue: 0,
             useNativeDriver: true,
+            stiffness: 300,
+            damping: 20,
+            mass: 0.8,
         }).start();
     };
 
     const closeModal = () => {
-        Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-        }).start(() => {
+        setContentVisible(false);
+        setTimeout(() => {
             setModalVisible(false);
-        });
+        }, 200);
+        
+        Animated.spring(translateY, {
+            toValue: SCREEN_HEIGHT,
+            useNativeDriver: true,
+            stiffness: 300,
+            damping: 25, 
+            mass: 0.8,
+        }).start();
     };
 
     useImperativeHandle(ref, () => ({
@@ -71,6 +94,9 @@ const ModalAccounts = forwardRef((props, ref) => {
                     Animated.spring(translateY, {
                         toValue: 0,
                         useNativeDriver: true,
+                        stiffness: 300,
+                        damping: 20,
+                        mass: 0.8,
                     }).start();
                 }
             },
@@ -86,13 +112,12 @@ const ModalAccounts = forwardRef((props, ref) => {
             );
         }
 
-        if (accounts.length > 0) {
+        if (accounts && accounts.length > 0) {
             return accounts.map(account => (
                 <TouchableOpacity
                     key={account.id}
                     style={styles.accountItem}
                     onPress={() => {
-                        console.log(account.id)
                         setSelectedAccount(account);
                         closeModal();
                     }}
@@ -127,20 +152,45 @@ const ModalAccounts = forwardRef((props, ref) => {
                 ]}
                 {...panResponder.panHandlers}
             >
-                <View style={styles.handle} />
-                <View style={styles.header}>
-                    <View style={styles.headerTitleContainer}>
-                        <IconAt width={20} height={20} />
-                        <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
-                    </View>
-                    <TouchableOpacity style={styles.addButton} onPress={() => {
-                        closeModal();
-                        router.push('/accounts/create');
-                    }}>
-                        <TextMalet style={styles.addButtonText}>+</TextMalet>
-                    </TouchableOpacity>
-                </View>
-                {renderContent()}
+                {contentVisible && (
+                    <>
+                        <View style={styles.handle} />
+                        <View style={styles.header}>
+                            <View style={styles.headerTitleContainer}>
+                                <IconAt width={20} height={20} />
+                                <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
+                            </View>
+                            <TouchableOpacity 
+                                style={styles.addButton} 
+                                onPress={() => {
+                                    closeModal();
+                                    router.push('/accounts/create');
+                                }}
+                            >
+                                <TextMalet style={styles.addButtonText}>+</TextMalet>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.accountItem}
+                            onPress={() => {
+                                setSelectedAccount({
+                                    id: '',
+                                    name: '',
+                                    balance: 0,
+                                    currency: 'All',
+                                    user_id: '',
+                                    created_at: new Date(),
+                                    updated_at: new Date()
+                                });
+                                closeModal();
+                            }}
+                        >
+                            <TextMalet style={styles.accountName}>Todas las cuentas</TextMalet>
+                            <TextMalet style={styles.accountBalance}>Presiona para ver las transacciones de todas las cuentas.</TextMalet>
+                        </TouchableOpacity>
+                        {renderContent()}
+                    </>
+                )}
             </Animated.View>
         </Modal>
     );
