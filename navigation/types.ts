@@ -2,6 +2,9 @@ export type RootStackParamList = {
   GetAllTransaction: {
     account_id: string;
   };
+  transactions: {
+    id: string;
+  };
   // Agrega aquí otras pantallas de tu navegación
   // Ejemplo:
   // Home: undefined;
