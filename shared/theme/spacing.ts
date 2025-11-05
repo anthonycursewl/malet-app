@@ -11,7 +11,7 @@
  * - Usa `spacing.getSpacing(multiplier)` para valores personalizados (ej: getSpacing(3) = 24px)
  */
 
-const BASE_UNIT = 8; // 8px como unidad base (común en Material Design)
+const BASE_UNIT = 8; 
 
 export const spacing = {
   // Espaciados predefinidos
@@ -22,12 +22,11 @@ export const spacing = {
   xlarge: BASE_UNIT * 4,    // 32px
   xxlarge: BASE_UNIT * 5,   // 40px
   
-  // Función para obtener espaciados personalizados
   getSpacing: (multiplier: number): number => BASE_UNIT * multiplier,
   
   // Atajos comunes
-  pagePadding: BASE_UNIT * 2, // 16px
-  cardPadding: BASE_UNIT * 2, // 16px
-  inputPadding: BASE_UNIT * 1.5, // 12px
-  buttonPadding: `${BASE_UNIT}px ${BASE_UNIT * 2}px`, // 8px 16px
+  pagePadding: BASE_UNIT * 2, 
+  cardPadding: BASE_UNIT * 2, 
+  inputPadding: BASE_UNIT * 1.5, 
+  buttonPadding: `${BASE_UNIT}px ${BASE_UNIT * 2}px`, 
 };
