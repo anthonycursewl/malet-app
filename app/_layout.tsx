@@ -1,8 +1,8 @@
 import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppProvider } from '../components/AppProvider';
-
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -27,6 +27,7 @@ export default function RootLayout() {
 
   return (
     <AppProvider>
+      <StatusBar style="dark" translucent={true}/>
       <Stack screenOptions={{ headerShown: false }} />
     </AppProvider>
   );

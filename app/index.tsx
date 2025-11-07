@@ -42,6 +42,7 @@ export default function Index() {
   };
 
   return (
+    <>
     <SafeAreaView
       style={{
         backgroundColor: '#fff',
@@ -99,7 +100,7 @@ export default function Index() {
         </TouchableOpacity>
 
       </View>
-
     </SafeAreaView>
+    </>
   );
 }
