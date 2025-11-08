@@ -1,24 +1,19 @@
-import { StyleProp, Text, TextStyle } from "react-native";
+import { StyleProp, Text, TextProps, TextStyle } from "react-native";
 
 type TextMaletStyle = StyleProp<TextStyle>;
 
-interface TextMaletProps {
+interface TextMaletProps extends TextProps {
     children: React.ReactNode;
     style?: TextMaletStyle | TextMaletStyle[];
     className?: string;
 }
 
 export default function TextMalet({ children, style, className }: TextMaletProps) {
-    const flattenedStyles = Array.isArray(style) 
-        ? style.filter(Boolean) 
-        : style || [];
-
+    const baseStyle = { fontFamily: 'Onest' };
+    
     return (
         <Text 
-            style={[
-                { fontFamily: 'Onest' },
-                ...(Array.isArray(flattenedStyles) ? flattenedStyles : [flattenedStyles])
-            ]}
+            style={[baseStyle, style]}
             className={className}
         >
             {children}

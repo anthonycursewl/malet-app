@@ -22,6 +22,7 @@ interface WalletStore {
     getHistoryTransactions: (account_id: string, user_id?: string, options?: { refresh?: boolean }) => Promise<void>;
     getPreviewTransactions: (account_id: string, user_id?: string) => Promise<void>;
     logoutWallet: () => void;
+    clearStore: () => void;
 }
 
 export const useWalletStore = create<WalletStore>((set, get) => ({
@@ -137,6 +138,19 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     },
 
     logoutWallet: () => {
+        set({
+            error: null,
+            transactions: [],
+            previewTransactions: [],
+            paginationTransactions: {
+                skip: 0,
+                take: 10,
+                isEnd: false,
+            },
+        })
+    },
+
+    clearStore: () => {
         set({
             error: null,
             transactions: [],

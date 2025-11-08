@@ -12,7 +12,7 @@
  */
 
 const BASE_UNIT = 8; 
-
+ 
 export const spacing = {
   // Espaciados predefinidos
   xsmall: BASE_UNIT / 2,    // 4px
