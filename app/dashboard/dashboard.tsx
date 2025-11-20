@@ -7,13 +7,19 @@ import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
+import IconVerified from "@/svgs/common/IconVerified";
+import IconWarning from "@/svgs/common/IconWarning";
+import IconAI from "@/svgs/dashboard/IconAI";
 import IconArrow from "@/svgs/dashboard/IconArrow";
 import IconAt from "@/svgs/dashboard/IconAt";
+import IconBudget from "@/svgs/dashboard/IconBudget";
+import IconFiles from "@/svgs/dashboard/IconFiles";
 import IconMinus from "@/svgs/dashboard/IconMinus";
+import IconNotes from "@/svgs/dashboard/IconNotes";
 import IconPlus from "@/svgs/dashboard/IconPlus";
 import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 
 interface ModalAccountsRef {
     openModal: () => void;
@@ -65,6 +71,18 @@ const BalanceSection = memo(({
 ));
 
 const DashboardHeader = memo(({ userName }: { userName: string }) => {
+    const { width } = Dimensions.get('window');
+    
+    const getTruncatedName = useCallback((name: string) => {
+        const maxLength = Math.floor(width / 15);
+        const maxDisplayLength = Math.max(15, maxLength); 
+        
+        if (name.length > maxDisplayLength) {
+            return `${name.slice(0, maxDisplayLength - 3)}...`;
+        }
+        return name;
+    }, [width]);
+    
     const formattedDate = useMemo(() => {
         const options = { 
             weekday: 'long' as const, 
@@ -78,25 +96,67 @@ const DashboardHeader = memo(({ userName }: { userName: string }) => {
 
     return (
         <View style={{ gap: 8 }}>
-            <ScrollView 
-                horizontal 
-                contentContainerStyle={styles.headerScroll}
-                showsHorizontalScrollIndicator={false}
-            >
+            <View style={{ paddingBottom: 7, paddingTop: 5 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
+                    <TextMalet style={styles.headerText} numberOfLines={1}>
+                        Bienvenido,{" "}
+                    </TextMalet>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                        <TextMalet style={{ color: 'rgba(116, 116, 116, 1)' }}>{getTruncatedName(userName)}</TextMalet>
+                        <IconVerified width={20} height={20} fill="rgba(94, 94, 94, 1)" />
+                    </View>
+                </View>
+            
+                <TextMalet style={{ color: 'rgb(95, 95, 95)', fontSize: 14 }}>
+                    {formattedDate}
+                </TextMalet>
+            </View>
+
+            <View style={styles.iconsContainer}>
+
                 <ContainerDash>
-                    <TouchableOpacity onPress={() => router.push('/profile/profile')}>
+                    <TouchableOpacity onPress={() => {}}>
                         <IconAt width={18} height={18} />
                     </TouchableOpacity>
                 </ContainerDash>
-                <ContainerDash style={{ width: '100%'}}>
-                    <TextMalet style={styles.headerText}>
-                        ¡Bienvenido {userName}!
-                    </TextMalet>
+
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconAI width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
                 </ContainerDash>
-            </ScrollView>
-            <TextMalet style={{ color: 'rgb(95, 95, 95)', fontSize: 14 }}>
-                {formattedDate}
-            </TextMalet>
+
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconNotes width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
+                </ContainerDash>
+
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconBudget width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
+                </ContainerDash>
+
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconFiles width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
+                </ContainerDash>
+
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconWarning width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
+                </ContainerDash>
+                <ContainerDash style={{ marginLeft: 8 }}>
+                    <TouchableOpacity onPress={() => {}}>
+                        <IconWarning width={18} height={18} fill="#313131ff" />
+                    </TouchableOpacity>
+                </ContainerDash>
+            </View>
+            
         </View>
     );
 });
@@ -107,6 +167,8 @@ export default function Dashboard() {
     const { selectedAccount } = useAccountStore();
     
     const [loadingSession, setLoadingSession] = useState(false);
+    const [modalAccountsVisible, setModalAccountsVisible] = useState(false);
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const logoFadeAnim = useRef(new Animated.Value(0)).current;
     const modalAccountsRef = useRef<ModalAccountsRef>(null);
@@ -151,7 +213,11 @@ export default function Dashboard() {
     }, [user?.id, selectedAccount?.id, getPreviewTransactions]);
 
     const handleOpenModal = useCallback(() => {
-        modalAccountsRef.current?.openModal();
+        setModalAccountsVisible(true);
+    }, []);
+
+    const handleCloseModalAccounts = useCallback(() => {
+        setModalAccountsVisible(false);
     }, []);
 
     const handleRefresh = useCallback(() => {
@@ -228,7 +294,7 @@ export default function Dashboard() {
                 </View>
             </View>
             
-            <ModalAccounts ref={modalAccountsRef} />
+            <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
         </LayoutAuthenticated>
     );
 };
@@ -262,15 +328,25 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    headerScroll: {
-        gap: 8,
+    headerContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+    headerScroll: {
+        flex: 1,
+        alignItems: 'center',
+    },
+     iconsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 0,
     },
     headerText: {
         fontSize: 15,
     },
     balanceSection: {
-        marginTop: 20,
+        marginTop: 10,
         flexDirection: 'row',
         alignItems: 'flex-end',
         gap: 10,
