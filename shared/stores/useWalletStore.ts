@@ -49,7 +49,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         isEnd: false,
     },
     setPaginationTransactions: (pagination) => set({ paginationTransactions: pagination }),
-    
+
     addTransaction: async (transaction): Promise<TransactionItem | undefined> => {
         const { error, response } = await secureFetch({
             url: `${MALET_API_URL}/transactions/save`,
@@ -57,14 +57,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             body: JSON.stringify(transaction),
             setLoading: get().setLoading,
         });
-            
+
         if (error) {
             get().setError(error);
             return undefined;
         }
-            
+
         get().setError(null);
-        
+
         get().setPreviewTransactions([response, ...get().previewTransactions]);
         return response
     },
@@ -73,13 +73,13 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         const { refresh = false } = options;
         const state = get();
         const { setLoading, setError, paginationTransactions, transactions } = state;
-        
+
         if (state.loading) return;
         if (state.paginationTransactions.isEnd && !refresh) return;
-    
+
         const take = paginationTransactions.take;
         const skip = refresh ? 0 : paginationTransactions.skip;
-    
+
         const { error, response } = await secureFetch({
             url: `${MALET_API_URL}/transactions/history?skip=${skip}&take=${take}&account_id=${account_id}&user_id=${user_id}`,
             method: 'GET',
@@ -90,11 +90,11 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             setError(error);
             return;
         }
-    
+
         setError(null);
-    
+
         const isEnd = response.length < take;
-    
+
         if (refresh) {
             set({
                 transactions: response,
@@ -120,19 +120,19 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
     getPreviewTransactions: async (account_id: string, user_id = '') => {
         const { setLoading, setError, setPreviewTransactions } = get();
-        
+
         const endpoint = `/transactions/history?skip=${0}&take=${10}&account_id=${account_id}&user_id=${user_id}`;
         const { error, response } = await secureFetch({
             url: `${MALET_API_URL}${endpoint}`,
             method: 'GET',
             setLoading: setLoading,
         });
-            
+
         if (error) {
             setError(error);
             return;
         }
-            
+
         setError(null);
         setPreviewTransactions(response);
     },
@@ -152,6 +152,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
     clearStore: () => {
         set({
+            loading: false,
             error: null,
             transactions: [],
             previewTransactions: [],
