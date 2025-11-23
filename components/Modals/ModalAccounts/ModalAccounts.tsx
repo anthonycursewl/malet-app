@@ -1,42 +1,108 @@
+import ModalOptions from "@/components/shared/ModalOptions";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { Account } from "@/shared/entities/Account";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
+import { spacing } from "@/shared/theme";
 import IconAt from "@/svgs/dashboard/IconAt";
+import IconPlus from "@/svgs/dashboard/IconPlus";
+import IconReload from "@/svgs/dashboard/IconReload";
 import { router } from "expo-router";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useState, useRef } from "react";
 import {
-    ActivityIndicator,
     Alert,
-    Animated,
-    Dimensions,
-    Modal,
-    PanResponder,
+    ScrollView,
     StyleSheet,
     TouchableOpacity,
-    View
+    View,
+    Animated
 } from "react-native";
+import { AccountItem } from "./AccountItem";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+interface ModalAccountsProps {
+  visible: boolean;
+  onClose: () => void;
+}
 
-const ModalAccounts = forwardRef((props, ref) => {
-    const { 
-        loading, 
-        error, 
-        getAllAccountsByUserId, 
-        accounts, 
-        setSelectedAccount 
+const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const spinValue = useRef(new Animated.Value(0)).current;
+    const isMounted = useRef(true);
+    const isLoadingRef = useRef(false);
+    const {
+        loading,
+        error,
+        getAllAccountsByUserId,
+        accounts,
+        setSelectedAccount
     } = useAccountStore();
-    const { user } = useAuthStore()
+    const { user } = useAuthStore();
 
-    const [modalVisible, setModalVisible] = useState(false);
-    const [contentVisible, setContentVisible] = useState(false);
-    const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+    const spin = spinValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg']
+    });
+
+    const loadAccounts = useCallback(async (forceRefresh = false) => {
+        if (!user?.id || isLoadingRef.current) return;
+        
+        if (accounts.length > 0 && !forceRefresh) return;
+        
+        try {
+            isLoadingRef.current = true;
+            
+            const shouldShowLoading = forceRefresh || accounts.length === 0;
+            
+            if (shouldShowLoading) {
+                setIsRefreshing(true);
+                spinValue.setValue(0);
+                Animated.loop(
+                    Animated.timing(spinValue, {
+                        toValue: 1,
+                        duration: 1000,
+                        useNativeDriver: true,
+                    })
+                ).start();
+            }
+            
+            await getAllAccountsByUserId(user.id);
+            
+            if (isMounted.current) {
+                spinValue.stopAnimation();
+                spinValue.setValue(0);
+                setIsRefreshing(false);
+                isLoadingRef.current = false;
+            }
+        } catch (err) {
+            console.error('Error loading accounts:', err);
+            if (isMounted.current) {
+                Alert.alert('Error', 'No se pudieron cargar las cuentas');
+                setIsRefreshing(false);
+                isLoadingRef.current = false;
+                spinValue.stopAnimation();
+                spinValue.setValue(0);
+            }
+        }
+    }, [getAllAccountsByUserId, user?.id, spinValue]);
+
+    const handleRefresh = useCallback(() => {
+        loadAccounts(true);
+    }, [loadAccounts]);
 
     useEffect(() => {
-        if (modalVisible && accounts.length === 0) {
-            getAllAccountsByUserId(user.id);
+        isMounted.current = true;
+        
+        if (visible) {
+            if (accounts.length === 0) {
+                loadAccounts(false);
+            }
         }
-    }, [modalVisible, user.id]);
+        
+        return () => {
+            isMounted.current = false;
+            spinValue.stopAnimation();
+        };
+    }, [visible, loadAccounts, spinValue, accounts.length]);
 
     useEffect(() => {
         if (error) {
@@ -44,232 +110,201 @@ const ModalAccounts = forwardRef((props, ref) => {
         }
     }, [error]);
 
-    const openModal = () => {
-        setModalVisible(true);
+    const handleAccountPress = useCallback((account: Account) => {
+        setSelectedAccount(account);
+        onClose();
+    }, [setSelectedAccount, onClose]);
+
+    const handleCreateAccount = useCallback(() => {
+        onClose();
+
         setTimeout(() => {
-            setContentVisible(true);
-        }, 100)
-        translateY.setValue(SCREEN_HEIGHT);
-        
-        
-        Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            stiffness: 300,
-            damping: 20,
-            mass: 0.8,
-        }).start();
-    };
+            router.push('/accounts/create');
+        }, 300);
+    }, [onClose, router]);
 
-    const closeModal = () => {
-        setContentVisible(false);
-        setTimeout(() => {
-            setModalVisible(false);
-        }, 200);
-        
-        Animated.spring(translateY, {
-            toValue: SCREEN_HEIGHT,
-            useNativeDriver: true,
-            stiffness: 300,
-            damping: 25, 
-            mass: 0.8,
-        }).start();
-    };
-
-    useImperativeHandle(ref, () => ({
-        openModal,
-    }));
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onPanResponderMove: (_, gestureState) => {
-                if (gestureState.dy > 0) {
-                    translateY.setValue(gestureState.dy);
-                }
-            },
-            onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-                    closeModal();
-                } else {
-                    Animated.spring(translateY, {
-                        toValue: 0,
-                        useNativeDriver: true,
-                        stiffness: 300,
-                        damping: 20,
-                        mass: 0.8,
-                    }).start();
-                }
-            },
-        })
-    ).current;
-
-    const renderContent = () => {
-        if (loading) {
-            return (
-                <View style={styles.centeredContent}>
-                    <ActivityIndicator size="large" color="#333" />
-                </View>
-            );
-        }
-
-        if (accounts && accounts.length > 0) {
-            return accounts.map(account => (
-                <TouchableOpacity
-                    key={account.id}
-                    style={styles.accountItem}
-                    onPress={() => {
-                        setSelectedAccount(account);
-                        closeModal();
-                    }}
-                >
-                    <TextMalet style={styles.accountName}>{account.name}</TextMalet>
-                    <TextMalet style={styles.accountBalance}>${account.balance.toFixed(2)}</TextMalet>
-                </TouchableOpacity>
-            ));
-        }
-
+    const renderSkeleton = () => {
         return (
-            <View style={styles.centeredContent}>
-                <TextMalet style={styles.emptyText}>No tienes cuentas registradas.</TextMalet>
+            <View style={styles.skeletonContainer}>
+                {[1, 2, 3].map((i) => (
+                    <View key={i} style={styles.skeletonItem}>
+                        <View style={styles.skeletonAvatar} />
+                        <View style={styles.skeletonTextContainer}>
+                            <View style={[styles.skeletonText, { width: '60%' }]} />
+                            <View style={[styles.skeletonText, { width: '40%', marginTop: 8 }]} />
+                        </View>
+                    </View>
+                ))}
             </View>
         );
     };
 
+    const renderContent = useCallback(() => {
+        if ((loading && accounts.length === 0) || isRefreshing) {
+            return renderSkeleton();
+        }
+
+        if (accounts && accounts.length > 0) {
+            return (
+                <ScrollView 
+                    style={styles.accountsList}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {accounts.map((account, index) => (
+                        <AccountItem
+                            key={account.id}
+                            account={account}
+                            onPress={handleAccountPress}
+                            isLast={index === accounts.length - 1}
+                        />
+                    ))}
+                </ScrollView>
+            );
+        }
+
+        return (
+            <View style={styles.centeredContent}>
+                <TextMalet style={styles.emptyText}>
+                    No tienes cuentas registradas.
+                </TextMalet>
+                <TouchableOpacity 
+                    style={styles.addButton}
+                    onPress={handleCreateAccount}
+                >
+                    <TextMalet style={styles.addButtonText}>
+                        Crear mi primera cuenta
+                    </TextMalet>
+                </TouchableOpacity>
+            </View>
+        );
+    }, [loading, accounts, handleAccountPress, handleCreateAccount, isRefreshing]);
+
     return (
-        <Modal
-            visible={modalVisible}
-            transparent={true}
-            animationType="none"
-            onRequestClose={closeModal}
-            statusBarTranslucent={true}
+        <ModalOptions
+            visible={visible}
+            onClose={onClose}
         >
-            <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeModal} />
-            
-            <Animated.View
-                style={[
-                    styles.modalContainer,
-                    { transform: [{ translateY }] }
-                ]}
-                {...panResponder.panHandlers}
-            >
-                {contentVisible && (
-                    <>
-                        <View style={styles.handle} />
-                        <View style={styles.header}>
-                            <View style={styles.headerTitleContainer}>
-                                <IconAt width={20} height={20} />
-                                <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
-                            </View>
-                            <TouchableOpacity 
-                                style={styles.addButton} 
-                                onPress={() => {
-                                    closeModal();
-                                    router.push('/accounts/create');
-                                }}
-                            >
-                                <TextMalet style={styles.addButtonText}>+</TextMalet>
-                            </TouchableOpacity>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.accountItem}
-                            onPress={() => {
-                                setSelectedAccount({
-                                    id: '',
-                                    name: '',
-                                    balance: 0,
-                                    currency: 'All',
-                                    user_id: '',
-                                    created_at: new Date(),
-                                    updated_at: new Date()
-                                });
-                                closeModal();
-                            }}
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <View style={styles.headerTitleContainer}>
+                        <IconAt width={20} height={20} />
+                        <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
+                    </View>
+
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity 
+                            onPress={handleRefresh} 
+                            disabled={isRefreshing || loading}
+                            style={styles.reloadButton}
                         >
-                            <TextMalet style={styles.accountName}>Todas las cuentas</TextMalet>
-                            <TextMalet style={styles.accountBalance}>Presiona para ver las transacciones de todas las cuentas.</TextMalet>
+                            <Animated.View style={[styles.reloadIconContainer, { transform: [{ rotate: spin }] }]}>
+                                <IconReload 
+                                    width={22} 
+                                    height={22} 
+                                    fill={(isRefreshing || loading) ? '#ccc' : 'rgba(29, 29, 29, 1)'} 
+                                />
+                            </Animated.View>
                         </TouchableOpacity>
-                        {renderContent()}
-                    </>
-                )}
-            </Animated.View>
-        </Modal>
+                        <TouchableOpacity onPress={handleCreateAccount}>
+                            <IconPlus width={25} height={25} fill={'rgba(29, 29, 29, 1)'} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {renderContent()}
+            </View>
+        </ModalOptions>
     );
-});
+};
 
 const styles = StyleSheet.create({
-    backdrop: {
+    container: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-    modalContainer: {
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-        height: SCREEN_HEIGHT * 0.7,
-        backgroundColor: 'white',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingHorizontal: 20,
-        paddingTop: 10,
-    },
-    handle: {
-        width: 50,
-        height: 5,
-        backgroundColor: '#ccc',
-        borderRadius: 5,
-        alignSelf: 'center',
-        marginVertical: 10,
     },
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        justifyContent: 'space-between',
+        paddingBottom: spacing.medium,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 15,
+    },
+    reloadButton: {
+        padding: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    reloadIconContainer: {
+        width: 22,
+        height: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    skeletonContainer: {
+        paddingVertical: spacing.small,
+    },
+    skeletonItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.medium,
+        paddingHorizontal: spacing.small,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5',
+    },
+    skeletonAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        marginRight: 12,
+    },
+    skeletonTextContainer: {
+        flex: 1,
+    },
+    skeletonText: {
+        height: 16,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 4,
     },
     headerTitleContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-    },
-    addButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    addButtonText: {
-        fontSize: 22,
-        color: '#333',
-        lineHeight: 24,
+        fontWeight: '600',
+        color: '#1a1a1a',
     },
     centeredContent: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
-    accountItem: {
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    accountName: {
-        fontSize: 16,
-    },
-    accountBalance: {
-        fontSize: 14,
-        color: '#666',
+    accountsList: {
+        flex: 1,
     },
     emptyText: {
         fontSize: 16,
-        color: '#888',
+        color: '#666',
         textAlign: 'center',
-    }
+        marginBottom: 20,
+    },
+    addButton: {
+        backgroundColor: '#4A90E2',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        marginTop: 16,
+    },
+    addButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
 });
 
-export default ModalAccounts;
+export default memo(ModalAccounts);

@@ -1,50 +1,121 @@
 import Button from "@/components/Button/Button";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
+import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { Account } from "@/shared/entities/Account";
+import { UserPrimitives } from "@/shared/entities/User";
 import { parseAccountNumber } from "@/shared/services/wallet/parseAccountNumber";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import IconAt from "@/svgs/dashboard/IconAt";
-import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, Modal, PanResponder, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from 'react-native';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+interface CardAnimationProps {
+    user: UserPrimitives;
+    selectedAccount: Account | null;
+}
+
+const StaticCard = memo(({ user, selectedAccount }: CardAnimationProps) => {
+    const parsedAccountNumber = useMemo(() => parseAccountNumber(selectedAccount?.id || '0000 0000 0000'), [selectedAccount]);
+
+    return (
+        <View style={stylesAllTransaction.cardContainer}>
+            <LinearGradient
+                colors={['#FFFFFF', '#E9ECEF']}
+                style={stylesAllTransaction.gradient}
+            >
+                <View style={stylesAllTransaction.wave} />
+                <View style={stylesAllTransaction.wave2} />
+                <View style={stylesAllTransaction.cardHeader}>
+                    <TextMalet style={stylesAllTransaction.bankName}>MALET</TextMalet>
+                    <View style={stylesAllTransaction.contactlessIcon}>
+                        <View style={stylesAllTransaction.contactlessRing1} />
+                        <View style={stylesAllTransaction.contactlessRing2} />
+                        <View style={stylesAllTransaction.contactlessRing3} />
+                    </View>
+                </View>
+
+                <LinearGradient
+                    colors={['#888888ff', '#32333336']}
+                    style={stylesAllTransaction.chip}
+                />
+
+                <View style={stylesAllTransaction.cardNumberContainer}>
+                    <TextMalet style={stylesAllTransaction.repAccountNumber}>
+                        {parsedAccountNumber}
+                    </TextMalet>
+                </View>
+
+                <View style={stylesAllTransaction.cardFooter}>
+                    <View>
+                        <TextMalet style={stylesAllTransaction.cardHolder}>Malet-owner</TextMalet>
+                        <TextMalet style={stylesAllTransaction.cardName} numberOfLines={1}>
+                            {user?.name?.toUpperCase() || 'USUARIO'}
+                        </TextMalet>
+                    </View>
+                    <IconAt width={30} height={30} fill="#343A40" />
+                </View>
+            </LinearGradient>
+        </View>
+    );
+});
+
+const SkeletonLoader = memo(() => (
+    <View style={stylesAllTransaction.skeletonContainer}>
+        <View style={[stylesAllTransaction.skeletonLine, { width: '60%', height: 24, marginBottom: 20 }]} />
+        <View style={[stylesAllTransaction.skeletonCard, { marginBottom: 20 }]}>
+            <View style={[stylesAllTransaction.skeletonLine, { width: '80%', height: 24, marginBottom: 20 }]} />
+            <View style={stylesAllTransaction.skeletonFooter}>
+                <View>
+                    <View style={[stylesAllTransaction.skeletonLine, { width: 100, height: 14, marginBottom: 8 }]} />
+                    <View style={[stylesAllTransaction.skeletonLine, { width: 120, height: 18 }]} />
+                </View>
+                <View style={[stylesAllTransaction.skeletonCircle, { width: 22, height: 22 }]} />
+            </View>
+        </View>
+        <View style={[stylesAllTransaction.skeletonLine, { width: '50%', height: 24, marginBottom: 10 }]} />
+        {[1, 2, 3, 4, 5].map((_, index) => (
+            <View key={index} style={[stylesAllTransaction.skeletonTransaction, { marginBottom: 12 }]}>
+                <View style={stylesAllTransaction.skeletonTransactionLeft}>
+                    <View style={[stylesAllTransaction.skeletonCircle, { width: 40, height: 40, marginRight: 12 }]} />
+                    <View>
+                        <View style={[stylesAllTransaction.skeletonLine, { width: 120, height: 16, marginBottom: 4 }]} />
+                        <View style={[stylesAllTransaction.skeletonLine, { width: 80, height: 14 }]} />
+                    </View>
+                </View>
+                <View style={[stylesAllTransaction.skeletonLine, { width: 80, height: 18 }]} />
+            </View>
+        ))}
+    </View>
+));
+
+const AccountBalance = memo(({ selectedAccount }: { selectedAccount: Account }) => {
+    const accountBalance = useMemo(() => {
+        return selectedAccount.balance
+    }, [selectedAccount])
+
+    return (
+        <View style={stylesAllTransaction.balanceContainer}>
+            <TextMalet style={stylesAllTransaction.balanceLabel}>Saldo Disponible</TextMalet>
+            <TextMalet style={stylesAllTransaction.balanceAmount}>
+                $ {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <TextMalet style={stylesAllTransaction.currency}> {selectedAccount.currency}</TextMalet>
+            </TextMalet>
+        </View>
+    );
+});
 
 export default function GetAllTransaction() {
     const { user } = useAuthStore();
-    const { getHistoryTransactions, loading: loadingWallet, transactions, paginationTransactions, setTransactions } = useWalletStore();
-    const { accounts, error, getAllAccountsByUserId, selectedAccount, setSelectedAccount } = useAccountStore();
-
+    const [firstMount, setFirstMount] = useState(true);
+    const { getHistoryTransactions, loading: loadingWallet, transactions, paginationTransactions, clearStore } = useWalletStore();
+    const { accounts, error, getAllAccountsByUserId, selectedAccount } = useAccountStore();
     const [modalVisible, setModalVisible] = useState(false);
-    const MODAL_HEIGHT = SCREEN_HEIGHT * 0.9;
-    const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-    
-    // Referencia para controlar el disparo prematuro de onEndReached
     const onEndReachedCalledDuringMomentum = useRef(true);
-
-    useEffect(() => {
-        if (modalVisible) {
-            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 5, speed: 10 }).start();
-        } else {
-            Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start();
-        }
-    }, [modalVisible]);
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onPanResponderMove: (_, gestureState) => { if (gestureState.dy > 0) translateY.setValue(gestureState.dy); },
-            onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-                    setModalVisible(false);
-                } else {
-                    Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 5, speed: 10 }).start();
-                }
-            },
-        })
-    ).current;
 
     useEffect(() => {
         if (error) Alert.alert('Malet | Error', error);
@@ -55,302 +126,230 @@ export default function GetAllTransaction() {
     }, []);
 
     useEffect(() => {
-        if (selectedAccount?.id && transactions.length === 0) getHistoryTransactions(selectedAccount?.id || '', user.id, { refresh: true });
-    }, []);
+        const getData = async () => {
+            if (selectedAccount?.id) {
+                const hasData = transactions && transactions.length > 0;
+                const isSameAccount = hasData && transactions[0]?.account_id === selectedAccount.id;
 
-    const SkeletonLoader = () => (
-        <View style={stylesAllTransaction.skeletonContainer}>
-            <View style={[stylesAllTransaction.skeletonLine, { width: '60%', height: 24, marginBottom: 20 }]} />
-            <View style={[stylesAllTransaction.skeletonCard, { marginBottom: 20 }]}>
-                <View style={[stylesAllTransaction.skeletonLine, { width: '80%', height: 24, marginBottom: 20 }]} />
-                <View style={stylesAllTransaction.skeletonFooter}>
-                    <View>
-                        <View style={[stylesAllTransaction.skeletonLine, { width: 100, height: 14, marginBottom: 8 }]} />
-                        <View style={[stylesAllTransaction.skeletonLine, { width: 120, height: 18 }]} />
-                    </View>
-                    <View style={[stylesAllTransaction.skeletonCircle, { width: 22, height: 22 }]} />
-                </View>
-            </View>
-            <View style={[stylesAllTransaction.skeletonLine, { width: '50%', height: 24, marginBottom: 10 }]} />
-            {[1, 2, 3, 4, 5].map((_, index) => (
-                <View key={index} style={[stylesAllTransaction.skeletonTransaction, { marginBottom: 12 }]}>
-                    <View style={stylesAllTransaction.skeletonTransactionLeft}>
-                        <View style={[stylesAllTransaction.skeletonCircle, { width: 40, height: 40, marginRight: 12 }]} />
-                        <View>
-                            <View style={[stylesAllTransaction.skeletonLine, { width: 120, height: 16, marginBottom: 4 }]} />
-                            <View style={[stylesAllTransaction.skeletonLine, { width: 80, height: 14 }]} />
-                        </View>
-                    </View>
-                    <View style={[stylesAllTransaction.skeletonLine, { width: 80, height: 18 }]} />
-                </View>
-            ))}
-        </View>
-    );
+                if (isSameAccount) {
+                    setFirstMount(false);
+                    return;
+                }
 
-    if (loadingWallet && transactions.length === 0) {
-        return (
-            <LayoutAuthenticated>
-                <SkeletonLoader />
-            </LayoutAuthenticated>
-        );
-    }
+                setFirstMount(true)
+                clearStore();
+                await getHistoryTransactions(selectedAccount.id, user.id, { refresh: true });
+                setFirstMount(false)
+            }
+        };
+
+        getData();
+    }, [selectedAccount?.id, user.id]);
+
+
+
+    const showSkeleton = firstMount && selectedAccount?.id;
 
     const onEndReached = () => {
-        if (loadingWallet || paginationTransactions.isEnd) {
+        if (loadingWallet || paginationTransactions.isEnd || onEndReachedCalledDuringMomentum.current) {
             return;
         }
         getHistoryTransactions(selectedAccount?.id || '', user.id, { refresh: false });
     };
 
+
     return (
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
             <LayoutAuthenticated>
-                <View style={{ paddingBottom: 15 }}>
-                    <TextMalet style={{ fontSize: 16 }}>Todas las Transacciones</TextMalet>
-                </View>
-
-                <View style={stylesAllTransaction.showcaseCard}>
-                    <View>
-                        <TextMalet style={stylesAllTransaction.repreAccountNumber}>{parseAccountNumber(selectedAccount?.id || '')}</TextMalet>
-                    </View>
-                    <View style={stylesAllTransaction.cardFooter}>
-                        <View>
-                            <TextMalet style={stylesAllTransaction.cardHolder}>Titular de la cuenta</TextMalet>
-                            <TextMalet style={stylesAllTransaction.cardName}>{user.name}</TextMalet>
+                {showSkeleton ? (
+                    <SkeletonLoader />
+                ) : (
+                    <>
+                        <View style={{ paddingBottom: 15 }}>
+                            <TextMalet style={{ fontSize: 16 }}>Todas las Transacciones</TextMalet>
                         </View>
-                        <IconAt style={{ width: 22, height: 22 }} />
-                    </View>
-                </View>
+                        <StaticCard user={user} selectedAccount={selectedAccount} />
 
-                <FlatList
-                    data={transactions}
-                    keyExtractor={(item) => item.id.toString() + 1}
-                    showsVerticalScrollIndicator={false}
-                    style={stylesAllTransaction.transactionsList}
-                    ListHeaderComponent={() => <TextMalet style={stylesAllTransaction.listHeader}>Transacciones recientes</TextMalet>}
-                    renderItem={({ item }) => <LastTransactions item={item} />}
-                    ListEmptyComponent={() => (
-                        !loadingWallet ? <TextMalet style={stylesAllTransaction.emptyListText}>No hay transacciones recientes.</TextMalet> : null
-                    )}
-                    onRefresh={() => getHistoryTransactions(selectedAccount?.id || '', user.id, { refresh: true })}
-                    refreshing={loadingWallet && transactions.length === 0}
-                    onEndReached={onEndReached}
-                    onEndReachedThreshold={0.4}
-                    onMomentumScrollBegin={() => {
-                        onEndReachedCalledDuringMomentum.current = false;
-                    }}
-                    ListFooterComponent={() => loadingWallet && transactions.length > 0 ? <ActivityIndicator style={{ margin: 20 }} size="small" /> : null}
-                />
+                        {selectedAccount && (
+                            <AccountBalance selectedAccount={selectedAccount} />
+                        )}
+
+                        <FlatList
+                            key={`transactions-${selectedAccount?.id || 'no-account'}`}
+                            initialNumToRender={10}
+                            data={transactions}
+                            keyExtractor={(item) => item.id.toString()}
+                            showsVerticalScrollIndicator={false}
+                            style={stylesAllTransaction.transactionsList}
+                            ListHeaderComponent={() => <TextMalet style={stylesAllTransaction.listHeader}>Transacciones recientes</TextMalet>}
+                            renderItem={({ item }) => <LastTransactions item={item} />}
+                            ListEmptyComponent={() => (
+                                !loadingWallet ? (
+                                    <TextMalet style={stylesAllTransaction.emptyListText}>
+                                        {selectedAccount?.id ? 'No hay transacciones recientes.' : 'Selecciona una cuenta para ver las transacciones.'}
+                                    </TextMalet>
+                                ) : null
+                            )}
+                            onRefresh={() => getHistoryTransactions(selectedAccount?.id || '', user.id, { refresh: true })}
+                            refreshing={loadingWallet && transactions.length === 0}
+                            onEndReached={onEndReached}
+                            onEndReachedThreshold={0.4}
+                            onScrollBeginDrag={() => { onEndReachedCalledDuringMomentum.current = false; }}
+                            ListFooterComponent={() => loadingWallet && transactions.length > 0 ? (
+                                <ActivityIndicator style={{ margin: 20 }} size="small" />
+                            ) : null}
+                            removeClippedSubviews={true}
+                            windowSize={10}
+                            maxToRenderPerBatch={10}
+                            updateCellsBatchingPeriod={50}
+                        />
+                    </>
+                )}
             </LayoutAuthenticated>
-
             <View style={stylesAllTransaction.footerContainer}>
-                <Button
-                    text={`${selectedAccount ? `${selectedAccount.name} ${selectedAccount.currency}` : 'Seleccionar cuenta'}`}
-                    onPress={() => setModalVisible(true)}
-                    style={{ width: '100%' }}
-                />
+                <Button text={`${selectedAccount ? `${selectedAccount.name} ${selectedAccount.currency}` : 'Seleccionar cuenta'}`} onPress={() => setModalVisible(true)} style={{ width: '100%' }} />
             </View>
 
-            <Modal
+            <ModalAccounts
                 visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
-                animationType="none"
-                statusBarTranslucent={true}
-                transparent={true}
-            >
-                <View style={stylesAllTransaction.modalOverlay}>
-                    <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-                        <View style={StyleSheet.absoluteFill} />
-                    </TouchableWithoutFeedback>
-
-                    <Animated.View
-                        style={[stylesAllTransaction.modalContainer, { transform: [{ translateY }], height: MODAL_HEIGHT }]}
-                        {...panResponder.panHandlers}
-                    >
-                        <View style={stylesAllTransaction.modalHeader}>
-                            <View style={stylesAllTransaction.modalHandle} />
-                        </View>
-                        <TextMalet style={stylesAllTransaction.modalTitle}>Seleccionar Cuenta</TextMalet>
-                        <FlatList
-                            data={accounts}
-                            keyExtractor={item => item.id}
-                            renderItem={({ item: account }) => (
-                                <TouchableOpacity
-                                    key={account.id}
-                                    style={stylesAllTransaction.accountItem}
-                                    onPress={() => {
-                                        setModalVisible(false);
-
-                                        setTimeout(() => {
-                                            setTransactions([]);     
-                                            setSelectedAccount(account);
-                                            getHistoryTransactions(account.id, user.id, { refresh: true });
-                                        }, 150);
-                                    }}
-                                >
-                                    <TextMalet style={stylesAllTransaction.accountName}>{account.name}</TextMalet>
-                                    <TextMalet style={stylesAllTransaction.accountBalance}>${account.balance.toFixed(2)}</TextMalet>
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </Animated.View>
-                </View>
-            </Modal>
+                onClose={() => setModalVisible(false)}
+            />
         </View>
     );
 }
 
 const stylesAllTransaction = StyleSheet.create({
-    showcaseCard: {
-        width: '100%',
-        minHeight: 140,
-        backgroundColor: '#F0F0F0',
-        borderRadius: 16,
-        padding: 20,
-        justifyContent: 'space-between',
-        marginBottom: 18,
+    balanceContainer: {
+        marginBottom: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
     },
-    cardHolder: {
-        color: '#555',
+    balanceLabel: {
         fontSize: 12,
+        color: '#868e96',
+        marginBottom: 4,
+        fontWeight: '600',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    balanceAmount: {
+        fontSize: 26,
+        fontWeight: '700',
+        color: '#212529',
+        letterSpacing: -0.5,
+    },
+    currency: {
+        fontSize: 14,
+        color: '#adb5bd',
+        fontWeight: '600',
+    },
+    cardContainer: {
+        marginBottom: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    gradient: {
+        borderRadius: 18,
+        paddingVertical: 15,
+        paddingHorizontal: 17,
+        overflow: 'hidden',
+    },
+    wave: {
+        position: 'absolute',
+        top: '60%',
+        left: -100,
+        width: 400,
+        height: 400,
+        borderRadius: 200,
+        backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    },
+    wave2: {
+        position: 'absolute',
+        bottom: -150,
+        right: -150,
+        width: 350,
+        height: 350,
+        borderRadius: 175,
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    bankName: {
+        color: '#495057',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    contactlessIcon: {
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        transform: [{ rotate: '90deg' }]
+    },
+    contactlessRing1: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    contactlessRing2: { width: 17, height: 17, borderRadius: 8.5, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    contactlessRing3: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    chip: {
+        width: 44,
+        height: 34,
+        borderRadius: 6,
+        marginBottom: 16,
+    },
+    cardNumberContainer: {
+        marginBottom: 12,
+    },
+    repAccountNumber: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#212529',
+        letterSpacing: 2.5,
+        fontFamily: 'monospace',
     },
     cardFooter: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-end',
     },
-    repreAccountNumber: {
-        fontSize: 18,
+    cardHolder: {
+        fontSize: 10,
+        color: '#6C757D',
+        marginBottom: 4,
+        letterSpacing: 1,
         fontWeight: '600',
-        letterSpacing: 1.5,
-        color: '#333',
     },
     cardName: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#111',
-    },
-    transactionsList: {
-        flex: 1
-    },
-    listHeader: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 10,
-    },
-    emptyListText: {
-        textAlign: 'center',
-        marginTop: 20,
-        color: '#888',
-    },
-    skeletonContainer: {
-        padding: 2,
-    },
-    skeletonLine: {
-        backgroundColor: '#f0f0f0',
-        borderRadius: 4,
-        marginBottom: 8,
-    },
-    skeletonCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    skeletonFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    skeletonCircle: {
-        backgroundColor: '#f0f0f0',
-        borderRadius: 20,
-    },
-    skeletonTransaction: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
-    },
-    skeletonTransactionLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    footerContainer: {
-        padding: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: '100%',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        backgroundColor: '#fff',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContainer: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingTop: 10,
-        width: '100%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    modalHeader: {
-        width: '100%',
-        alignItems: 'center',
-        paddingVertical: 10,
-    },
-    modalHandle: {
-        width: 40,
-        height: 5,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 5,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 20,
-        textAlign: 'center',
-    },
-    accountItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    accountName: {
-        fontSize: 16,
-    },
-    accountBalance: {
         fontSize: 14,
-        color: '#666',
+        fontWeight: '600',
+        color: '#212529',
+        letterSpacing: 0.5,
+        maxWidth: 180,
     },
-    emptyText: {
-        fontSize: 16,
-        color: '#888',
-        textAlign: 'center',
-    }
+    transactionsList: { flex: 1 },
+    listHeader: { fontSize: 18, fontWeight: '600', marginBottom: 10, },
+    emptyListText: { textAlign: 'center', marginTop: 20, color: '#888', },
+    skeletonContainer: { padding: 2, },
+    skeletonLine: { backgroundColor: '#f0f0f0', borderRadius: 4, marginBottom: 8, },
+    skeletonCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2, },
+    skeletonFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, },
+    skeletonCircle: { backgroundColor: '#f0f0f0', borderRadius: 20, },
+    skeletonTransaction: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#fff', borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1, },
+    skeletonTransactionLeft: { flexDirection: 'row', alignItems: 'center', },
+    footerContainer: { padding: 20, justifyContent: 'center', alignItems: 'center', width: '100%', borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff', },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end', },
+    modalContainer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingTop: 10, width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 10, },
+    modalHeader: { width: '100%', alignItems: 'center', paddingVertical: 10, },
+    modalHandle: { width: 40, height: 5, backgroundColor: '#e0e0e0', borderRadius: 5, },
+    modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 20, textAlign: 'center', },
+    accountItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee', },
+    accountName: { fontSize: 16, },
+    accountBalance: { fontSize: 14, color: '#666', },
+    emptyText: { fontSize: 16, color: '#888', textAlign: 'center', }
 });
