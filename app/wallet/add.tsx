@@ -1,6 +1,6 @@
 import Button from "@/components/Button/Button";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
-import AccountSelectorModal from "@/components/Modals/ModalAccounts/ModalAccountSelector";
+import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { Account } from "@/shared/entities/Account";
 import { TransactionItem } from "@/shared/entities/TransactionItem";
@@ -22,8 +22,8 @@ export default function AddWallet() {
 
   // stores
   const { addTransaction, loading } = useWalletStore();
-  const { user } = useAuthStore() 
-  const { accounts, getAllAccountsByUserId, updateBalanceInMemory } = useAccountStore()
+  const { user } = useAuthStore()
+  const { accounts, getAllAccountsByUserId, updateBalanceInMemory, selectedAccount } = useAccountStore()
   const router = useRouter();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -31,11 +31,10 @@ export default function AddWallet() {
     name: '',
     amount: '',
     type: type as 'expense' | 'saving',
-    account_id: '',
+    account_id: selectedAccount?.id || '',
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-  const selectedAccount = accounts.find(acc => acc.id === formData.account_id);
 
   const handleInputChange = (field: keyof Omit<TransactionItem, 'id' | 'issued_at'>, value: string) => {
     setFormData(prevState => ({
@@ -89,12 +88,12 @@ export default function AddWallet() {
     }
 
     const amount = parseAmount(formData.amount);
-    
+
     const transaction = await addTransaction({
       ...formData,
       amount: amount.toString(),
     });
-    
+
     if (transaction) {
       updateBalanceInMemory(formData.account_id, amount, formData.type === 'expense' ? 'expense' : 'saving');
       router.back();
@@ -106,6 +105,12 @@ export default function AddWallet() {
       getAllAccountsByUserId(user.id)
     }
   }, [user.id, accounts])
+
+  useEffect(() => {
+    if (selectedAccount) {
+      handleInputChange('account_id', selectedAccount.id);
+    }
+  }, [selectedAccount])
 
   return (
     <LayoutAuthenticated>
@@ -218,13 +223,10 @@ export default function AddWallet() {
             }
           </View>
         </View>
-        
-        <AccountSelectorModal
+
+        <ModalAccounts
           visible={isModalVisible}
           onClose={() => setIsModalVisible(false)}
-          accounts={accounts}
-          selectedAccountId={formData.account_id}
-          onSelectAccount={handleSelectAccount}
         />
       </KeyboardAvoidingView>
     </LayoutAuthenticated>
@@ -233,17 +235,17 @@ export default function AddWallet() {
 
 const styles = StyleSheet.create({
   flexOne: { flex: 1 },
-  container: { 
-    flex: 1, 
-    padding: 12, 
-    paddingTop: 0, 
-    backgroundColor: '#fff' 
+  container: {
+    flex: 1,
+    padding: 12,
+    paddingTop: 0,
+    backgroundColor: '#fff'
   },
-  header: { 
-    flexDirection: 'row', 
-    marginBottom: 32, 
-    justifyContent: 'flex-start', 
-    alignItems: 'center' 
+  header: {
+    flexDirection: 'row',
+    marginBottom: 32,
+    justifyContent: 'flex-start',
+    alignItems: 'center'
   },
   backButton: { padding: 8 },
   backButtonText: { fontSize: 28, color: '#1f2937', fontWeight: 'bold' },
