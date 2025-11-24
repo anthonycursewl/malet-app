@@ -99,13 +99,21 @@ const AccountBalance = memo(({ selectedAccount }: { selectedAccount: Account }) 
     }, [selectedAccount])
 
     return (
-        <View style={stylesAllTransaction.balanceContainer}>
+        <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={stylesAllTransaction.balanceContainer}
+        >
             <TextMalet style={stylesAllTransaction.balanceLabel}>Saldo Disponible</TextMalet>
-            <TextMalet style={stylesAllTransaction.balanceAmount}>
-                $ {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <TextMalet style={stylesAllTransaction.currencySymbol}>$</TextMalet>
+                <TextMalet style={stylesAllTransaction.balanceAmount}>
+                    {accountBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </TextMalet>
                 <TextMalet style={stylesAllTransaction.currency}> {selectedAccount.currency}</TextMalet>
-            </TextMalet>
-        </View>
+            </View>
+        </LinearGradient>
     );
 });
 
@@ -220,42 +228,51 @@ export default function GetAllTransaction() {
 
 const stylesAllTransaction = StyleSheet.create({
     balanceContainer: {
-        marginBottom: 16,
-        alignItems: 'center',
+        marginBottom: 5,
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        paddingVertical: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
     },
     balanceLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#868e96',
-        marginBottom: 4,
         fontWeight: '600',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: 1,
     },
     balanceAmount: {
-        fontSize: 26,
+        fontSize: 24,
         fontWeight: '700',
         color: '#212529',
         letterSpacing: -0.5,
     },
+    currencySymbol: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#868e96',
+        marginRight: 4,
+        transform: [{ translateY: -4 }],
+    },
     currency: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#adb5bd',
         fontWeight: '600',
+        marginLeft: 4,
     },
     cardContainer: {
-        marginBottom: 20,
+        marginBottom: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 10,
+        shadowRadius: 8,
+        elevation: 6,
     },
     gradient: {
-        borderRadius: 18,
-        paddingVertical: 15,
-        paddingHorizontal: 17,
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
         overflow: 'hidden',
     },
     wave: {
@@ -284,33 +301,33 @@ const stylesAllTransaction = StyleSheet.create({
     },
     bankName: {
         color: '#495057',
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     contactlessIcon: {
-        width: 20,
-        height: 20,
+        width: 18,
+        height: 18,
         justifyContent: 'center',
         alignItems: 'center',
         transform: [{ rotate: '90deg' }]
     },
-    contactlessRing1: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
-    contactlessRing2: { width: 17, height: 17, borderRadius: 8.5, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
-    contactlessRing3: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    contactlessRing1: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    contactlessRing2: { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
+    contactlessRing3: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.5)', position: 'absolute' },
     chip: {
-        width: 44,
-        height: 34,
-        borderRadius: 6,
-        marginBottom: 16,
-    },
-    cardNumberContainer: {
+        width: 36,
+        height: 28,
+        borderRadius: 4,
         marginBottom: 12,
     },
+    cardNumberContainer: {
+        marginBottom: 8,
+    },
     repAccountNumber: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#212529',
-        letterSpacing: 2.5,
+        letterSpacing: 2,
         fontFamily: 'monospace',
     },
     cardFooter: {
@@ -319,18 +336,18 @@ const stylesAllTransaction = StyleSheet.create({
         alignItems: 'flex-end',
     },
     cardHolder: {
-        fontSize: 10,
+        fontSize: 9,
         color: '#6C757D',
-        marginBottom: 4,
+        marginBottom: 2,
         letterSpacing: 1,
         fontWeight: '600',
     },
     cardName: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#212529',
         letterSpacing: 0.5,
-        maxWidth: 180,
+        maxWidth: 160,
     },
     transactionsList: { flex: 1 },
     listHeader: { fontSize: 18, fontWeight: '600', marginBottom: 10, },

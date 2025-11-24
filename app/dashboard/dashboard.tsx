@@ -31,64 +31,83 @@ const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Val
             <IconAt width={100} height={100} />
         </Animated.View>
         <TextMalet style={{ marginTop: 20 }}>Verificando sesión...</TextMalet>
-        <ActivityIndicator 
-            size="small" 
+        <ActivityIndicator
+            size="small"
             color={'rgb(10, 10, 10)'}
             style={{ marginTop: 20 }}
         />
     </Animated.View>
 ));
 
-const BalanceSection = memo(({ 
-    balance, 
-    onOpenModal 
-}: { 
-    balance: string, 
-    onOpenModal: () => void 
-}) => (
-    <View style={styles.balanceSection}>
-        <View style={styles.balanceContainer}>
-            <TouchableOpacity 
-                onPress={onOpenModal} 
-                style={styles.balanceTouchable}
-            >
-                <TextMalet style={styles.balanceLabel}>Balance</TextMalet>
-                <IconArrow width={18} height={18} />
-            </TouchableOpacity>
-            <ContainerDash style={styles.balanceValueContainer}>
-                <TextMalet style={styles.balanceValue}>{balance}</TextMalet>
-            </ContainerDash>
+const BalanceSection = memo((({
+    balance,
+    onOpenModal,
+    accountName,
+    accountNumber
+}: {
+    balance: string,
+    onOpenModal: () => void,
+    accountName: string,
+    accountNumber: string
+}) => {
+    const maskedAccountNumber = accountNumber.slice(0, 4) + ' ***';
+
+    return (
+        <View style={styles.balanceSection}>
+            <View style={styles.balanceContainer}>
+                {/* Account info outside the card */}
+                <TouchableOpacity
+                    onPress={onOpenModal}
+                    style={styles.accountHeader}
+                >
+                    <View style={styles.accountInfo}>
+                        <TextMalet style={styles.accountName} numberOfLines={1} ellipsizeMode="tail">
+                            {accountName}
+                        </TextMalet>
+                        <TextMalet style={styles.accountNumber}>
+                            {maskedAccountNumber}
+                        </TextMalet>
+                    </View>
+                    <IconArrow width={12} height={12} />
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={onOpenModal}>
+                    <View style={styles.balanceCard}>
+                        <TextMalet style={styles.balanceValue} numberOfLines={1}>{balance}</TextMalet>
+                    </View>
+                </TouchableOpacity>
+            </View>
+            <View style={styles.actionsContainer}>
+                <Link push href='/wallet/add?type=expense'>
+                    <IconMinus width={40} height={40} fill={'rgb(255, 114, 114)'} />
+                </Link>
+                <Link push href='/wallet/add?type=saving'>
+                    <IconPlus width={45} height={45} fill={'rgb(38, 219, 93)'} />
+                </Link>
+            </View>
         </View>
-        <View style={styles.actionsContainer}>
-            <Link push href='/wallet/add?type=expense'>
-                <IconMinus width={40} height={40} fill={'rgb(255, 114, 114)'} />
-            </Link>
-            <Link push href='/wallet/add?type=saving'>
-                <IconPlus width={45} height={45} fill={'rgb(38, 219, 93)'} />
-            </Link>
-        </View>
-    </View>
-));
+    );
+}));
 
 const DashboardHeader = memo(({ userName }: { userName: string }) => {
     const { width } = Dimensions.get('window');
-    
+
     const getTruncatedName = useCallback((name: string) => {
         const maxLength = Math.floor(width / 15);
-        const maxDisplayLength = Math.max(15, maxLength); 
-        
+        const maxDisplayLength = Math.max(15, maxLength);
+
         if (name.length > maxDisplayLength) {
             return `${name.slice(0, maxDisplayLength - 3)}...`;
         }
         return name;
     }, [width]);
-    
+
     const formattedDate = useMemo(() => {
-        const options = { 
-            weekday: 'long' as const, 
-            year: 'numeric' as const, 
-            month: 'long' as const, 
-            day: 'numeric' as const 
+        const options = {
+            weekday: 'long' as const,
+            year: 'numeric' as const,
+            month: 'long' as const,
+            day: 'numeric' as const
         };
         const dateStr = new Date().toLocaleDateString('es-ES', options);
         return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
@@ -107,7 +126,7 @@ const DashboardHeader = memo(({ userName }: { userName: string }) => {
                         <IconVerified width={20} height={20} fill="rgba(94, 94, 94, 1)" />
                     </View>
                 </View>
-            
+
                 <TextMalet style={{ color: 'rgb(95, 95, 95)', fontSize: 14 }}>
                     {formattedDate}
                 </TextMalet>
@@ -116,47 +135,47 @@ const DashboardHeader = memo(({ userName }: { userName: string }) => {
             <View style={styles.iconsContainer}>
 
                 <ContainerDash>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconAt width={18} height={18} />
                     </TouchableOpacity>
                 </ContainerDash>
 
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconAI width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
 
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconNotes width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
 
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconBudget width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
 
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconFiles width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
 
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconWarning width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
                 <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => {}}>
+                    <TouchableOpacity onPress={() => { }}>
                         <IconWarning width={18} height={18} fill="#313131ff" />
                     </TouchableOpacity>
                 </ContainerDash>
             </View>
-            
+
         </View>
     );
 });
@@ -165,7 +184,7 @@ export default function Dashboard() {
     const { user, verifySession } = useAuthStore();
     const { previewTransactions, getPreviewTransactions, error, loading } = useWalletStore();
     const { selectedAccount } = useAccountStore();
-    
+
     const [loadingSession, setLoadingSession] = useState(false);
     const [modalAccountsVisible, setModalAccountsVisible] = useState(false);
 
@@ -229,45 +248,47 @@ export default function Dashboard() {
     }, []);
 
     const formattedBalance = useMemo(() => {
-        return selectedAccount 
+        return selectedAccount
             ? `${selectedAccount.balance.toFixed(2)} ${selectedAccount.currency}`
             : 'General';
     }, [selectedAccount]);
 
     useEffect(() => {
         verifyUserSession();
-        
+
         return () => {
             fadeAnim.setValue(0);
             logoFadeAnim.setValue(0);
         };
     }, [verifyUserSession, fadeAnim, logoFadeAnim]);
-    
+
     useEffect(() => {
         loadTransactions();
     }, [loadTransactions]);
-    
+
     useEffect(() => {
         if (error) {
             Alert.alert('Malet | Error', error);
         }
     }, [error]);
-    
+
     if (loadingSession) {
         return <LoadingScreen fadeAnim={fadeAnim} logoFadeAnim={logoFadeAnim} />;
     }
-    
+
     return (
         <LayoutAuthenticated>
             <View style={styles.container}>
                 <DashboardHeader userName={user?.name || ''} />
-                
-                <BalanceSection 
-                    balance={formattedBalance} 
-                    onOpenModal={handleOpenModal} 
+
+                <BalanceSection
+                    balance={formattedBalance}
+                    onOpenModal={handleOpenModal}
+                    accountName={selectedAccount?.name || 'General'}
+                    accountNumber={selectedAccount?.id || '0000'}
                 />
 
-                <FlatList 
+                <FlatList
                     data={previewTransactions}
                     keyExtractor={(item) => item.id.toString()}
                     showsVerticalScrollIndicator={false}
@@ -288,12 +309,12 @@ export default function Dashboard() {
                 />
 
                 <View style={styles.viewAllTransactions}>
-                    <Button text="Ver todas las transacciones" onPress={handleViewAllTransactions} 
-                    style={{ width: '100%' }}
+                    <Button text="Ver todas las transacciones" onPress={handleViewAllTransactions}
+                        style={{ width: '100%' }}
                     />
                 </View>
             </View>
-            
+
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
         </LayoutAuthenticated>
     );
@@ -337,7 +358,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
     },
-     iconsContainer: {
+    iconsContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flexShrink: 0,
@@ -352,25 +373,46 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     balanceContainer: {
-        gap: 5,
         flex: 1,
+        gap: 6,
     },
-    balanceTouchable: {
+    accountHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        justifyContent: 'space-between',
+        gap: 6,
     },
-    balanceLabel: {
-        fontSize: 16,
+    accountInfo: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    accountName: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: 'rgba(60, 60, 60, 1)',
+        flexShrink: 1,
+    },
+    accountNumber: {
+        fontSize: 11,
         fontWeight: '500',
+        color: 'rgba(120, 120, 120, 0.8)',
+        letterSpacing: 0.5,
     },
-    balanceValueContainer: {
-        width: '100%',
-        paddingVertical: 10,
+    balanceCard: {
+        backgroundColor: 'rgb(250, 250, 250)',
+        borderRadius: 10,
+        padding: 8,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.08)',
     },
     balanceValue: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
+        color: 'rgba(20, 20, 20, 1)',
+        letterSpacing: -0.3,
     },
     actionsContainer: {
         flexDirection: 'row',

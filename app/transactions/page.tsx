@@ -1,361 +1,415 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
+import { useAccountStore } from '@/shared/stores/useAccountStore';
+import { useWalletStore } from '@/shared/stores/useWalletStore';
 import { colors, spacing } from '@/shared/theme';
+import IconAt from '@/svgs/dashboard/IconAt';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-// Format date using native JavaScript
-
-interface Transaction {
-  id: string;
-  name: string;
-  amount: string;
-  type: 'expense' | 'income';
-  category: string;
-  issued_at: string;
-  description?: string;
-  account?: string;
-  payment_method?: string;
-}
-
-const MOCK_TRANSACTION: Transaction = {
-  id: '1',
-  name: 'Compra en supermercado',
-  amount: '125.99',
-  type: 'expense',
-  category: 'Compras',
-  account: 'Cuenta Principal',
-  payment_method: 'Tarjeta de Crédito',
-  issued_at: new Date().toISOString(),
-  description: 'Compra semanal de víveres en el supermercado incluyendo frutas, verduras y productos de limpieza.',
-};
-
-const DetailRow = ({ 
-  label, 
-  value, 
-  icon, 
-  isLast = false 
-}: { 
-  label: string; 
-  value: string; 
-  icon?: string;
-  isLast?: boolean;
-}) => (
-  <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
-    <View style={styles.detailLabelContainer}>
-      {icon && (
-        <MaterialIcons 
-          name={icon as any} 
-          size={20} 
-          color={colors.text.secondary} 
-          style={styles.detailIcon}
-        />
-      )}
-      <TextMalet style={styles.detailLabel}>
-        {label}
-      </TextMalet>
-    </View>
-    <TextMalet style={styles.detailValue} numberOfLines={2}>
-      {value}
-    </TextMalet>
-  </View>
-);
+import { Alert, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function TransactionDetail() {
-  const { id } = useLocalSearchParams();
-  
-  // In a real app, you would fetch the transaction data using the ID
-  const transaction = MOCK_TRANSACTION;
+  const { transaction_id } = useLocalSearchParams();
+  const router = useRouter();
+  const { transactions } = useWalletStore();
+  const { accounts } = useAccountStore();
+  const transaction = transactions.find(t => t.id.toString() === transaction_id);
+  const account = accounts.find(a => a.id === transaction?.account_id);
+
+  if (!transaction) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Stack.Screen options={{ title: 'Detalle' }} />
+        <MaterialIcons name="error-outline" size={48} color={colors.text.secondary} />
+        <TextMalet style={styles.notFoundText}>Transacción no encontrada</TextMalet>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TextMalet style={styles.backButtonText}>Volver</TextMalet>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const isExpense = transaction.type === 'expense';
-  const amountColor = isExpense ? colors.error.main : colors.success.main;
-  
-  const formatDate = (dateString: string) => {
+  const statusColor = isExpense ? colors.error.main : colors.success.main;
+  const statusBg = isExpense ? '#FFEBEE' : '#E8F5E9';
+  const statusIcon = isExpense ? 'arrow-upward' : 'check';
+  const statusText = isExpense ? 'GASTO REALIZADO' : 'INGRESO COMPLETADO';
+
+  const amountParts = parseFloat(transaction.amount).toFixed(2).split('.');
+  const amountInteger = amountParts[0];
+  const amountDecimal = amountParts[1];
+
+  const formatDate = (dateString: Date | string) => {
     const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
+    return date.toLocaleString('es-ES', {
       day: 'numeric',
+      month: 'short',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
-    };
-    
-    // Format the date in Spanish
-    return date.toLocaleDateString('es-ES', options)
-      .replace(/(\d+):(\d+)/, (_, h, m) => `${h.padStart(2, '0')}:${m} ${+h >= 12 ? 'PM' : 'AM'}`)
-      .replace(/^([^,]+),/, (match) => {
-        // Capitalize first letter of weekday
-        return match.charAt(0).toUpperCase() + match.slice(1);
-      });
+      hour12: false
+    }).replace(',', ' -');
   };
 
-  const handleEdit = () => {
-    // Handle edit action
+  const formatAccountInfo = () => {
+    if (!account) return 'Desconocida';
+    const maskedId = account.id.slice(0, 4) + ' ****';
+    return `${account.name} • ${maskedId}`;
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Comprobante de transacción Malet\n\nMonto: $${transaction.amount}\nFecha: ${formatDate(transaction.issued_at)}\nRef: ${transaction.id}`,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo compartir la transacción');
+    }
+  };
+
+  const handleCopyId = () => {
+    // In a real app with expo-clipboard: await Clipboard.setStringAsync(transaction.id.toString());
+    Alert.alert('Copiado', `ID ${transaction.id} copiado al portapapeles`);
   };
 
   const handleDelete = () => {
-    // Handle delete action
+    Alert.alert('Eliminar', '¿Estás seguro de que deseas eliminar esta transacción?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => console.log('Delete') }
+    ]);
   };
+
+  const gradientColors = isExpense
+    ? ['rgba(255, 82, 82, 0.12)', 'rgba(255, 82, 82, 0)'] as const
+    : ['rgba(120, 255, 165, 0.12)', 'rgba(141, 255, 184, 0)'] as const;
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <Stack.Screen
-        options={{
-          title: 'Detalle de transacción',
-          headerTitleStyle: {
-            fontFamily: 'Onest',
-            fontWeight: '600',
-          },
-          headerBackTitle: 'Atrás',
-        }}
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.topGradient}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
       />
-      
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.amountContainer}>
-          <View style={[styles.iconContainer, { backgroundColor: `${amountColor}15` }]}>
-            <MaterialIcons 
-              name={isExpense ? 'shopping-cart' : 'savings'} 
-              size={28} 
-              color={amountColor} 
-            />
-          </View>
-          
-          <TextMalet style={[styles.amount, { color: amountColor }]}>
-            {isExpense ? '-' : '+'} ${parseFloat(transaction.amount).toFixed(2)}
-          </TextMalet>
-          
-          <TextMalet style={styles.transactionType}>
-            {isExpense ? 'Gasto' : 'Ingreso'} • {transaction.category}
-          </TextMalet>
-          
-          <TextMalet style={styles.transactionDate}>
-            {formatDate(transaction.issued_at)}
-          </TextMalet>
-        </View>
-        
-        <View style={styles.detailsContainer}>
-          <TextMalet style={styles.sectionTitle}>Detalles de la transacción</TextMalet>
-          
-          <DetailRow 
-            label="Descripción" 
-            value={transaction.name} 
-            icon="description"
-          />
-          
-          <DetailRow 
-            label="Categoría" 
-            value={transaction.category} 
-            icon="category"
-          />
-          
-          <DetailRow 
-            label="Cuenta" 
-            value={transaction.account || 'No especificada'} 
-            icon="account-balance-wallet"
-          />
-          
-          <DetailRow 
-            label="Método de pago" 
-            value={transaction.payment_method || 'No especificado'}
-            icon="credit-card"
-            isLast
-          />
-        </View>
-        
-        {transaction.description && (
-          <View style={[styles.detailsContainer, styles.descriptionContainer]}>
-            <TextMalet style={styles.sectionTitle}>Notas</TextMalet>
-            <View style={styles.descriptionBox}>
-              <TextMalet style={styles.description}>
-                {transaction.description}
-              </TextMalet>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          {/* Header Section */}
+          <View style={styles.cardHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, position: 'relative' }}>
+              <View style={[styles.statusIconContainer, { backgroundColor: statusBg }]}>
+                <MaterialIcons name={statusIcon} size={32} color={statusColor} />
+              </View>
+
+              <View style={{
+                position: 'absolute', right: 0,
+                bottom: 15, backgroundColor: 'rgba(255, 255, 255, 1)',
+                padding: 4, borderRadius: 100,
+                borderRightWidth: 1,
+                borderRightColor: '#aaaaaadc',
+                borderLeftWidth: 1,
+                borderLeftColor: '#aaaaaadc',
+                borderTopWidth: 1,
+                borderTopColor: '#aaaaaadc',
+                borderBottomWidth: 1,
+                borderBottomColor: '#aaaaaadc',
+              }}>
+                <IconAt height={18} width={18} fill={"#252525ff"} />
+              </View>
+            </View>
+
+            <TextMalet style={[styles.statusText, { color: statusColor }]}>
+              {statusText}
+            </TextMalet>
+
+            <View style={styles.amountContainer}>
+              <TextMalet style={styles.currencySymbol}>$</TextMalet>
+              <TextMalet style={styles.amountInteger}>{amountInteger}</TextMalet>
+              <TextMalet style={styles.amountDecimal}>.{amountDecimal}</TextMalet>
+            </View>
+
+            <TextMalet style={styles.subtitle} numberOfLines={1}>
+              {transaction.name}
+            </TextMalet>
+
+            <View style={styles.securityContainer}>
+              <View style={styles.securityPill}>
+                <TextMalet style={styles.securityText}>
+                  Esta transacción ha sido verificada por
+                </TextMalet>
+                <MaskedView
+                  style={styles.maskedView}
+                  maskElement={
+                    <TextMalet style={styles.securityBrandText}>
+                      BRD-Secure
+                    </TextMalet>
+                  }
+                >
+                  <LinearGradient
+                    colors={['#ff766cff', '#9477ffff']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ flex: 1 }}
+                  />
+                </MaskedView>
+              </View>
             </View>
           </View>
-        )}
-      </ScrollView>
-      
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.editButton]}
-          onPress={handleEdit}
-        >
-          <MaterialIcons name="edit" size={20} color="#fff" />
-          <TextMalet style={styles.actionButtonText}>Editar</TextMalet>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={handleDelete}
-        >
-          <MaterialIcons name="delete" size={20} color="#fff" />
-          <TextMalet style={styles.actionButtonText}>Eliminar</TextMalet>
-        </TouchableOpacity>
-      </View>
-    </View>
+
+          {/* Details Section */}
+          <View style={styles.detailsSection}>
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>Fecha y Hora</TextMalet>
+              <TextMalet style={styles.detailValue}>{formatDate(transaction.issued_at)}</TextMalet>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>Cuenta</TextMalet>
+              <View style={styles.accountValueContainer}>
+                <MaterialIcons name="account-balance-wallet" size={16} color={colors.text.secondary} style={{ marginRight: 4 }} />
+                <TextMalet style={styles.detailValue}>{formatAccountInfo()}</TextMalet>
+              </View>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>ID de Referencia</TextMalet>
+              <TextMalet style={styles.detailValue} numberOfLines={1} ellipsizeMode="middle">
+                {transaction.id}
+              </TextMalet>
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>Tipo</TextMalet>
+              <TextMalet style={styles.detailValue}>{isExpense ? 'Gasto' : 'Ingreso'}</TextMalet>
+            </View>
+
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>Etiquetas</TextMalet>
+              <TextMalet style={styles.detailValue}>{'Etiqueta 1, Etiqueta 2'}</TextMalet>
+            </View>
+          </View>
+
+          {/* Actions Section */}
+          <View style={styles.actionsSection}>
+            <TouchableOpacity style={styles.copyButton} onPress={handleCopyId}>
+              <MaterialIcons name="content-copy" size={20} color={colors.text.primary} />
+              <TextMalet style={styles.copyButtonText}>Copiar ID de Transacción</TextMalet>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+              <MaterialIcons name="share" size={20} color="#fff" />
+              <TextMalet style={styles.shareButtonText}>Compartir Recibo</TextMalet>
+            </TouchableOpacity>
+          </View>
+
+        </View>
+      </ScrollView >
+    </View >
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  amountContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.large,
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: spacing.medium,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
   },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+  topGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 150,
+  },
+  centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.medium,
+    padding: spacing.large,
   },
-  amount: {
-    fontSize: 40,
-    fontWeight: '700',
-    marginBottom: spacing.xsmall / 2,
-    fontFamily: 'Onest',
+  scrollContent: {
+    paddingTop: 60,
+    paddingBottom: 40,
   },
-  transactionType: {
-    fontSize: 15,
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  notFoundText: {
+    fontSize: 16,
     color: colors.text.secondary,
-    marginBottom: spacing.xsmall / 2,
-    textTransform: 'capitalize',
-    fontFamily: 'Onest',
   },
-  transactionDate: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontFamily: 'Onest',
+  backButton: {
+    padding: spacing.small,
   },
-  detailsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: spacing.medium,
-    marginBottom: spacing.medium,
-    marginHorizontal: spacing.medium,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  sectionTitle: {
+  backButtonText: {
+    color: colors.primary.main,
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.medium,
-    fontFamily: 'Onest',
+  },
+  card: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 24,
+    minHeight: '100%',
+  },
+  cardHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statusIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  currencySymbol: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#212529',
+    marginTop: 6,
+    marginRight: 2,
+  },
+  amountInteger: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#212529',
+    letterSpacing: -1,
+  },
+  amountDecimal: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#868e96',
+    marginTop: 6,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#495057',
+    textAlign: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F1F3F5',
+    marginVertical: 20,
+    width: '100%',
+  },
+  detailsSection: {
+    marginBottom: 24,
   },
   detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.medium,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  detailRowLast: {
-    borderBottomWidth: 0,
-    paddingBottom: 0,
-  },
-  detailLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  detailIcon: {
-    marginRight: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    gap: 4,
   },
   detailLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    fontFamily: 'Onest',
-  },
-  detailValue: {
-    fontSize: 15,
-    color: colors.text.primary,
-    textAlign: 'right',
-    marginLeft: spacing.medium,
-    fontFamily: 'Onest',
+    fontSize: 13,
+    color: '#868e96',
     fontWeight: '500',
   },
-  descriptionContainer: {
-    marginTop: 0,
-    marginHorizontal: spacing.medium,
+  detailValue: {
+    fontSize: 16,
+    color: '#212529',
+    fontWeight: '600',
   },
-  descriptionBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: spacing.medium,
-  },
-  description: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 22,
-    fontFamily: 'Onest',
-  },
-  footer: {
+  accountValueContainer: {
     flexDirection: 'row',
-    padding: spacing.medium,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
-    ...Platform.select({
-      ios: {
-        paddingBottom: spacing.large,
-      },
-    }),
+    alignItems: 'center',
   },
-  actionButton: {
-    flex: 1,
+  separator: {
+    height: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  actionsSection: {
+    gap: 12,
+  },
+  copyButton: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.medium,
-    borderRadius: 12,
-    marginHorizontal: spacing.small,
+    gap: 8,
   },
-  editButton: {
-    backgroundColor: colors.primary.main,
-  },
-  deleteButton: {
-    backgroundColor: colors.error.main,
-  },
-  actionButtonText: {
-    color: '#fff',
-    marginLeft: spacing.small,
-    fontWeight: '600',
+  copyButtonText: {
     fontSize: 15,
-    fontFamily: 'Onest',
+    fontWeight: '600',
+    color: '#495057',
+  },
+  shareButton: {
+    backgroundColor: '#252525ff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: "#ff7d5cff",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  shareButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  securityContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 15,
+  },
+  securityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f7f7f7ee',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+    gap: 6,
+  },
+  securityText: {
+    fontSize: 12,
+    color: '#252525ea',
+  },
+  maskedView: {
+    height: 15,
+    width: 65,
+  },
+  securityBrandText: {
+    fontSize: 12,
+    fontWeight: '700',
+    backgroundColor: 'transparent',
   },
 });
+
+
