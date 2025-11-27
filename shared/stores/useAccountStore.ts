@@ -12,10 +12,11 @@ interface AccountStore {
     setAccounts: (account: Account) => void;
     selectedAccount: Account | null;
     setSelectedAccount: (account: Account | null) => void;
-    
+
     // Methods
     createAccount: (account: Omit<Account, 'created_at' | 'updated_at' | 'id'>) => Promise<Account>
-    getAllAccountsByUserId: (user_id: string) => Promise<void>
+    updateAccount: (account_id: string, account: Partial<Omit<Account, 'id' | 'created_at' | 'updated_at' | 'user_id'>>) => Promise<Account>
+    getAllAccountsByUserId: () => Promise<void>
     updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => void
     logoutAccount: () => void
 }
@@ -30,7 +31,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     selectedAccount: null,
     setSelectedAccount: (account: Account | null) => set({ selectedAccount: account }),
 
-    
+
     createAccount: async (account: Omit<Account, 'created_at' | 'updated_at' | 'id'>) => {
         const { error, response } = await secureFetch({
             url: MALET_API_URL + '/accounts/create',
@@ -49,22 +50,54 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         return response;
     },
 
-    getAllAccountsByUserId: async (user_id: string) => {
-        get().setError(null)
+    updateAccount: async (account_id: string, account: Partial<Omit<Account, 'id' | 'created_at' | 'updated_at' | 'user_id'>>) => {
+        set({
+            loading: true,
+            error: null
+        })
+
         const { error, response } = await secureFetch({
-            url: `${MALET_API_URL}/accounts/get/all/${user_id}`,
-            method: 'GET',
+            url: `${MALET_API_URL}/accounts/update/${account_id}`,
+            method: 'PUT',
+            body: JSON.stringify(account),
             setLoading: get().setLoading
-        }) 
+        })
 
         if (error) {
-            get().setError(error)
+            set({ error })
+            return null
         }
 
-        get().setError(null);
+        set({ error: null, loading: false })
+
+        const updatedAccounts = get().accounts.map(acc =>
+            acc.id === account_id ? { ...acc, ...response } : acc
+        );
+        set({ accounts: updatedAccounts });
+
+        if (get().selectedAccount?.id === account_id) {
+            set({ selectedAccount: { ...get().selectedAccount!, ...response } });
+        }
+
+        return response;
+    },
+
+    getAllAccountsByUserId: async () => {
         set({
-            accounts: response
-        });
+            loading: true,
+            error: null
+        })
+        const { error, response } = await secureFetch({
+            url: `${MALET_API_URL}/accounts/get/all`,
+            method: 'GET',
+            setLoading: get().setLoading
+        })
+
+        if (error) {
+            set({ error })
+        }
+
+        set({ error: null, accounts: response });
     },
 
     updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => {
@@ -72,16 +105,16 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         const updatedAccounts = accounts.map(acc => {
             if (acc.id === account_id) {
 
-            set({
-                selectedAccount: {
+                set({
+                    selectedAccount: {
+                        ...acc,
+                        balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
+                    }
+                })
+                return {
                     ...acc,
                     balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
                 }
-            })
-            return {
-                ...acc,
-                balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
-            }
             }
             return acc;
         })
