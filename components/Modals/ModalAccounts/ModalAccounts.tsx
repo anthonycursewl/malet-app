@@ -8,24 +8,24 @@ import IconAt from "@/svgs/dashboard/IconAt";
 import IconPlus from "@/svgs/dashboard/IconPlus";
 import IconReload from "@/svgs/dashboard/IconReload";
 import { router } from "expo-router";
-import React, { memo, useCallback, useEffect, useState, useRef } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
+    Animated,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
-    View,
-    Animated
+    View
 } from "react-native";
 import { AccountItem } from "./AccountItem";
 
 interface ModalAccountsProps {
-  visible: boolean;
-  onClose: () => void;
+    visible: boolean;
+    onClose: () => void;
 }
 
 const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [hasLoadError, setHasLoadError] = useState(false);
     const spinValue = useRef(new Animated.Value(0)).current;
     const isMounted = useRef(true);
     const isLoadingRef = useRef(false);
@@ -45,14 +45,15 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
 
     const loadAccounts = useCallback(async (forceRefresh = false) => {
         if (!user?.id || isLoadingRef.current) return;
-        
+
         if (accounts.length > 0 && !forceRefresh) return;
-        
+
         try {
             isLoadingRef.current = true;
-            
+            setHasLoadError(false);
+
             const shouldShowLoading = forceRefresh || accounts.length === 0;
-            
+
             if (shouldShowLoading) {
                 setIsRefreshing(true);
                 spinValue.setValue(0);
@@ -64,26 +65,30 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                     })
                 ).start();
             }
-            
-            await getAllAccountsByUserId(user.id);
-            
+
+            await getAllAccountsByUserId();
+
             if (isMounted.current) {
                 spinValue.stopAnimation();
                 spinValue.setValue(0);
                 setIsRefreshing(false);
                 isLoadingRef.current = false;
+
+                if (error) {
+                    setHasLoadError(true);
+                }
             }
         } catch (err) {
             console.error('Error loading accounts:', err);
             if (isMounted.current) {
-                Alert.alert('Error', 'No se pudieron cargar las cuentas');
+                setHasLoadError(true);
                 setIsRefreshing(false);
                 isLoadingRef.current = false;
                 spinValue.stopAnimation();
                 spinValue.setValue(0);
             }
         }
-    }, [getAllAccountsByUserId, user?.id, spinValue]);
+    }, [getAllAccountsByUserId, user?.id, spinValue, error]);
 
     const handleRefresh = useCallback(() => {
         loadAccounts(true);
@@ -91,24 +96,18 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
 
     useEffect(() => {
         isMounted.current = true;
-        
+
         if (visible) {
             if (accounts.length === 0) {
                 loadAccounts(false);
             }
         }
-        
+
         return () => {
             isMounted.current = false;
             spinValue.stopAnimation();
         };
     }, [visible, loadAccounts, spinValue, accounts.length]);
-
-    useEffect(() => {
-        if (error) {
-            Alert.alert('Error al cargar cuentas', error);
-        }
-    }, [error]);
 
     const handleAccountPress = useCallback((account: Account) => {
         setSelectedAccount(account);
@@ -120,6 +119,17 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
 
         setTimeout(() => {
             router.push('/accounts/create');
+        }, 300);
+    }, [onClose, router]);
+
+    const handleAccountLongPress = useCallback((account: Account) => {
+        onClose();
+
+        setTimeout(() => {
+            router.push({
+                pathname: '/accounts/edit',
+                params: { accountId: account.id }
+            });
         }, 300);
     }, [onClose, router]);
 
@@ -144,9 +154,34 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
             return renderSkeleton();
         }
 
+        if (hasLoadError && accounts.length === 0) {
+            return (
+                <View style={styles.errorContainer}>
+                    <View style={styles.errorIconContainer}>
+                        <TextMalet style={styles.errorIcon}>⚠️</TextMalet>
+                    </View>
+                    <TextMalet style={styles.errorTitle}>
+                        Error al cargar cuentas
+                    </TextMalet>
+                    <TextMalet style={styles.errorMessage}>
+                        No se pudieron cargar tus cuentas. Por favor, verifica tu conexión e intenta nuevamente.
+                    </TextMalet>
+                    <TouchableOpacity
+                        style={styles.retryButton}
+                        onPress={() => loadAccounts(true)}
+                    >
+                        <IconReload width={18} height={18} fill="#fff" />
+                        <TextMalet style={styles.retryButtonText}>
+                            Intentar de nuevo
+                        </TextMalet>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
         if (accounts && accounts.length > 0) {
             return (
-                <ScrollView 
+                <ScrollView
                     style={styles.accountsList}
                     showsVerticalScrollIndicator={false}
                 >
@@ -155,6 +190,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                             key={account.id}
                             account={account}
                             onPress={handleAccountPress}
+                            onLongPress={handleAccountLongPress}
                             isLast={index === accounts.length - 1}
                         />
                     ))}
@@ -163,21 +199,29 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
         }
 
         return (
-            <View style={styles.centeredContent}>
-                <TextMalet style={styles.emptyText}>
-                    No tienes cuentas registradas.
+            <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyIconContainer}>
+                    <IconAt width={60} height={60} fill="#ccc" />
+                </View>
+                <TextMalet style={styles.emptyTitle}>
+                    No tienes cuentas
                 </TextMalet>
-                <TouchableOpacity 
-                    style={styles.addButton}
+                <TextMalet style={styles.emptyMessage}>
+                    Crea tu primera cuenta para comenzar a gestionar tus finanzas
+                </TextMalet>
+                <TouchableOpacity
+                    style={styles.createAccountButton}
                     onPress={handleCreateAccount}
+                    activeOpacity={0.8}
                 >
-                    <TextMalet style={styles.addButtonText}>
-                        Crear mi primera cuenta
+                    <IconPlus width={20} height={20} fill="#fff" />
+                    <TextMalet style={styles.createAccountButtonText}>
+                        Crear cuenta
                     </TextMalet>
                 </TouchableOpacity>
             </View>
         );
-    }, [loading, accounts, handleAccountPress, handleCreateAccount, isRefreshing]);
+    }, [loading, accounts, handleAccountPress, handleCreateAccount, isRefreshing, hasLoadError, loadAccounts, handleAccountLongPress]);
 
     return (
         <ModalOptions
@@ -185,30 +229,34 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
             onClose={onClose}
         >
             <View style={styles.container}>
-                <View style={styles.header}>
-                    <View style={styles.headerTitleContainer}>
-                        <IconAt width={20} height={20} />
-                        <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
+                <View style={styles.headerContainer}>
+                    <View style={styles.header}>
+                        <View style={styles.headerTitleContainer}>
+                            <IconAt width={20} height={20} />
+                            <TextMalet style={styles.headerTitle}>Seleccionar cuenta</TextMalet>
+                        </View>
+
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                onPress={handleRefresh}
+                                disabled={isRefreshing || loading}
+                                style={styles.reloadButton}
+                            >
+                                <Animated.View style={[styles.reloadIconContainer, { transform: [{ rotate: spin }] }]}>
+                                    <IconReload
+                                        width={22}
+                                        height={22}
+                                        fill={(isRefreshing || loading) ? '#ccc' : 'rgba(29, 29, 29, 1)'}
+                                    />
+                                </Animated.View>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleCreateAccount}>
+                                <IconPlus width={25} height={25} fill={'rgba(29, 29, 29, 1)'} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
-                    <View style={styles.headerActions}>
-                        <TouchableOpacity 
-                            onPress={handleRefresh} 
-                            disabled={isRefreshing || loading}
-                            style={styles.reloadButton}
-                        >
-                            <Animated.View style={[styles.reloadIconContainer, { transform: [{ rotate: spin }] }]}>
-                                <IconReload 
-                                    width={22} 
-                                    height={22} 
-                                    fill={(isRefreshing || loading) ? '#ccc' : 'rgba(29, 29, 29, 1)'} 
-                                />
-                            </Animated.View>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleCreateAccount}>
-                            <IconPlus width={25} height={25} fill={'rgba(29, 29, 29, 1)'} />
-                        </TouchableOpacity>
-                    </View>
+                    <TextMalet style={styles.descriptionText}>Para editar una cuenta, manten presionando sobre la cuenta.</TextMalet>
                 </View>
 
                 {renderContent()}
@@ -221,10 +269,17 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    descriptionText: {
+        marginTop: spacing.small - 2,
+        fontSize: 12,
+        color: '#666',
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    headerContainer: {
         paddingBottom: spacing.medium,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
@@ -287,23 +342,95 @@ const styles = StyleSheet.create({
     accountsList: {
         flex: 1,
     },
-    emptyText: {
-        fontSize: 16,
+    emptyStateContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: spacing.large,
+    },
+    emptyIconContainer: {
+        marginBottom: spacing.medium,
+        opacity: 0.5,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1a1a1a',
+        textAlign: 'center',
+        marginBottom: spacing.small,
+    },
+    emptyMessage: {
+        fontSize: 14,
         color: '#666',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: spacing.large,
+        lineHeight: 20,
+        maxWidth: 280,
     },
-    addButton: {
-        backgroundColor: '#4A90E2',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-        marginTop: 16,
+    createAccountButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#000',
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
-    addButtonText: {
+    createAccountButtonText: {
         color: '#fff',
         fontWeight: '600',
+        fontSize: 15,
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: spacing.large,
+        paddingVertical: spacing.xlarge,
+    },
+    errorIconContainer: {
+        marginBottom: spacing.medium,
+    },
+    errorIcon: {
+        fontSize: 48,
+    },
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1a1a1a',
+        marginBottom: spacing.small,
+        textAlign: 'center',
+    },
+    errorMessage: {
         fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: spacing.large,
+        lineHeight: 20,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#4A90E2',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 15,
     },
 });
 

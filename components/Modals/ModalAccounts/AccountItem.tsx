@@ -8,16 +8,18 @@ interface AccountItemProps {
   account: Account;
   onPress: (account: Account) => void;
   isLast?: boolean;
+  onLongPress?: (account: Account) => void;
 }
 
-export const AccountItem = memo(({ account, onPress, isLast }: AccountItemProps) => {
+export const AccountItem = memo(({ account, onPress, isLast, onLongPress }: AccountItemProps) => {
   const { name, balance } = account;
-  
+
   return (
     <TouchableOpacity
       style={[styles.container, isLast && styles.noBorder]}
       onPress={() => onPress(account)}
       activeOpacity={0.7}
+      onLongPress={() => onLongPress?.(account)}
     >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
