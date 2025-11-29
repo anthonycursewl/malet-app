@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             method: 'POST',
             body: JSON.stringify(user),
             setLoading: get().setLoading,
-        }) 
+        })
 
         if (error) {
             get().setError(error);
@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             method: 'POST',
             body: JSON.stringify(credentials),
             setLoading: get().setLoading,
-        }) 
+        })
 
         if (error) {
             get().setError(error);
@@ -97,19 +97,19 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             url: MALET_API_URL + '/auth/verify',
             method: 'GET',
             setLoading: get().setLoading,
-        }) 
+        })
 
         if (error) {
             await AsyncStorage.removeItem('token');
-            get().setError(error);
+            set({ error });
             return false;
         }
 
-        get().setUser(response);
         set({
-            error: null
+            error: null,
+            user: response
         })
         return true;
     }
-    
+
 }))

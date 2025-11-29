@@ -3,43 +3,53 @@ import Button from "@/components/Button/Button";
 import Input from "@/components/Input/Input";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import TextMalet from "@/components/TextMalet/TextMalet";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 // interfaces and hooks
 import { Account } from "@/shared/entities/Account";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useEffect, useState } from "react";
-// svgs
-import AccountCard from "@/components/AccountCard/AccountCard";
+// services and stores
+import { AccountCard } from "@/components/AccountCard/AccountCard";
 import ModalCurrencies from "@/components/CardCurrencies/CardCurrencies";
 import { currencies } from "@/shared/entities/Currencies";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
-export default function Create() {
+export default function EditAccount() {
+    const { accountId } = useLocalSearchParams<{ accountId: string }>();
     const { user } = useAuthStore();
-    const { createAccount, loading, error } = useAccountStore()
+    const { updateAccount, loading, error, accounts } = useAccountStore();
+    const [modalCurrencyOpen, setModalCurrencyOpen] = useState(false);
 
     const [balanceInput, setBalanceInput] = useState('');
-    const [accountDetails, setAccountDetails] = useState<Omit<Account, 'created_at' | 'updated_at' | 'id'>>({
+    const [accountDetails, setAccountDetails] = useState<Partial<Omit<Account, 'id' | 'created_at' | 'updated_at' | 'user_id'>>>({
         name: '',
         balance: 0,
         currency: '',
-        user_id: user.id
+        icon: undefined,
     });
-    const [modalCurrencyOpen, setModalCurrencyOpen] = useState(false);
 
-    const handleCurrencySelect = (currency: typeof currencies[0]) => {
-        setAccountDetails(prev => ({ ...prev, currency: currency.name }));
-        setModalCurrencyOpen(false);
-    };
+    // Load account data
+    useEffect(() => {
+        if (accountId && accounts.length > 0) {
+            const account = accounts.find(acc => acc.id === accountId);
+            if (account) {
+                setAccountDetails({
+                    name: account.name,
+                    balance: account.balance,
+                    currency: account.currency,
+                    icon: account.icon
+                });
+                setBalanceInput(account.balance.toString());
+            }
+        }
+    }, [accountId, accounts]);
 
     useEffect(() => {
         if (error) {
-            Alert.alert('Malet | Error', error)
+            Alert.alert('Malet | Error', error);
         }
-    }, [error])
-
-    let accountNumber = '123456789012';
+    }, [error]);
 
     const handleTextChange = (field: 'name' | 'currency', value: string) => {
         setAccountDetails(prev => ({ ...prev, [field]: value }));
@@ -63,22 +73,37 @@ export default function Create() {
         setAccountDetails(prev => ({ ...prev, balance: numericValue }));
     };
 
+    const handleCurrencySelect = (currency: typeof currencies[0]) => {
+        setAccountDetails(prev => ({ ...prev, currency: currency.name }));
+        setModalCurrencyOpen(false);
+    };
 
     const submit = async () => {
         if (!accountDetails.name || !accountDetails.currency) {
-            alert("Por favor, completa el nombre y el tipo de moneda.");
+            Alert.alert("Error", "Por favor, completa el nombre y el tipo de moneda.");
             return;
         }
-        console.log("Enviando datos de la cuenta:", accountDetails);
-        const account = await createAccount(accountDetails)
-        if (account) {
-            Alert.alert('Malet | Éxito!', 'Tu cuenta ha sido creada correctamente!')
 
-            if (router.canGoBack()) {
-                router.back()
-            }
+        if (!accountId) {
+            Alert.alert("Error", "No se encontró el ID de la cuenta.");
+            return;
         }
 
+        console.log("Actualizando cuenta:", accountDetails);
+        const updatedAccount = await updateAccount(accountId, accountDetails);
+
+        if (updatedAccount) {
+            Alert.alert(
+                'Malet | Éxito!',
+                'Tu cuenta ha sido actualizada correctamente!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => router.back()
+                    }
+                ]
+            );
+        }
     };
 
     return (
@@ -94,20 +119,17 @@ export default function Create() {
                     keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.header}>
-                        <TextMalet style={styles.textTitle}>Crear cuenta de Mallet</TextMalet>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                            <TextMalet style={styles.backText}>←</TextMalet>
+                            <TextMalet style={styles.backText}>Volver</TextMalet>
+                        </TouchableOpacity>
+
+                        <TextMalet style={styles.textTitle}>Editar cuenta</TextMalet>
                     </View>
 
                     <AccountCard
-                        selectedAccount={{
-                            created_at: new Date(),
-                            updated_at: new Date(),
-                            id: '123456789012',
-                            name: accountDetails.name,
-                            balance: accountDetails.balance,
-                            currency: accountDetails.currency,
-                            user_id: user.id
-                        }}
                         user={user}
+                        selectedAccount={accounts.find(acc => acc.id === accountId) || null}
                     />
 
                     <View style={styles.formContainer}>
@@ -122,35 +144,36 @@ export default function Create() {
 
                         <View style={styles.inputGroup}>
                             <TextMalet style={styles.inputLabel}>Tipo de Moneda</TextMalet>
-
-                            <TouchableOpacity
-                                style={styles.currencyButton}
-                                onPress={() => setModalCurrencyOpen(true)}>
-                                <TextMalet>{accountDetails.currency}</TextMalet>
+                            <TouchableOpacity onPress={() => setModalCurrencyOpen(true)}>
+                                <TextMalet style={styles.inputText}>
+                                    {accountDetails.currency || 'Seleccionar moneda'}
+                                </TextMalet>
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <TextMalet style={styles.inputLabel}>Balance inicial (opcional)</TextMalet>
+                            <TextMalet style={styles.inputLabel}>Balance actual</TextMalet>
                             <Input
                                 value={balanceInput}
                                 onChangeText={handleBalanceChange}
                                 placeholder="0.00"
                                 keyboardType="decimal-pad"
                             />
+                            <TextMalet style={styles.helperText}>
+                                Actualiza el balance solo si es necesario corregir un error.
+                            </TextMalet>
                         </View>
                     </View>
                 </ScrollView>
 
                 <View style={styles.footer}>
-                    {loading ?
-                        <ActivityIndicator size={20} color={'#000'} /> :
-                        <Button
-                            text="Crear cuenta"
-                            style={styles.createButton}
-                            onPress={submit}
-                        />
-                    }
+                    <Button
+                        loading={loading}
+                        disabled={loading}
+                        text="Guardar cambios"
+                        style={styles.createButton}
+                        onPress={submit}
+                    />
                 </View>
             </KeyboardAvoidingView>
 
@@ -169,6 +192,16 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'white',
     },
+    inputText: {
+        fontSize: 15,
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        borderColor: '#E0E0E0',
+        borderWidth: 1,
+        paddingVertical: 12,
+        color: '#333',
+    },
     scrollContentContainer: {
         flexGrow: 1,
         paddingHorizontal: 5,
@@ -178,46 +211,20 @@ const styles = StyleSheet.create({
         marginTop: 10,
         marginBottom: 20,
     },
+    backButton: {
+        marginBottom: 12,
+        gap: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backText: {
+        fontSize: 18,
+        color: '#666',
+        fontWeight: '500',
+    },
     textTitle: {
         fontSize: 22,
         fontWeight: '700'
-    },
-    currencyButton: {
-        backgroundColor: '#F0F0F0',
-        borderRadius: 14,
-        padding: 14,
-        borderColor: '#ccc',
-        borderWidth: 1,
-    },
-    showcaseCard: {
-        width: '100%',
-        minHeight: 140,
-        backgroundColor: '#F0F0F0',
-        borderRadius: 16,
-        padding: 20,
-        justifyContent: 'space-between',
-        marginBottom: 30,
-    },
-    repreAccountNumber: {
-        fontSize: 18,
-        fontWeight: '600',
-        letterSpacing: 1.5,
-        color: '#333',
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    cardHolder: {
-        color: '#555',
-        fontSize: 12,
-        textTransform: 'uppercase',
-    },
-    cardName: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#111',
     },
     formContainer: {
         gap: 24,
@@ -231,6 +238,12 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#444',
     },
+    helperText: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
     footer: {
         paddingHorizontal: 16,
         paddingBottom: Platform.OS === 'ios' ? 34 : 20,
@@ -241,5 +254,5 @@ const styles = StyleSheet.create({
     },
     createButton: {
         width: '100%',
-    }
+    },
 });

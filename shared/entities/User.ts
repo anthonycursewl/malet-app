@@ -5,4 +5,6 @@ export interface UserPrimitives {
     email: string;
     created_at: Date;
     password: string;
+    avatar_url?: string;
+    banner_url?: string;
 }

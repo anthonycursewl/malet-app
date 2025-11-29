@@ -104,7 +104,7 @@ export default function Register() {
       case 1:
         return (
           <View style={{ gap: 20, justifyContent: 'center', alignItems: 'center' }}>
-            
+
             <View style={{ width: '100%', gap: 10 }}>
               <TextMalet style={{ fontSize: 16 }}>
                 Nombres
@@ -125,8 +125,8 @@ export default function Register() {
               <Input
                 placeholder="Elige un @username..."
                 value={userData.username}
-                onChangeText={(text) => handleInputChange('username', text)}
-                style={{ width: '100%' }} 
+                onChangeText={(text) => handleInputChange('username', text.toLowerCase().trim())}
+                style={{ width: '100%' }}
                 autoCapitalize="none"
                 keyboardType="default"
               />
@@ -195,43 +195,43 @@ export default function Register() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <View style={{
-          width: '95%',
-          alignSelf: 'center',
-          backgroundColor: '#fff',
-          borderRadius: 10,
-        }}>
-          <View style={{ alignItems: 'center', marginBottom: 30 }}>
-            <IconAt style={{ width: 80, height: 80 }} />
-          </View>
-
-          <View style={{ gap: 24 }}>
-            {renderStepIndicator()}
-            {renderStep()}
-
-            <View style={{ marginTop: 10, gap: 12 }}>
-              {loading ? (
-                <View style={{ alignItems: 'center', width: '100%', justifyContent: 'center' }}>
-                  <ActivityIndicator size="small" color="#007AFF" />
-                </View>
-              ) : (
-                <Button
-                  text={step === 3 ? 'Registrarse' : 'Siguiente'}
-                  onPress={step === 3 ? handleSubmit : handleNext}
-                />
-              )}
-
-              
-              {step > 1 && !loading && (
-                <Button
-                  text="Volver atrás"
-                  onPress={handlePrevious}
-                />
-              )}
+          <View style={{
+            width: '95%',
+            alignSelf: 'center',
+            backgroundColor: '#fff',
+            borderRadius: 10,
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: 30 }}>
+              <IconAt style={{ width: 80, height: 80 }} />
             </View>
-          </View>
 
-        </View>
+            <View style={{ gap: 24 }}>
+              {renderStepIndicator()}
+              {renderStep()}
+
+              <View style={{ marginTop: 10, gap: 12 }}>
+                {loading ? (
+                  <View style={{ alignItems: 'center', width: '100%', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color="#007AFF" />
+                  </View>
+                ) : (
+                  <Button
+                    text={step === 3 ? 'Registrarse' : 'Siguiente'}
+                    onPress={step === 3 ? handleSubmit : handleNext}
+                  />
+                )}
+
+
+                {step > 1 && !loading && (
+                  <Button
+                    text="Volver atrás"
+                    onPress={handlePrevious}
+                  />
+                )}
+              </View>
+            </View>
+
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
