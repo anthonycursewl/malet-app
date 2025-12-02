@@ -1,25 +1,22 @@
 import Button from "@/components/Button/Button";
-import { ContainerDash } from "@/components/dashboard/ContainerDash";
 import LastTransactions from "@/components/dashboard/LastTransactions";
-import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
+import DashboardHeader from "@/components/DashboardHeader";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { parseDate } from "@/shared/services/date/parseDate";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
-import IconVerified from "@/svgs/common/IconVerified";
-import IconWarning from "@/svgs/common/IconWarning";
-import IconAI from "@/svgs/dashboard/IconAI";
 import IconArrow from "@/svgs/dashboard/IconArrow";
 import IconAt from "@/svgs/dashboard/IconAt";
-import IconBudget from "@/svgs/dashboard/IconBudget";
-import IconFiles from "@/svgs/dashboard/IconFiles";
+import IconCommunities from "@/svgs/dashboard/IconCommunities";
 import IconMinus from "@/svgs/dashboard/IconMinus";
-import IconNotes from "@/svgs/dashboard/IconNotes";
 import IconPlus from "@/svgs/dashboard/IconPlus";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ModalAccountsRef {
     openModal: () => void;
@@ -89,108 +86,21 @@ const BalanceSection = memo((({
     );
 }));
 
-const DashboardHeader = memo(({ userName }: { userName: string }) => {
-    const { width } = Dimensions.get('window');
-
-    const getTruncatedName = useCallback((name: string) => {
-        const maxLength = Math.floor(width / 15);
-        const maxDisplayLength = Math.max(15, maxLength);
-
-        if (name.length > maxDisplayLength) {
-            return `${name.slice(0, maxDisplayLength - 3)}...`;
-        }
-        return name;
-    }, [width]);
-
-    const formattedDate = useMemo(() => {
-        const options = {
-            weekday: 'long' as const,
-            year: 'numeric' as const,
-            month: 'long' as const,
-            day: 'numeric' as const
-        };
-        const dateStr = new Date().toLocaleDateString('es-ES', options);
-        return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-    }, []);
-
-    return (
-        <View style={{ gap: 8 }}>
-            <View style={{ paddingBottom: 7, paddingTop: 5 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
-                    <TextMalet style={styles.headerText} numberOfLines={1}>
-                        Bienvenido,{" "}
-                    </TextMalet>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        <TextMalet style={{ color: 'rgba(116, 116, 116, 1)' }}>{getTruncatedName(userName)}</TextMalet>
-                        <IconVerified width={20} height={20} fill="rgba(94, 94, 94, 1)" />
-                    </View>
-                </View>
-
-                <TextMalet style={{ color: 'rgb(95, 95, 95)', fontSize: 14 }}>
-                    {formattedDate}
-                </TextMalet>
-            </View>
-
-            <View style={styles.iconsContainer}>
-
-                <ContainerDash>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconAt width={18} height={18} />
-                    </TouchableOpacity>
-                </ContainerDash>
-
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconAI width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconNotes width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconBudget width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconFiles width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconWarning width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <TouchableOpacity onPress={() => { }}>
-                        <IconWarning width={18} height={18} fill="#313131ff" />
-                    </TouchableOpacity>
-                </ContainerDash>
-            </View>
-
-        </View>
-    );
-});
-
 export default function Dashboard() {
     const { user, verifySession } = useAuthStore();
-    const { previewTransactions, getPreviewTransactions, error, loading } = useWalletStore();
+    const { previewTransactions, getPreviewTransactions, error, loading, tasas, getTasas } = useWalletStore();
     const { selectedAccount } = useAccountStore();
 
     const [loadingSession, setLoadingSession] = useState(false);
     const [modalAccountsVisible, setModalAccountsVisible] = useState(false);
+    // Index for carousel of tasas
+    const [currentTasaIndex, setCurrentTasaIndex] = useState(0);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const logoFadeAnim = useRef(new Animated.Value(0)).current;
     const modalAccountsRef = useRef<ModalAccountsRef>(null);
+    // Animated value for fading tasa text on change
+    const fadeTasaAnim = useRef(new Animated.Value(1)).current;
 
     const startAnimation = useCallback(() => {
         Animated.timing(fadeAnim, {
@@ -213,6 +123,7 @@ export default function Dashboard() {
                 })
             ])
         ).start();
+
     }, [fadeAnim, logoFadeAnim]);
 
     const verifyUserSession = useCallback(async () => {
@@ -225,11 +136,20 @@ export default function Dashboard() {
         setLoadingSession(false);
     }, [verifySession, startAnimation]);
 
-    const loadTransactions = useCallback(() => {
+    const loadTransactions = useCallback(async () => {
         if (user?.id) {
-            getPreviewTransactions(selectedAccount?.id || '', user.id);
+            await getPreviewTransactions(selectedAccount?.id || '', user.id);
         }
     }, [user?.id, selectedAccount?.id, getPreviewTransactions]);
+
+    // -- GET VENEZUELAN TASAS
+    // Using a useCallback to prevent unnecessary re-renders
+    // and to ensure that the function is only created once
+    // brd-task-4857390986324342
+    const loadTasas = useCallback(async () => {
+        await getTasas();
+    }, [getTasas]);
+
 
     const handleOpenModal = useCallback(() => {
         setModalAccountsVisible(true);
@@ -264,7 +184,34 @@ export default function Dashboard() {
 
     useEffect(() => {
         loadTransactions();
-    }, [loadTransactions]);
+        loadTasas();
+        console.log(tasas);
+    }, [loadTransactions, loadTasas]);
+
+    // Carousel effect: change displayed tasa every 10 seconds
+    useEffect(() => {
+        if (!tasas || tasas.length === 0) return;
+        const interval = setInterval(() => {
+            setCurrentTasaIndex(prev => (prev + 1) % tasas.length);
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [tasas]);
+
+    // Fade animation when the displayed tasa changes
+    useEffect(() => {
+        Animated.sequence([
+            Animated.timing(fadeTasaAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(fadeTasaAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [currentTasaIndex]);
 
     useEffect(() => {
         if (error) {
@@ -277,9 +224,9 @@ export default function Dashboard() {
     }
 
     return (
-        <LayoutAuthenticated>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
             <View style={styles.container}>
-                <DashboardHeader userName={user?.name || ''} />
+                <DashboardHeader name={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url} username={user.username} />
 
                 <BalanceSection
                     balance={formattedBalance}
@@ -287,6 +234,69 @@ export default function Dashboard() {
                     accountName={selectedAccount?.name || 'General'}
                     accountNumber={selectedAccount?.id || '0000'}
                 />
+
+                {/* Tasas de Cambio Section */}
+                <View style={styles.tasasContainer}>
+                    <TextMalet style={styles.tasasHeader}>Tasas de Cambio</TextMalet>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        {/* BCV Rate Card with enhanced style */}
+                        <LinearGradient
+                            colors={['#f0f0f059', '#eeeeeead']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 0.5, y: 0 }}
+                            style={styles.tasaCard}
+                        >
+                            <Animated.View style={{ opacity: fadeTasaAnim }}>
+                                {tasas && tasas.length > 0 ? (
+                                    <>
+                                        <TextMalet style={{ marginBottom: 2, fontWeight: '600' }}>
+                                            Tasa {tasas[currentTasaIndex]?.nombre}
+                                        </TextMalet>
+                                        <TextMalet style={{ fontSize: 13 }}>
+                                            1 USD = Bs {tasas[currentTasaIndex]?.promedio}
+                                        </TextMalet>
+                                        <TextMalet style={{ color: '#555', fontSize: 12 }}>
+                                            {parseDate(tasas[currentTasaIndex]?.fechaActualizacion)}
+                                        </TextMalet>
+
+                                    </>
+                                ) : (
+                                    <View style={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                        <ActivityIndicator size="small" color="#000" />
+                                    </View>
+                                )}
+                            </Animated.View>
+                        </LinearGradient>
+
+                        <LinearGradient
+                            colors={['#ffffff', '#ffffffff']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ padding: 10, borderRadius: 10, width: '49%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
+                                <TextMalet>Comunidades</TextMalet>
+                            </View>
+
+                            <View>
+                                <View style={{ flexDirection: 'row', gap: 2 }}>
+                                    <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
+                                    <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
+                                </View>
+                            </View>
+
+                        </LinearGradient>
+                    </View>
+                </View>
+
+                {/* Transacciones recientes. */}
+                {/* Turn into a separated component brd-task-1526845236958456 */}
 
                 <FlatList
                     data={previewTransactions}
@@ -308,15 +318,16 @@ export default function Dashboard() {
                     refreshing={loading && previewTransactions.length === 0}
                 />
 
-                <View style={styles.viewAllTransactions}>
-                    <Button text="Ver todas las transacciones" onPress={handleViewAllTransactions}
-                        style={{ width: '100%' }}
-                    />
-                </View>
+            </View>
+
+            <View style={styles.viewAllTransactions}>
+                <Button text="Ver todas las transacciones" onPress={handleViewAllTransactions}
+                    style={{ width: '100%' }}
+                />
             </View>
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
-        </LayoutAuthenticated>
+        </SafeAreaView>
     );
 };
 
@@ -328,6 +339,46 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    // ---- Tasas styles ----
+    tasasContainer: {
+        marginTop: 8,
+    },
+    tasasHeader: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 5,
+    },
+    // Card style for BCV rate with subtle gradient and shadow
+    tasaCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#dbd9d9ff',
+        borderStyle: 'dashed',
+        width: '48%',
+    },
+    tasaItem: {
+        backgroundColor: 'rgb(245, 245, 245)',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 8,
+    },
+    tasaName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#222',
+    },
+    tasaValue: {
+        fontSize: 14,
+        color: '#555',
+    },
+    tasaDate: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 4,
     },
     viewAllButtonText: {
         color: 'white',
@@ -348,6 +399,9 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
+        paddingTop: 0,
+        padding: 12,
+        paddingBottom: 0
     },
     headerContainer: {
         flexDirection: 'row',
@@ -431,13 +485,13 @@ const styles = StyleSheet.create({
     },
     transactionsList: {
         flex: 1,
-        marginTop: 20,
+        marginTop: 9,
         flexGrow: 1,
     },
     listHeader: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     emptyListText: {
         textAlign: 'center',
@@ -446,8 +500,9 @@ const styles = StyleSheet.create({
     },
     viewAllTransactions: {
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: 10,
         paddingVertical: 15,
+        paddingHorizontal: 12,
         borderTopWidth: 1,
         borderTopColor: '#ccc',
         width: '100%',

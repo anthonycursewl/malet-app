@@ -102,9 +102,9 @@ export default function AddWallet() {
 
   useEffect(() => {
     if (accounts && accounts.length === 0) {
-      getAllAccountsByUserId(user.id)
+      getAllAccountsByUserId()
     }
-  }, [user.id, accounts])
+  }, [user.id])
 
   useEffect(() => {
     if (selectedAccount) {
