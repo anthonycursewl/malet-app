@@ -1,3 +1,9 @@
+export interface VerificationTypePrimitive {
+    id: string;
+    type: string;
+    icon_url: string;
+}
+
 export interface UserPrimitives {
     id: string;
     name: string;
@@ -7,4 +13,9 @@ export interface UserPrimitives {
     password: string;
     avatar_url?: string;
     banner_url?: string;
+    verified: boolean;
+    verification_type_id?: string | null;
+    verification_type?: VerificationTypePrimitive | null;
 }
+
+

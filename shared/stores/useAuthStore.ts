@@ -31,6 +31,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         email: '',
         created_at: new Date(),
         password: '',
+        verified: false,
+        verification_type_id: null,
+        verification_type: null,
+
     },
     setUser: (user: UserPrimitives) => set({ user }),
 
@@ -81,6 +85,9 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
                 email: '',
                 created_at: new Date(),
                 password: '',
+                verified: false,
+                verification_type_id: null,
+                verification_type: null,
             },
             error: null
         });
