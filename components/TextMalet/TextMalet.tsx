@@ -8,13 +8,14 @@ interface TextMaletProps extends TextProps {
     className?: string;
 }
 
-export default function TextMalet({ children, style, className }: TextMaletProps) {
+export default function TextMalet({ children, style, className, ...props }: TextMaletProps) {
     const baseStyle = { fontFamily: 'Onest' };
-    
+
     return (
-        <Text 
+        <Text
             style={[baseStyle, style]}
             className={className}
+            {...props}
         >
             {children}
         </Text>

@@ -3,6 +3,15 @@ import { MALET_API_URL } from "../config/malet.config";
 import { TransactionItem } from "../entities/TransactionItem";
 import { secureFetch } from "../http/secureFetch";
 
+interface Tasas {
+    fuente: string;
+    nombre: string;
+    compra: number | null;
+    venta: number | null;
+    promedio: number;
+    fechaActualizacion: string;
+}
+
 interface WalletStore {
     loading: boolean;
     setLoading: (loading: boolean) => void;
@@ -23,6 +32,11 @@ interface WalletStore {
     getPreviewTransactions: (account_id: string, user_id?: string) => Promise<void>;
     logoutWallet: () => void;
     clearStore: () => void;
+
+    // Tasas de cambio u.u
+    tasas: Tasas[];
+    setTasas: (tasas: Tasas[]) => void;
+    getTasas: () => Promise<void>;
 }
 
 export const useWalletStore = create<WalletStore>((set, get) => ({
@@ -49,6 +63,24 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         isEnd: false,
     },
     setPaginationTransactions: (pagination) => set({ paginationTransactions: pagination }),
+
+    tasas: [] as Tasas[],
+    setTasas: (tasas: Tasas[]) => set({ tasas: tasas }),
+
+    getTasas: async (): Promise<void> => {
+        const { error, response } = await secureFetch({
+            url: `https://ve.dolarapi.com/v1/dolares`,
+            method: 'GET',
+            setLoading: get().setLoading,
+        });
+
+        if (error) {
+            set({ error })
+            return;
+        }
+
+        set({ error: null, tasas: response })
+    },
 
     addTransaction: async (transaction): Promise<TransactionItem | undefined> => {
         const { error, response } = await secureFetch({
@@ -115,8 +147,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
                 },
             });
         }
-    }
-    ,
+    },
 
     getPreviewTransactions: async (account_id: string, user_id = '') => {
         const { setLoading, setError, setPreviewTransactions } = get();
