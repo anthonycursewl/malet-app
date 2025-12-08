@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Modal,
-    PanResponder,
-    StyleSheet,
-    TouchableWithoutFeedback,
-    View,
-    ViewStyle,
+  Animated,
+  Dimensions,
+  Modal,
+  PanResponder,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View,
+  ViewStyle,
 } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -18,6 +18,7 @@ interface ModalOptionsProps {
   onClose: () => void;
   children?: React.ReactNode;
   gesturesEnabled?: boolean;
+  isOnTop?: boolean;
 }
 
 export default function ModalOptions({
@@ -25,6 +26,7 @@ export default function ModalOptions({
   onClose,
   children,
   gesturesEnabled = true,
+  isOnTop = false,
 }: ModalOptionsProps) {
   const [isModalRendered, setIsModalRendered] = useState(visible);
   const translateY = useRef(new Animated.Value(MODAL_HEIGHT)).current;
@@ -87,7 +89,7 @@ export default function ModalOptions({
       },
     })
   ).current;
-  
+
   if (!isModalRendered) {
     return null;
   }
@@ -113,7 +115,7 @@ export default function ModalOptions({
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View style={[styles.backdrop, animatedStyles.backdrop]} />
+        <Animated.View style={[styles.backdrop, animatedStyles.backdrop, !isOnTop && { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]} />
       </TouchableWithoutFeedback>
 
       <Animated.View
@@ -134,7 +136,6 @@ export default function ModalOptions({
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modal: {
     position: 'absolute',
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 16,
     paddingBottom: 15,
-    paddingHorizontal: 20, 
+    paddingHorizontal: 20,
   },
   dragHandle: {
     width: 40,
