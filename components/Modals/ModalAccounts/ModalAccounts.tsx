@@ -46,6 +46,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
     const loadAccounts = useCallback(async (forceRefresh = false) => {
         if (!user?.id || isLoadingRef.current) return;
 
+
         if (accounts.length > 0 && !forceRefresh) return;
 
         try {
