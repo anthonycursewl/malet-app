@@ -39,7 +39,9 @@ export default function ChatListScreen() {
     return (
         <LayoutAuthenticated>
             <View style={styles.container}>
-                <DashboardHeader userName={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url} />
+                <DashboardHeader name={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url}
+                    username={user?.username || ''} showOptions={false}
+                />
 
                 <FlatList
                     data={MOCK_CHATS}
