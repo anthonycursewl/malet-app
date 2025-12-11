@@ -269,29 +269,31 @@ export default function Dashboard() {
                             </Animated.View>
                         </LinearGradient>
 
-                        <LinearGradient
-                            colors={['#ffffff', '#ffffffff']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{ padding: 10, borderRadius: 10, width: '49%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
-                                <TextMalet>Comunidades</TextMalet>
-                            </View>
-
-                            <View>
-                                <View style={{ flexDirection: 'row', gap: 2 }}>
-                                    <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
-                                    <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
+                        <TouchableOpacity onPress={() => router.push('/communities' as any)} style={{ width: '49%' }}>
+                            <LinearGradient
+                                colors={['#ffffff', '#ffffffff']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ padding: 10, borderRadius: 10, width: '100%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
+                                    <TextMalet>Comunidades</TextMalet>
                                 </View>
-                            </View>
 
-                        </LinearGradient>
+                                <View>
+                                    <View style={{ flexDirection: 'row', gap: 2 }}>
+                                        <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
+                                        <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
+                                    </View>
+                                </View>
+
+                            </LinearGradient>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
