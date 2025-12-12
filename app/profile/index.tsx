@@ -1,10 +1,17 @@
 import Button from "@/components/Button/Button";
+import { VERIFICATION_TYPES } from "@/components/DashboardHeader";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import { spacing } from "@/shared/theme";
+import IconAbout from "@/svgs/common/IconAbout";
+import IconHelp from "@/svgs/common/IconHelp";
+import IconNotification from "@/svgs/common/IconNotification";
+import IconPeople from "@/svgs/common/IconPeople";
+import IconSecurity from "@/svgs/common/IconSecurity";
+import IconSettings from "@/svgs/common/IconSettings";
 import IconVerified from "@/svgs/common/IconVerified";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { router } from "expo-router";
@@ -113,6 +120,9 @@ export default function ProfileView() {
         Alert.alert('Próximamente', 'Esta función estará disponible pronto.');
     };
 
+    const verificationType = user?.verification_type?.type;
+    const verificationTypeColor = verificationType ? VERIFICATION_TYPES[verificationType]?.color : undefined;
+
     return (
         <LayoutAuthenticated>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -134,7 +144,9 @@ export default function ProfileView() {
                     <View style={styles.userInfo}>
                         <View style={styles.nameContainer}>
                             <TextMalet style={styles.userName}>{user?.name || 'Usuario'}</TextMalet>
-                            <IconVerified width={20} height={20} fill="#313131ff" />
+                            {verificationTypeColor && (
+                                <IconVerified width={20} height={20} fill={verificationTypeColor} />
+                            )}
                         </View>
                         <TextMalet style={styles.userEmail}>{user?.email || 'email@example.com'}</TextMalet>
                     </View>
@@ -145,19 +157,19 @@ export default function ProfileView() {
                     <TextMalet style={styles.sectionTitle}>Cuenta</TextMalet>
                     <View style={styles.optionsGroup}>
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>👤</TextMalet>}
+                            icon={<IconPeople width={25} height={25} fill="#161616ff" />}
                             title="Editar perfil"
                             subtitle="Actualiza tu información personal"
                             onPress={handleEditProfile}
                         />
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>⚙️</TextMalet>}
+                            icon={<IconSettings width={25} height={25} fill="#161616ff" />}
                             title="Configuración"
                             subtitle="Preferencias de la aplicación"
                             onPress={handleSettings}
                         />
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>🔒</TextMalet>}
+                            icon={<IconSecurity width={25} height={25} fill="#161616ff" />}
                             title="Seguridad"
                             subtitle="Contraseña y autenticación"
                             onPress={handleSecurity}
@@ -171,7 +183,7 @@ export default function ProfileView() {
                     <TextMalet style={styles.sectionTitle}>Preferencias</TextMalet>
                     <View style={styles.optionsGroup}>
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>🔔</TextMalet>}
+                            icon={<IconNotification width={25} height={25} fill="#161616ff" />}
                             title="Notificaciones"
                             subtitle="Gestiona tus notificaciones"
                             onPress={handleNotifications}
@@ -185,13 +197,13 @@ export default function ProfileView() {
                     <TextMalet style={styles.sectionTitle}>Soporte</TextMalet>
                     <View style={styles.optionsGroup}>
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>❓</TextMalet>}
+                            icon={<IconHelp width={25} height={25} fill="#161616ff" />}
                             title="Ayuda"
                             subtitle="Centro de ayuda y FAQs"
                             onPress={handleHelp}
                         />
                         <ProfileOption
-                            icon={<TextMalet style={styles.optionIcon}>ℹ️</TextMalet>}
+                            icon={<IconAbout width={25} height={25} fill="#161616ff" />}
                             title="Acerca de"
                             subtitle="Versión y términos de uso"
                             onPress={handleAbout}
