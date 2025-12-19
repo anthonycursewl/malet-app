@@ -6,8 +6,9 @@ import IconWarning from "@/svgs/common/IconWarning";
 import IconAI from "@/svgs/dashboard/IconAI";
 import IconAt from "@/svgs/dashboard/IconAt";
 import IconBudget from "@/svgs/dashboard/IconBudget";
-import IconFiles from "@/svgs/dashboard/IconFiles";
+import IconGarzon from "@/svgs/dashboard/IconGarzon";
 import IconNotes from "@/svgs/dashboard/IconNotes";
+import IconWalletGarzon from "@/svgs/dashboard/IconWalletGarzon";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { memo, useCallback, useState } from "react";
@@ -358,15 +359,15 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
                         </ContainerDash>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => { }}>
+                    <TouchableOpacity onPress={() => router.push('/garzon' as any)}>
                         <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconFiles width={18} height={18} fill="#313131ff" />
+                            <IconGarzon width={18} height={18} fill="#313131ff" />
                         </ContainerDash>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => { }}>
+                    <TouchableOpacity onPress={() => router.push('/garzon/wallet' as any)}>
                         <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconWarning width={18} height={18} fill="#313131ff" />
+                            <IconWalletGarzon width={18} height={18} fill="#313131ff" />
                         </ContainerDash>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { }}>
