@@ -1,17 +1,25 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { TopProducto } from '@/shared/interfaces/garzon.interfaces';
-import React, { memo, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useMemo, useState } from 'react';
+import { FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import ModalOptions from '../shared/ModalOptions';
 
-// Bandera de Venezuela
 const FLAG_VE = 'https://flagcdn.com/w40/ve.png';
+const INITIAL_ITEMS_COUNT = 4;
 
 interface TopProductosCardProps {
     data: TopProducto[];
 }
 
-// Componente para mostrar montos con decimales en gris
+const RANK_STYLES = [
+    { bg: '#FEF3C7', text: '#D97706', bar: '#F59E0B' },
+    { bg: '#E0E7FF', text: '#4338CA', bar: '#6366F1' },
+    { bg: '#FCE7F3', text: '#BE185D', bar: '#EC4899' },
+];
+const DEFAULT_RANK_STYLE = { bg: '#F3F4F6', text: '#6B7280', bar: '#9CA3AF' };
+
+const getRankStyle = (index: number) => RANK_STYLES[index] ?? DEFAULT_RANK_STYLE;
+
 const FormattedAmount = memo(({ value, prefix = 'Bs', color = '#374151' }: {
     value: number;
     prefix?: string;
@@ -28,221 +36,244 @@ const FormattedAmount = memo(({ value, prefix = 'Bs', color = '#374151' }: {
     );
 });
 
-// Componente de producto individual (memoizado)
-const ProductItem = memo(({ producto, index, maxTotal }: {
+const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
     producto: TopProducto;
     index: number;
     maxTotal: number;
+    onPress: (producto: TopProducto, index: number) => void;
 }) => {
-    const [visible, setVisible] = useState(false);
-
-    // Memoizar todos los cálculos para evitar recálculos en cada render
-    const calculatedData = useMemo(() => {
-        const total = parseFloat(producto.total);
-        const costo = parseFloat(producto.costo);
-        const cantidad = parseInt(producto.cantidad);
-        const ganancia = total - costo;
-        const margenPct = (ganancia / total) * 100;
-        const progressWidth = (total / maxTotal) * 100;
-        const gananciaPorUnidad = ganancia / cantidad;
-
-        return { total, costo, cantidad, ganancia, margenPct, progressWidth, gananciaPorUnidad };
+    const { total, costo, cantidad, ganancia, margenPct, progressWidth } = useMemo(() => {
+        const t = parseFloat(producto.total);
+        const c = parseFloat(producto.costo);
+        const cant = parseInt(producto.cantidad);
+        const gan = t - c;
+        return {
+            total: t,
+            costo: c,
+            cantidad: cant,
+            ganancia: gan,
+            margenPct: (gan / t) * 100,
+            progressWidth: (t / maxTotal) * 100,
+        };
     }, [producto.total, producto.costo, producto.cantidad, maxTotal]);
 
-    // Memoizar estilos de ranking
-    const rankStyle = useMemo(() => {
-        if (index === 0) return { bg: '#FEF3C7', text: '#D97706', bar: '#F59E0B' };
-        if (index === 1) return { bg: '#E0E7FF', text: '#4338CA', bar: '#6366F1' };
-        if (index === 2) return { bg: '#FCE7F3', text: '#BE185D', bar: '#EC4899' };
-        return { bg: '#F3F4F6', text: '#6B7280', bar: '#9CA3AF' };
-    }, [index]);
-
-    const { total, costo, cantidad, ganancia, margenPct, progressWidth, gananciaPorUnidad } = calculatedData;
+    const rankStyle = getRankStyle(index);
     const articulo = producto.articulos;
 
+    const handlePress = useCallback(() => {
+        onPress(producto, index);
+    }, [onPress, producto, index]);
+
     return (
-        <>
-            <TouchableOpacity
-                style={styles.productCard}
-                onPress={() => setVisible(true)}
-                activeOpacity={0.7}
+        <TouchableOpacity
+            style={styles.productCard}
+            onPress={handlePress}
+            activeOpacity={0.7}
+        >
+            <View style={styles.productHeader}>
+                <View style={styles.productLeft}>
+                    <View style={[styles.rankBadge, { backgroundColor: rankStyle.bg }]}>
+                        <TextMalet style={[styles.rankText, { color: rankStyle.text }]}>
+                            {index + 1}
+                        </TextMalet>
+                    </View>
+                    <View style={styles.productDetails}>
+                        <TextMalet style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
+                            {articulo.descripcion}
+                        </TextMalet>
+                        <View style={styles.productMeta}>
+                            <TextMalet style={styles.productCode} numberOfLines={1}>
+                                {articulo.codigo}
+                            </TextMalet>
+                            <View style={styles.dotSeparator} />
+                            <TextMalet style={styles.departmentText} numberOfLines={1}>
+                                {articulo.departamento.descripcion}
+                            </TextMalet>
+                        </View>
+                    </View>
+                </View>
+                <View style={styles.quantityBadge}>
+                    <TextMalet style={styles.quantityText}>{cantidad}</TextMalet>
+                    <TextMalet style={styles.quantityLabel}>uds</TextMalet>
+                </View>
+            </View>
+
+            <View style={styles.progressRow}>
+                <View style={styles.progressBar}>
+                    <View
+                        style={[
+                            styles.progressFill,
+                            { width: `${progressWidth}%`, backgroundColor: rankStyle.bar }
+                        ]}
+                    />
+                </View>
+                <FormattedAmount value={total} color="#10B981" />
+            </View>
+
+            <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                    <TextMalet style={styles.statLabel}>Costo</TextMalet>
+                    <TextMalet style={styles.statValue}>
+                        Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </TextMalet>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <TextMalet style={styles.statLabel}>Margen</TextMalet>
+                    <TextMalet style={[styles.statValue, margenPct >= 30 ? styles.statValueGood : styles.statValueWarn]}>
+                        {margenPct.toFixed(1)}%
+                    </TextMalet>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <TextMalet style={styles.statLabel}>Ganancia</TextMalet>
+                    <TextMalet style={[styles.statValue, styles.statValueGood]}>
+                        Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </TextMalet>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
+const ProductDetailModal = memo(({
+    visible,
+    onClose,
+    producto,
+    index
+}: {
+    visible: boolean;
+    onClose: () => void;
+    producto: TopProducto | null;
+    index: number;
+}) => {
+    const lastProductRef = React.useRef<{ producto: TopProducto; index: number } | null>(null);
+
+    if (producto) {
+        lastProductRef.current = { producto, index };
+    }
+    const displayData = producto ?? lastProductRef.current?.producto;
+    const displayIndex = producto ? index : (lastProductRef.current?.index ?? 0);
+
+    if (!displayData) return null;
+
+    const total = parseFloat(displayData.total);
+    const costo = parseFloat(displayData.costo);
+    const cantidad = parseInt(displayData.cantidad);
+    const ganancia = total - costo;
+    const margenPct = (ganancia / total) * 100;
+    const gananciaPorUnidad = ganancia / cantidad;
+    const rankStyle = getRankStyle(displayIndex);
+    const articulo = displayData.articulos;
+
+    return (
+        <ModalOptions visible={visible} onClose={onClose}>
+            <ScrollView
+                style={styles.modalScrollView}
+                contentContainerStyle={styles.modalContent}
+                showsVerticalScrollIndicator={false}
             >
-                {/* Header del producto */}
-                <View style={styles.productHeader}>
-                    <View style={styles.productLeft}>
-                        <View style={[styles.rankBadge, { backgroundColor: rankStyle.bg }]}>
-                            <TextMalet style={[styles.rankText, { color: rankStyle.text }]}>
-                                {index + 1}
-                            </TextMalet>
-                        </View>
-                        <View style={styles.productDetails}>
-                            <TextMalet style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
-                                {articulo.descripcion}
-                            </TextMalet>
-                            <View style={styles.productMeta}>
-                                <TextMalet style={styles.productCode} numberOfLines={1}>
-                                    {articulo.codigo}
-                                </TextMalet>
-                                <View style={styles.dotSeparator} />
-                                <TextMalet style={styles.departmentText} numberOfLines={1}>
-                                    {articulo.departamento.descripcion}
-                                </TextMalet>
-                            </View>
-                        </View>
+                <View style={styles.modalHeader}>
+                    <View style={[styles.modalRankBadge, { backgroundColor: rankStyle.bg }]}>
+                        <TextMalet style={[styles.modalRankText, { color: rankStyle.text }]}>
+                            #{index + 1}
+                        </TextMalet>
                     </View>
-                    <View style={styles.quantityBadge}>
-                        <TextMalet style={styles.quantityText}>{cantidad}</TextMalet>
-                        <TextMalet style={styles.quantityLabel}>uds</TextMalet>
+                    <View style={styles.modalTitleContainer}>
+                        <TextMalet style={styles.modalTitle} numberOfLines={2}>
+                            {articulo.descripcion}
+                        </TextMalet>
+                        <TextMalet style={styles.modalCode}>{articulo.codigo}</TextMalet>
                     </View>
                 </View>
 
-                {/* Barra de progreso y monto */}
-                <View style={styles.progressRow}>
-                    <View style={styles.progressBar}>
-                        <View
-                            style={[
-                                styles.progressFill,
-                                { width: `${progressWidth}%`, backgroundColor: rankStyle.bar }
-                            ]}
-                        />
-                    </View>
-                    <FormattedAmount value={total} color="#10B981" />
+                <View style={styles.modalTag}>
+                    <TextMalet style={styles.modalTagText}>
+                        {articulo.departamento.descripcion}
+                    </TextMalet>
                 </View>
 
-                {/* Stats en línea */}
-                <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                        <TextMalet style={styles.statLabel}>Costo</TextMalet>
-                        <TextMalet style={styles.statValue}>
-                            Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <View style={styles.modalQuickStats}>
+                    <View style={styles.modalQuickStatItem}>
+                        <TextMalet style={styles.modalQuickStatValue}>{cantidad}</TextMalet>
+                        <TextMalet style={styles.modalQuickStatLabel}>uds. vendidas</TextMalet>
+                    </View>
+                    <View style={styles.modalQuickStatDivider} />
+                    <View style={styles.modalQuickStatItem}>
+                        <View style={styles.modalAmountRow}>
+                            <Image source={{ uri: FLAG_VE }} style={styles.modalFlagIcon} />
+                            <TextMalet style={[styles.modalQuickStatValue, { color: '#10B981' }]}>
+                                {total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                        </View>
+                        <TextMalet style={styles.modalQuickStatLabel}>total vendido</TextMalet>
+                    </View>
+                </View>
+
+                <View style={styles.modalSection}>
+                    <TextMalet style={styles.modalSectionTitle}>Desglose Financiero</TextMalet>
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Costo total</TextMalet>
+                        <TextMalet style={styles.modalInfoValue}>
+                            Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </TextMalet>
                     </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <TextMalet style={styles.statLabel}>Margen</TextMalet>
-                        <TextMalet style={[styles.statValue, margenPct >= 30 ? styles.statValueGood : styles.statValueWarn]}>
-                            {margenPct.toFixed(1)}%
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Ganancia bruta</TextMalet>
+                        <TextMalet style={[styles.modalInfoValue, { color: '#059669' }]}>
+                            Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </TextMalet>
                     </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <TextMalet style={styles.statLabel}>Ganancia</TextMalet>
-                        <TextMalet style={[styles.statValue, styles.statValueGood]}>
-                            Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Margen de ganancia</TextMalet>
+                        <TextMalet style={[styles.modalInfoValue, margenPct >= 30 ? { color: '#059669' } : { color: '#D97706' }]}>
+                            {margenPct.toFixed(2)}%
+                        </TextMalet>
+                    </View>
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Ganancia por unidad</TextMalet>
+                        <TextMalet style={styles.modalInfoValue}>
+                            Bs {gananciaPorUnidad.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                         </TextMalet>
                     </View>
                 </View>
-            </TouchableOpacity>
 
-            {/* Modal de detalles */}
-            <ModalOptions
-                visible={visible}
-                onClose={() => setVisible(false)}
-            >
-                <ScrollView
-                    style={styles.modalScrollView}
-                    contentContainerStyle={styles.modalContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Header del modal */}
-                    <View style={styles.modalHeader}>
-                        <View style={[styles.modalRankBadge, { backgroundColor: rankStyle.bg }]}>
-                            <TextMalet style={[styles.modalRankText, { color: rankStyle.text }]}>
-                                #{index + 1}
-                            </TextMalet>
-                        </View>
-                        <View style={styles.modalTitleContainer}>
-                            <TextMalet style={styles.modalTitle} numberOfLines={2}>
-                                {articulo.descripcion}
-                            </TextMalet>
-                            <TextMalet style={styles.modalCode}>{articulo.codigo}</TextMalet>
-                        </View>
-                    </View>
-
-                    {/* Departamento */}
-                    <View style={styles.modalTag}>
-                        <TextMalet style={styles.modalTagText}>
-                            {articulo.departamento.descripcion}
+                <View style={styles.modalSection}>
+                    <TextMalet style={styles.modalSectionTitle}>Información del Artículo</TextMalet>
+                    <View style={styles.modalDescriptionContainer}>
+                        <TextMalet style={styles.modalDescriptionLabel}>Descripción</TextMalet>
+                        <TextMalet style={styles.modalDescriptionText}>
+                            {articulo.descripcion}
                         </TextMalet>
                     </View>
-
-                    {/* Stats principales - minimalista */}
-                    <View style={styles.modalQuickStats}>
-                        <View style={styles.modalQuickStatItem}>
-                            <TextMalet style={styles.modalQuickStatValue}>{cantidad}</TextMalet>
-                            <TextMalet style={styles.modalQuickStatLabel}>uds. vendidas</TextMalet>
-                        </View>
-                        <View style={styles.modalQuickStatDivider} />
-                        <View style={styles.modalQuickStatItem}>
-                            <View style={styles.modalAmountRow}>
-                                <Image source={{ uri: FLAG_VE }} style={styles.modalFlagIcon} />
-                                <TextMalet style={[styles.modalQuickStatValue, { color: '#10B981' }]}>
-                                    {total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                                </TextMalet>
-                            </View>
-                            <TextMalet style={styles.modalQuickStatLabel}>total vendido</TextMalet>
-                        </View>
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Peso</TextMalet>
+                        <TextMalet style={styles.modalInfoValue}>{articulo.peso} kg</TextMalet>
                     </View>
-
-                    {/* Desglose financiero */}
-                    <View style={styles.modalSection}>
-                        <TextMalet style={styles.modalSectionTitle}>Desglose Financiero</TextMalet>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Costo total</TextMalet>
-                            <TextMalet style={styles.modalInfoValue}>
-                                Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                            </TextMalet>
-                        </View>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Ganancia bruta</TextMalet>
-                            <TextMalet style={[styles.modalInfoValue, { color: '#059669' }]}>
-                                Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                            </TextMalet>
-                        </View>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Margen de ganancia</TextMalet>
-                            <TextMalet style={[styles.modalInfoValue, margenPct >= 30 ? { color: '#059669' } : { color: '#D97706' }]}>
-                                {margenPct.toFixed(2)}%
-                            </TextMalet>
-                        </View>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Ganancia por unidad</TextMalet>
-                            <TextMalet style={styles.modalInfoValue}>
-                                Bs {gananciaPorUnidad.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                            </TextMalet>
-                        </View>
+                    <View style={styles.modalInfoRow}>
+                        <TextMalet style={styles.modalInfoLabel}>Estado</TextMalet>
+                        <TextMalet style={[styles.modalInfoValue, { color: articulo.activo ? '#059669' : '#DC2626' }]}>
+                            {articulo.activo ? 'Activo' : 'Inactivo'}
+                        </TextMalet>
                     </View>
-
-                    {/* Información adicional */}
-                    <View style={styles.modalSection}>
-                        <TextMalet style={styles.modalSectionTitle}>Información del Artículo</TextMalet>
-
-                        {/* Descripción completa */}
-                        <View style={styles.modalDescriptionContainer}>
-                            <TextMalet style={styles.modalDescriptionLabel}>Descripción</TextMalet>
-                            <TextMalet style={styles.modalDescriptionText}>
-                                {articulo.descripcion}
-                            </TextMalet>
-                        </View>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Peso</TextMalet>
-                            <TextMalet style={styles.modalInfoValue}>{articulo.peso} kg</TextMalet>
-                        </View>
-                        <View style={styles.modalInfoRow}>
-                            <TextMalet style={styles.modalInfoLabel}>Estado</TextMalet>
-                            <TextMalet style={[styles.modalInfoValue, { color: articulo.activo ? '#059669' : '#DC2626' }]}>
-                                {articulo.activo ? 'Activo' : 'Inactivo'}
-                            </TextMalet>
-                        </View>
-                    </View>
-                </ScrollView>
-            </ModalOptions>
-        </>
+                </View>
+            </ScrollView>
+        </ModalOptions>
     );
 });
 
 const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
-    // Memoizar cálculos
+    const [showAll, setShowAll] = useState(false);
+
+    const [selectedProduct, setSelectedProduct] = useState<{ producto: TopProducto; index: number } | null>(null);
+
+    const visibleData = useMemo(() => {
+        return showAll ? data : data.slice(0, INITIAL_ITEMS_COUNT);
+    }, [data, showAll]);
+
+    const hasMoreItems = data.length > INITIAL_ITEMS_COUNT;
+    const remainingCount = data.length - INITIAL_ITEMS_COUNT;
+
     const { totalVendido, totalGanancia, maxTotal } = useMemo(() => {
         let vendido = 0;
         let ganancia = 0;
@@ -259,9 +290,29 @@ const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
         return { totalVendido: vendido, totalGanancia: ganancia, maxTotal: max };
     }, [data]);
 
+    const handleProductPress = useCallback((producto: TopProducto, index: number) => {
+        setSelectedProduct({ producto, index });
+    }, []);
+
+    const handleCloseModal = useCallback(() => {
+        setSelectedProduct(null);
+    }, []);
+
+    const renderItem = useCallback(({ item, index }: { item: TopProducto; index: number }) => (
+        <ProductItem
+            producto={item}
+            index={index}
+            maxTotal={maxTotal}
+            onPress={handleProductPress}
+        />
+    ), [maxTotal, handleProductPress]);
+
+    const keyExtractor = useCallback((item: TopProducto) => item.articulos.id.toString(), []);
+
+    const ItemSeparator = useCallback(() => <View style={styles.itemSeparator} />, []);
+
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.header}>
                 <View>
                     <TextMalet style={styles.title}>Top Productos</TextMalet>
@@ -269,19 +320,35 @@ const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
                 </View>
             </View>
 
-            {/* Lista de productos */}
-            <View style={styles.list}>
-                {data.map((producto, index) => (
-                    <ProductItem
-                        key={producto.articulos.id}
-                        producto={producto}
-                        index={index}
-                        maxTotal={maxTotal}
-                    />
-                ))}
-            </View>
+            <FlatList
+                data={visibleData}
+                renderItem={renderItem}
+                keyExtractor={keyExtractor}
+                ItemSeparatorComponent={ItemSeparator}
+                scrollEnabled={false}
+                removeClippedSubviews={true}
+                initialNumToRender={INITIAL_ITEMS_COUNT}
+                maxToRenderPerBatch={4}
+                windowSize={5}
+                getItemLayout={(_, index) => ({
+                    length: 130,
+                    offset: 130 * index + 12 * index,
+                    index,
+                })}
+            />
 
-            {/* Resumen */}
+            {hasMoreItems && (
+                <TouchableOpacity
+                    style={styles.showMoreButton}
+                    onPress={() => setShowAll(!showAll)}
+                    activeOpacity={0.7}
+                >
+                    <TextMalet style={styles.showMoreText}>
+                        {showAll ? 'Ver menos' : `Ver ${remainingCount} más`}
+                    </TextMalet>
+                </TouchableOpacity>
+            )}
+
             <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
                     <TextMalet style={styles.summaryLabel}>Total vendido</TextMalet>
@@ -293,6 +360,13 @@ const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
                     <FormattedAmount value={totalGanancia} color="#059669" />
                 </View>
             </View>
+
+            <ProductDetailModal
+                visible={selectedProduct !== null}
+                onClose={handleCloseModal}
+                producto={selectedProduct?.producto ?? null}
+                index={selectedProduct?.index ?? 0}
+            />
         </View>
     );
 });
@@ -322,6 +396,22 @@ const styles = StyleSheet.create({
     },
     list: {
         gap: 12,
+    },
+    itemSeparator: {
+        height: 12,
+    },
+    showMoreButton: {
+        alignSelf: 'center',
+        marginTop: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 20,
+    },
+    showMoreText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B7280',
     },
     productCard: {
         backgroundColor: '#FAFAFA',
@@ -482,7 +572,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#6B7280',
     },
-    // Modal styles
     modalScrollView: {
         maxHeight: 450,
     },

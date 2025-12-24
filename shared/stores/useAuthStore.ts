@@ -4,6 +4,11 @@ import { MALET_API_URL } from "../config/malet.config";
 import { UserPrimitives } from "../entities/User";
 import { secureFetch } from "../http/secureFetch";
 
+interface LoginResponse {
+    access_token: string;
+    user: UserPrimitives;
+}
+
 interface AuthStore {
     loading: boolean;
     setLoading: (loading: boolean) => void;
@@ -42,7 +47,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         const { error } = await secureFetch({
             url: MALET_API_URL + '/users/save',
             method: 'POST',
-            body: JSON.stringify(user),
+            body: user,
             setLoading: get().setLoading,
         })
 
@@ -56,22 +61,23 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     },
 
     login: async (credentials: { email: string; password: string }) => {
-        const { error, response } = await secureFetch({
+        const { error, response } = await secureFetch<LoginResponse>({
             url: MALET_API_URL + '/users/login',
             method: 'POST',
-            body: JSON.stringify(credentials),
+            body: credentials,
             setLoading: get().setLoading,
         })
 
-        if (error) {
-            get().setError(error);
+        if (error || !response) {
+            get().setError(error ?? 'Error al iniciar sesión');
             return false;
         }
 
-        AsyncStorage.setItem('token', response.access_token).then(() => {
-            get().setUser(response.user);
-            get().setError(null);
-        });
+        // Esperar a que el token se guarde antes de continuar
+        await AsyncStorage.setItem('token', response.access_token);
+        get().setUser(response.user);
+        get().setError(null);
+
         return true;
     },
 
@@ -100,15 +106,15 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
-        const { error, response } = await secureFetch({
+        const { error, response } = await secureFetch<UserPrimitives>({
             url: MALET_API_URL + '/auth/verify',
             method: 'GET',
             setLoading: get().setLoading,
         })
 
-        if (error) {
+        if (error || !response) {
             await AsyncStorage.removeItem('token');
-            set({ error });
+            set({ error: error ?? 'Error al verificar sesión' });
             return false;
         }
 

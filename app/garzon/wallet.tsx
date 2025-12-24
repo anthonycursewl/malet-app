@@ -5,6 +5,7 @@ import TextMalet from '@/components/TextMalet/TextMalet';
 import { MALET_API_URL } from '@/shared/config/malet.config';
 import { secureFetch } from '@/shared/http/secureFetch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
     Alert,
@@ -20,10 +21,86 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Rect } from 'react-native-svg';
+
+const SimpleBarcode = memo(({ value, width = 280, height = 80 }: { value: string; width?: number; height?: number }) => {
+    const CODE128_PATTERNS: Record<string, number[]> = {
+        'START': [2, 1, 1, 2, 3, 2],
+        'STOP': [2, 3, 3, 1, 1, 1, 2],
+        '0': [1, 1, 2, 2, 3, 2], '1': [1, 1, 2, 3, 2, 2], '2': [1, 1, 3, 2, 2, 2],
+        '3': [1, 2, 1, 1, 3, 3], '4': [1, 2, 1, 3, 1, 3], '5': [1, 3, 1, 1, 2, 3],
+        '6': [1, 2, 3, 1, 1, 3], '7': [1, 3, 2, 1, 1, 3], '8': [1, 3, 2, 3, 1, 1],
+        '9': [2, 1, 1, 2, 2, 3], 'A': [2, 1, 1, 3, 2, 2], 'B': [2, 3, 1, 1, 2, 2],
+        'C': [1, 1, 2, 1, 3, 3], 'D': [1, 1, 2, 3, 3, 1], 'E': [1, 3, 2, 1, 3, 1],
+        'F': [1, 1, 3, 1, 2, 3], 'G': [1, 1, 3, 3, 2, 1], 'H': [1, 3, 3, 1, 2, 1],
+        'I': [2, 1, 1, 1, 2, 4], 'J': [2, 1, 1, 1, 4, 2], 'K': [2, 1, 4, 1, 1, 2],
+        'L': [2, 4, 1, 1, 1, 2], 'M': [4, 1, 1, 2, 1, 2], 'N': [4, 1, 1, 2, 2, 1],
+        'O': [2, 1, 2, 1, 2, 3], 'P': [2, 1, 2, 3, 2, 1], 'Q': [2, 3, 2, 1, 2, 1],
+        'R': [1, 1, 1, 3, 2, 3], 'S': [1, 3, 1, 1, 2, 3], 'T': [1, 3, 1, 3, 2, 1],
+        'U': [1, 1, 2, 3, 2, 2], 'V': [1, 1, 4, 1, 2, 2], 'W': [1, 2, 4, 1, 1, 2],
+        'X': [1, 2, 2, 1, 4, 1], 'Y': [1, 2, 2, 4, 1, 1], 'Z': [1, 4, 2, 1, 2, 1],
+    };
+
+    const generateBars = (text: string) => {
+        const bars: { x: number; width: number }[] = [];
+        const padding = 8;
+
+        const patterns: number[][] = [];
+        patterns.push(CODE128_PATTERNS['START']);
+
+        for (const char of text.toUpperCase()) {
+            const pattern = CODE128_PATTERNS[char];
+            if (pattern) {
+                patterns.push(pattern);
+            } else {
+                patterns.push([1, 2, 1, 2, 1, 2]);
+            }
+        }
+
+        patterns.push(CODE128_PATTERNS['STOP']);
+
+        let totalUnits = 0;
+        for (const pattern of patterns) {
+            totalUnits += pattern.reduce((sum, val) => sum + val, 0);
+        }
+
+        const availableWidth = width - (padding * 2);
+        const unitWidth = availableWidth / totalUnits;
+
+        let x = padding;
+        for (const pattern of patterns) {
+            for (let i = 0; i < pattern.length; i++) {
+                const w = pattern[i] * unitWidth;
+                if (i % 2 === 0) {
+                    bars.push({ x, width: Math.max(w, 1) });
+                }
+                x += w;
+            }
+        }
+
+        return bars;
+    };
+
+    const bars = generateBars(value);
+
+    return (
+        <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+            {bars.map((bar, index) => (
+                <Rect
+                    key={index}
+                    x={bar.x}
+                    y={4}
+                    width={bar.width}
+                    height={height - 8}
+                    fill="#1F2937"
+                />
+            ))}
+        </Svg>
+    );
+});
 
 const STORAGE_KEY_WALLET_ID = 'garzon_wallet_id';
 
-// Banderas por código de moneda
 const CURRENCY_FLAGS: Record<string, string> = {
     COP: 'https://flagcdn.com/w40/co.png',
     USD: 'https://flagcdn.com/w40/us.png',
@@ -31,7 +108,6 @@ const CURRENCY_FLAGS: Record<string, string> = {
     PTG: 'https://flagcdn.com/w40/ve.png',
 };
 
-// Colores por código de moneda
 const CURRENCY_COLORS: Record<string, { bg: string; text: string }> = {
     COP: { bg: '#FEF3C7', text: '#D97706' },
     USD: { bg: '#D1FAE5', text: '#059669' },
@@ -74,7 +150,27 @@ interface WalletResponse {
     wallets: WalletItem[];
 }
 
-// Skeleton animado
+interface TokenWalletData {
+    id: number;
+    moneda: number;
+    cliente_id: number;
+    token: string;
+    date_token: string;
+}
+
+interface TokenDataItem {
+    code: number;
+    wallet: TokenWalletData;
+    message: string;
+}
+
+interface TokenResponse {
+    success: boolean;
+    message: string;
+    data: TokenDataItem[];
+    requestedWallets: number;
+}
+
 const SkeletonBox = memo(({ width, height, style }: { width: number | string; height: number; style?: any }) => {
     const animatedValue = React.useRef(new Animated.Value(0)).current;
 
@@ -189,7 +285,6 @@ const WalletCardSkeleton = memo(() => (
     </View>
 ));
 
-// Componente de carga completo
 const LoadingSkeleton = memo(() => (
     <View style={styles.listContent}>
         <ClientCardSkeleton />
@@ -202,6 +297,97 @@ const LoadingSkeleton = memo(() => (
         <WalletCardSkeleton />
     </View>
 ));
+
+const QRModalSkeleton = memo(() => (
+    <View style={qrSkeletonStyles.container}>
+        {/* Tabs skeleton */}
+        <View style={qrSkeletonStyles.tabsContainer}>
+            <View style={qrSkeletonStyles.tabActive}>
+                <SkeletonBox width={60} height={12} />
+            </View>
+            <View style={qrSkeletonStyles.tab}>
+                <SkeletonBox width={80} height={12} />
+            </View>
+        </View>
+
+        {/* QR Code skeleton */}
+        <View style={qrSkeletonStyles.qrContainer}>
+            <SkeletonBox width={200} height={200} style={{ borderRadius: 12 }} />
+            {/* Logo overlay simulado */}
+            <View style={qrSkeletonStyles.logoOverlay}>
+                <SkeletonBox width={44} height={44} style={{ borderRadius: 10 }} />
+            </View>
+        </View>
+
+        {/* Código skeleton */}
+        <View style={qrSkeletonStyles.codeContainer}>
+            <SkeletonBox width={50} height={10} style={{ marginBottom: 8 }} />
+            <SkeletonBox width={120} height={24} style={{ marginBottom: 8 }} />
+            <SkeletonBox width={80} height={10} />
+        </View>
+    </View>
+));
+
+const qrSkeletonStyles = StyleSheet.create({
+    container: {
+        alignItems: 'center',
+        width: '100%',
+    },
+    tabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        padding: 4,
+        marginBottom: 16,
+        width: '100%',
+    },
+    tabActive: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 8,
+        backgroundColor: '#fff',
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    qrContainer: {
+        padding: 16,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+        position: 'relative',
+    },
+    logoOverlay: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: [{ translateX: -22 }, { translateY: -22 }],
+        backgroundColor: '#fff',
+        padding: 4,
+        borderRadius: 12,
+    },
+    codeContainer: {
+        backgroundColor: '#F0FDF4',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        marginBottom: 16,
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#D1FAE5',
+    },
+});
 
 const WalletCard = memo(({ wallet }: { wallet: WalletItem }) => {
     const colors = CURRENCY_COLORS[wallet.currencyCode] || { bg: '#F3F4F6', text: '#6B7280' };
@@ -289,8 +475,8 @@ export default function GarzonWalletScreen() {
     const [isGeneratingToken, setIsGeneratingToken] = useState(false);
     const [tokenData, setTokenData] = useState<string | null>(null);
     const [showQRModal, setShowQRModal] = useState(false);
+    const [modalCodeTab, setModalCodeTab] = useState<'qr' | 'barcode'>('qr');
 
-    // Cargar ID guardado al iniciar
     useEffect(() => {
         loadSavedId();
     }, []);
@@ -318,7 +504,7 @@ export default function GarzonWalletScreen() {
         setError(null);
 
         try {
-            const { response, error } = await secureFetch({
+            const { response, error } = await secureFetch<WalletResponse>({
                 url: `${MALET_API_URL}/garzon/wallet/${id}`,
                 method: 'GET',
             });
@@ -327,6 +513,7 @@ export default function GarzonWalletScreen() {
                 throw new Error(error || 'Error al consultar wallet');
             }
 
+            console.log('Wallet response:', response);
             setWalletData(response);
         } catch (err: any) {
             setError(err.message || 'Error de conexión');
@@ -375,7 +562,6 @@ export default function GarzonWalletScreen() {
         }
     }, [walletId]);
 
-    // Token functions
     const toggleWalletSelection = useCallback((walletId: number) => {
         setSelectedWallet(prev => prev === walletId ? null : walletId);
     }, []);
@@ -386,12 +572,14 @@ export default function GarzonWalletScreen() {
             return;
         }
 
-        setIsGeneratingToken(true);
         setTokenData(null);
+        setShowQRModal(true);
+        setIsGeneratingToken(true);
 
         try {
             const wallet = walletData.wallets.find(w => w.walletId === selectedWallet);
             if (!wallet) {
+                setShowQRModal(false);
                 Alert.alert('Error', 'Wallet no encontrada');
                 return;
             }
@@ -402,26 +590,25 @@ export default function GarzonWalletScreen() {
                 client_id: walletData.client.id,
             }];
 
-            console.log(walletsPayload)
-
-            const { response, error } = await secureFetch({
+            const { response, error } = await secureFetch<TokenResponse>({
                 url: `${MALET_API_URL}/garzon/wallet/token`,
                 method: 'POST',
-                body: JSON.stringify(walletsPayload),
+                body: walletsPayload,
             });
 
-            console.log('ERROR EN LA VAINA ESTA ' + error)
-
             if (error) {
+                setShowQRModal(false);
                 throw new Error(error || 'Error al generar token');
             }
 
-            // Assuming the response contains a token string
-            const token = typeof response === 'string' ? response : JSON.stringify(response);
-            setTokenData(token);
-            setShowQRModal(true);
+            if (!response?.success || !response?.data?.[0]?.wallet?.token) {
+                setShowQRModal(false);
+                throw new Error(response?.message || 'No se recibió un token válido');
+            }
 
-            // Refresh wallet data
+            const tokenCode = response.data[0].wallet.token;
+            setTokenData(tokenCode.toUpperCase());
+
             if (savedId) {
                 fetchWallet(savedId);
             }
@@ -431,6 +618,13 @@ export default function GarzonWalletScreen() {
             setIsGeneratingToken(false);
         }
     }, [walletData, selectedWallet, savedId]);
+
+    const copyToClipboard = useCallback(async () => {
+        if (tokenData) {
+            await Clipboard.setStringAsync(tokenData);
+            Alert.alert('Copiado', 'El código se ha copiado al portapapeles');
+        }
+    }, [tokenData]);
 
     const clearWalletSelection = useCallback(() => {
         setSelectedWallet(null);
@@ -701,45 +895,92 @@ export default function GarzonWalletScreen() {
             {/* Modal de QR */}
             <ModalOptions
                 visible={showQRModal}
-                onClose={() => setShowQRModal(false)}
+                onClose={() => {
+                    if (!isGeneratingToken) {
+                        setShowQRModal(false);
+                        setTokenData(null);
+                        setSelectedWallet(null);
+                    }
+                }}
             >
                 <View>
-                    <View style={styles.qrModalContainer}>
-                        <TextMalet style={styles.qrModalTitle}>Token Generado</TextMalet>
+                    <ScrollView
+                        style={styles.qrModalScrollView}
+                        contentContainerStyle={styles.qrModalContainer}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <TextMalet style={styles.qrModalTitle}>
+                            {isGeneratingToken ? 'Generando Token...' : 'Token Generado'}
+                        </TextMalet>
                         <TextMalet style={styles.qrModalSubtitle}>
-                            Escanea este código para usar tu wallet
+                            {isGeneratingToken
+                                ? 'Por favor espera mientras generamos tu código'
+                                : 'Escanea este código para usar tu wallet'
+                            }
                         </TextMalet>
 
-                        {tokenData && (
-                            <View style={styles.qrCodeContainer}>
-                                <QRCode
-                                    value={tokenData}
-                                    size={200}
-                                    backgroundColor="white"
-                                    color="black"
-                                    logo={require('@/assets/images/malet/malet.png')}
-                                    logoSize={40}
-                                    logoBackgroundColor="white"
-                                    logoMargin={4}
-                                    logoBorderRadius={8}
-                                />
-                            </View>
-                        )}
+                        {isGeneratingToken ? (
+                            <QRModalSkeleton />
+                        ) : tokenData ? (
+                            <>
+                                {/* Tabs para QR y Código de Barras */}
+                                <View style={styles.modalTabsContainer}>
+                                    <TouchableOpacity
+                                        style={[styles.modalTab, modalCodeTab === 'qr' && styles.modalTabActive]}
+                                        onPress={() => setModalCodeTab('qr')}
+                                    >
+                                        <TextMalet style={[styles.modalTabText, modalCodeTab === 'qr' && styles.modalTabTextActive]}>
+                                            Código QR
+                                        </TextMalet>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.modalTab, modalCodeTab === 'barcode' && styles.modalTabActive]}
+                                        onPress={() => setModalCodeTab('barcode')}
+                                    >
+                                        <TextMalet style={[styles.modalTabText, modalCodeTab === 'barcode' && styles.modalTabTextActive]}>
+                                            Código de Barras
+                                        </TextMalet>
+                                    </TouchableOpacity>
+                                </View>
 
-                        <TouchableOpacity
-                            style={styles.qrCloseButton}
-                            onPress={() => {
-                                setShowQRModal(false);
-                                setTokenData(null);
-                                setSelectedWallet(null);
-                            }}
-                        >
-                            <TextMalet style={styles.qrCloseButtonText}>Cerrar</TextMalet>
-                        </TouchableOpacity>
-                    </View>
+                                {/* Código - arriba del contenido */}
+                                <TouchableOpacity
+                                    style={styles.tokenCodeContainer}
+                                    onPress={copyToClipboard}
+                                    activeOpacity={0.7}
+                                >
+                                    <TextMalet style={styles.tokenCodeValue}>{tokenData}</TextMalet>
+                                </TouchableOpacity>
+
+                                {/* Contenido según tab activo */}
+                                {modalCodeTab === 'qr' ? (
+                                    <View style={styles.qrCodeContainer}>
+                                        <QRCode
+                                            value={tokenData}
+                                            size={200}
+                                            backgroundColor="white"
+                                            color="#1F2937"
+                                            logo={require('@/assets/images/malet/malet.png')}
+                                            logoSize={40}
+                                            logoBackgroundColor="white"
+                                            logoMargin={4}
+                                            logoBorderRadius={8}
+                                        />
+                                    </View>
+                                ) : (
+                                    <View style={styles.barcodeContainer}>
+                                        <View style={styles.barcodeWrapper}>
+                                            <SimpleBarcode value={tokenData} width={280} height={80} />
+                                        </View>
+                                    </View>
+                                )}
+                            </>
+                        ) : null}
+
+                    </ScrollView>
                 </View>
             </ModalOptions>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }
 
@@ -771,7 +1012,6 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         marginTop: 5,
     },
-    // ID guardado
     savedIdContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1242,44 +1482,136 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         textAlign: 'center',
     },
+    qrModalScrollView: {
+        maxHeight: 600,
+    },
     qrModalContainer: {
         backgroundColor: '#fff',
         borderRadius: 20,
-        padding: 24,
+        padding: 5,
+        paddingHorizontal: 1,
         alignItems: 'center',
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 340,
     },
     qrModalTitle: {
         fontSize: 20,
         fontWeight: '700',
         color: '#1F2937',
-        marginBottom: 4,
+        marginBottom: 2,
+        textAlign: 'center',
     },
     qrModalSubtitle: {
         fontSize: 13,
         color: '#6B7280',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
+    },
+    modalTabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        padding: 4,
+        marginBottom: 16,
+        width: '100%',
+    },
+    modalTab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    modalTabActive: {
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    modalTabText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    modalTabTextActive: {
+        color: '#10B981',
+        fontWeight: '600',
     },
     qrCodeContainer: {
-        padding: 16,
+        padding: 10,
         backgroundColor: '#fff',
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#E5E7EB',
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    tokenCodeContainer: {
+        backgroundColor: '#fcfcfcff',
+        borderRadius: 25,
+        paddingVertical: 5,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#a5a5a5ff',
+    },
+    tokenCodeValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#3b3b3bff',
+        letterSpacing: 5,
+        textAlign: 'center',
+    },
+    barcodeContainer: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        alignItems: 'center',
         marginBottom: 20,
+        width: '100%',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    barcodeLabel: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#6B7280',
+        marginBottom: 8,
+        letterSpacing: 1,
+    },
+    barcodeWrapper: {
+        backgroundColor: '#fff',
+        padding: 8,
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    barcodeValue: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#374151',
+        letterSpacing: 2,
+        textAlign: 'center',
     },
     qrCloseButton: {
         backgroundColor: '#1F2937',
-        paddingVertical: 12,
+        paddingVertical: 14,
         paddingHorizontal: 32,
-        borderRadius: 10,
+        borderRadius: 12,
         width: '100%',
         alignItems: 'center',
     },
+    qrCloseButtonDisabled: {
+        backgroundColor: '#9CA3AF',
+    },
     qrCloseButtonText: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
         color: '#fff',
     },

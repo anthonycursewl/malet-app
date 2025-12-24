@@ -1,13 +1,14 @@
 // stores/useGarzonStore.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { HttpError, getUserFriendlyMessage } from '../http/HttpError';
 import {
     GarzonAuthState,
     GarzonCredentials,
     GarzonSession,
     GarzonUser
 } from '../interfaces/garzon.interfaces';
-import { ApiError, garzonApi } from '../services/garzon/GarzonApi';
+import { garzonApi } from '../services/garzon/GarzonApi';
 
 const STORAGE_KEY = '@garzon_session';
 
@@ -59,8 +60,8 @@ export const useGarzonStore = create<GarzonStore>((set, get) => ({
 
             return true;
         } catch (error) {
-            const message = error instanceof ApiError
-                ? error.message
+            const message = error instanceof HttpError
+                ? getUserFriendlyMessage(error)
                 : 'Error al conectar con el servidor';
 
             set({
@@ -109,7 +110,7 @@ export const useGarzonStore = create<GarzonStore>((set, get) => ({
                 isLoading: false,
             });
         } catch (error) {
-            if (error instanceof ApiError && error.status === 401) {
+            if (error instanceof HttpError && error.status === 401) {
                 await get().logout();
                 set({
                     error: 'La sesión ha expirado. Por favor, inicia sesión nuevamente.',
@@ -118,8 +119,8 @@ export const useGarzonStore = create<GarzonStore>((set, get) => ({
             } else {
                 set({
                     isLoading: false,
-                    error: error instanceof ApiError
-                        ? error.message
+                    error: error instanceof HttpError
+                        ? getUserFriendlyMessage(error)
                         : 'Error al actualizar los datos',
                 });
             }

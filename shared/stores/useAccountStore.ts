@@ -33,16 +33,16 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
 
 
     createAccount: async (account: Omit<Account, 'created_at' | 'updated_at' | 'id'>) => {
-        const { error, response } = await secureFetch({
+        const { error, response } = await secureFetch<Account>({
             url: MALET_API_URL + '/accounts/create',
             method: 'POST',
-            body: JSON.stringify(account),
+            body: account,
             setLoading: get().setLoading
         })
 
-        if (error) {
-            get().setError(error);
-            return
+        if (error || !response) {
+            get().setError(error ?? 'Error al crear la cuenta');
+            return null as unknown as Account;
         }
 
         get().setError(null);
@@ -56,16 +56,16 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
             error: null
         })
 
-        const { error, response } = await secureFetch({
+        const { error, response } = await secureFetch<Account>({
             url: `${MALET_API_URL}/accounts/update/${account_id}`,
             method: 'PUT',
-            body: JSON.stringify(account),
+            body: account,
             setLoading: get().setLoading
         })
 
-        if (error) {
-            set({ error })
-            return null
+        if (error || !response) {
+            set({ error: error ?? 'Error al actualizar la cuenta', loading: false })
+            return null as unknown as Account;
         }
 
         set({ error: null, loading: false })
@@ -87,17 +87,19 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
             loading: true,
             error: null
         })
-        const { error, response } = await secureFetch({
+        const { error, response } = await secureFetch<Account[]>({
             url: `${MALET_API_URL}/accounts/get/all`,
             method: 'GET',
-            setLoading: get().setLoading
+            setLoading: get().setLoading,
+            expectArray: true
         })
 
-        if (error) {
-            set({ error })
+        if (error || !response) {
+            set({ error: error ?? 'Error al cargar las cuentas', loading: false })
+            return;
         }
 
-        set({ error: null, accounts: response });
+        set({ error: null, accounts: response, loading: false });
     },
 
     updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => {

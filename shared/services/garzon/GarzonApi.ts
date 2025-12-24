@@ -1,5 +1,13 @@
 import { MALET_API_URL } from '@/shared/config/malet.config';
 import {
+    createTimeoutController,
+    ensureArray,
+    HttpError,
+    HttpResult,
+    parseError,
+    parseResponse,
+} from '@/shared/http/HttpError';
+import {
     DashboardData,
     GarzonCompleteResponse,
     GarzonSession,
@@ -11,23 +19,18 @@ import {
 } from '@/shared/interfaces/garzon.interfaces';
 
 const API_BASE_URL = MALET_API_URL;
+const REQUEST_TIMEOUT = 15000;
+
+// Alias para compatibilidad con código existente
+const ApiError = HttpError;
+type ApiResult<T> = HttpResult<T>;
 
 /**
- * Error personalizado con status HTTP
- */
-class ApiError extends Error {
-    status: number;
-    constructor(message: string, status: number) {
-        super(message);
-        this.status = status;
-        this.name = 'ApiError';
-    }
-}
-
-/**
- * Helper para hacer peticiones POST
+ * Helper para hacer peticiones POST con timeout y manejo robusto de errores
  */
 async function post<T>(endpoint: string, body: object): Promise<T> {
+    const { controller, cleanup } = createTimeoutController(REQUEST_TIMEOUT);
+
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
@@ -35,24 +38,57 @@ async function post<T>(endpoint: string, body: object): Promise<T> {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
+            signal: controller.signal,
         });
 
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            throw new ApiError(
-                data.message || `Error ${response.status}`,
-                response.status
-            );
-        }
-
-        return data as T;
+        cleanup();
+        return await parseResponse<T>(response);
     } catch (error) {
-        if (error instanceof ApiError) {
-            throw error;
-        }
-        throw new ApiError('Error de conexión con el servidor', 0);
+        cleanup();
+        throw parseError(error);
     }
+}
+
+/**
+ * Versión segura de post que retorna ApiResult en lugar de lanzar excepciones
+ */
+async function safePost<T>(endpoint: string, body: object): Promise<ApiResult<T>> {
+    try {
+        const data = await post<T>(endpoint, body);
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: parseError(error),
+        };
+    }
+}
+
+/**
+ * Valores por defecto para DashboardData (evita crashes por datos undefined)
+ */
+const DEFAULT_DASHBOARD_DATA: DashboardData = {
+    ventasPorTienda: [],
+    topClientes: [],
+    topPagos: [],
+    topProductos: [],
+    ventasPorDepartamento: [],
+};
+
+/**
+ * Normaliza los datos del dashboard asegurando que todos los arrays existan
+ */
+function normalizeDashboardData(data: Partial<DashboardData> | null | undefined): DashboardData {
+    if (!data) return DEFAULT_DASHBOARD_DATA;
+
+    return {
+        ventasPorTienda: ensureArray(data.ventasPorTienda),
+        topClientes: ensureArray(data.topClientes),
+        topPagos: ensureArray(data.topPagos),
+        topProductos: ensureArray(data.topProductos),
+        ventasPorDepartamento: ensureArray(data.ventasPorDepartamento),
+    };
 }
 
 export const garzonApi = {
@@ -65,11 +101,17 @@ export const garzonApi = {
         password: string,
         stid: number = 0
     ): Promise<GarzonCompleteResponse> => {
-        return post<GarzonCompleteResponse>('/garzon/dashboard/complete', {
+        const response = await post<GarzonCompleteResponse>('/garzon/dashboard/complete', {
             username,
             password,
             stid,
         });
+
+        // Normalizar dashboard para evitar undefined en arrays
+        return {
+            ...response,
+            dashboard: normalizeDashboardData(response.dashboard),
+        };
     },
 
     /**
@@ -80,10 +122,13 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<DashboardData> => {
-        return post<DashboardData>('/garzon/dashboard/all', {
+        const data = await post<DashboardData>('/garzon/dashboard/all', {
             session,
             stid,
         });
+
+        // Normalizar para evitar undefined en arrays
+        return normalizeDashboardData(data);
     },
 
     /**
@@ -109,10 +154,11 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<VentasTienda[]> => {
-        return post<VentasTienda[]>('/garzon/dashboard/ventas-tienda', {
+        const data = await post<VentasTienda[]>('/garzon/dashboard/ventas-tienda', {
             session,
             stid,
         });
+        return Array.isArray(data) ? data : [];
     },
 
     /**
@@ -122,10 +168,11 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<TopCliente[]> => {
-        return post<TopCliente[]>('/garzon/dashboard/top-clientes', {
+        const data = await post<TopCliente[]>('/garzon/dashboard/top-clientes', {
             session,
             stid,
         });
+        return Array.isArray(data) ? data : [];
     },
 
     /**
@@ -135,10 +182,11 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<TopPago[]> => {
-        return post<TopPago[]>('/garzon/dashboard/top-pagos', {
+        const data = await post<TopPago[]>('/garzon/dashboard/top-pagos', {
             session,
             stid,
         });
+        return Array.isArray(data) ? data : [];
     },
 
     /**
@@ -148,10 +196,11 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<TopProducto[]> => {
-        return post<TopProducto[]>('/garzon/dashboard/top-productos', {
+        const data = await post<TopProducto[]>('/garzon/dashboard/top-productos', {
             session,
             stid,
         });
+        return Array.isArray(data) ? data : [];
     },
 
     /**
@@ -161,12 +210,14 @@ export const garzonApi = {
         session: GarzonSession,
         stid: number = 0
     ): Promise<VentasDepartamento[]> => {
-        return post<VentasDepartamento[]>('/garzon/dashboard/ventas-departamento', {
+        const data = await post<VentasDepartamento[]>('/garzon/dashboard/ventas-departamento', {
             session,
             stid,
         });
+        return Array.isArray(data) ? data : [];
     },
 };
 
-export { ApiError };
+export { ApiError, DEFAULT_DASHBOARD_DATA, normalizeDashboardData, safePost };
+export type { ApiResult };
 

@@ -3,10 +3,8 @@ import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import IconExchange from "@/svgs/common/IconExchange";
 import IconAt from "@/svgs/dashboard/IconAt";
-// Iconos sugeridos (puedes usar los de tu librería de iconos preferida, ej: Lucide o Ionicons)
-// Aquí uso TextMalet como placeholder para los iconos si no tienes una librería instalada
-import * as Clipboard from 'expo-clipboard'; // npx expo install expo-clipboard
-import * as Haptics from 'expo-haptics'; // npx expo install expo-haptics
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -77,10 +75,32 @@ export default function Calculator() {
         return parseFloat(String(tasas?.[selectedTasaIndex]?.promedio || 0));
     }, [tasas, selectedTasaIndex]);
 
+    const lastEditedField = useRef<'from' | 'to'>('from');
+
+    useEffect(() => {
+        const rate = getCurrentRate();
+        if (rate === 0) return;
+
+        if (lastEditedField.current === 'from' && fromAmount) {
+            const numValue = parseFloat(cleanNumber(fromAmount));
+            if (!isNaN(numValue)) {
+                const result = fromCurrency === 'USD' ? numValue * rate : numValue / rate;
+                setToAmount(result.toFixed(2));
+            }
+        } else if (lastEditedField.current === 'to' && toAmount) {
+            const numValue = parseFloat(cleanNumber(toAmount));
+            if (!isNaN(numValue)) {
+                const result = toCurrency === 'BS' ? numValue / rate : numValue * rate;
+                setFromAmount(result.toFixed(2));
+            }
+        }
+    }, [selectedTasaIndex, getCurrentRate, fromCurrency, toCurrency]);
+
     const handleConvert = useCallback((value: string, isFromInput: boolean) => {
-        // Permitir solo números y un punto decimal
         const rawValue = cleanNumber(value);
         if (!/^\d*\.?\d*$/.test(rawValue)) return;
+
+        lastEditedField.current = isFromInput ? 'from' : 'to';
 
         const rate = getCurrentRate();
         const numValue = parseFloat(rawValue);
@@ -124,7 +144,6 @@ export default function Calculator() {
         if (!text) return;
         await Clipboard.setStringAsync(text);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Aquí podrías mostrar un Toast
         Alert.alert("Copiado", "Monto copiado al portapapeles");
     };
 

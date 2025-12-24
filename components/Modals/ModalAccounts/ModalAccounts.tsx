@@ -11,12 +11,13 @@ import { router } from "expo-router";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
     Animated,
-    ScrollView,
+    FlatList,
     StyleSheet,
     TouchableOpacity,
     View
 } from "react-native";
 import { AccountItem } from "./AccountItem";
+import { AccountSkeletonList } from "./AccountItemSkeleton";
 
 interface ModalAccountsProps {
     visible: boolean;
@@ -47,13 +48,13 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
         if (!user?.id || isLoadingRef.current) return;
 
 
-        if (accounts.length > 0 && !forceRefresh) return;
+        if ((accounts?.length ?? 0) > 0 && !forceRefresh) return;
 
         try {
             isLoadingRef.current = true;
             setHasLoadError(false);
 
-            const shouldShowLoading = forceRefresh || accounts.length === 0;
+            const shouldShowLoading = forceRefresh || (accounts?.length ?? 0) === 0;
 
             if (shouldShowLoading) {
                 setIsRefreshing(true);
@@ -99,7 +100,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
         isMounted.current = true;
 
         if (visible) {
-            if (accounts.length === 0) {
+            if ((accounts?.length ?? 0) === 0) {
                 loadAccounts(false);
             }
         }
@@ -108,7 +109,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
             isMounted.current = false;
             spinValue.stopAnimation();
         };
-    }, [visible, loadAccounts, spinValue, accounts.length]);
+    }, [visible, loadAccounts, spinValue, accounts?.length]);
 
     const handleAccountPress = useCallback((account: Account) => {
         setSelectedAccount(account);
@@ -134,28 +135,25 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
         }, 300);
     }, [onClose, router]);
 
-    const renderSkeleton = () => {
-        return (
-            <View style={styles.skeletonContainer}>
-                {[1, 2, 3].map((i) => (
-                    <View key={i} style={styles.skeletonItem}>
-                        <View style={styles.skeletonAvatar} />
-                        <View style={styles.skeletonTextContainer}>
-                            <View style={[styles.skeletonText, { width: '60%' }]} />
-                            <View style={[styles.skeletonText, { width: '40%', marginTop: 8 }]} />
-                        </View>
-                    </View>
-                ))}
-            </View>
-        );
-    };
+    // Render item optimizado para FlatList
+    const renderAccountItem = useCallback(({ item, index }: { item: Account; index: number }) => (
+        <AccountItem
+            account={item}
+            onPress={handleAccountPress}
+            onLongPress={handleAccountLongPress}
+            isLast={index === (accounts?.length ?? 0) - 1}
+        />
+    ), [handleAccountPress, handleAccountLongPress, accounts?.length]);
+
+    // Key extractor para FlatList
+    const keyExtractor = useCallback((item: Account) => item.id, []);
 
     const renderContent = useCallback(() => {
-        if ((loading && accounts.length === 0) || isRefreshing) {
-            return renderSkeleton();
+        if ((loading && (accounts?.length ?? 0) === 0) || isRefreshing) {
+            return <AccountSkeletonList count={4} />;
         }
 
-        if (hasLoadError && accounts.length === 0) {
+        if (hasLoadError && (accounts?.length ?? 0) === 0) {
             return (
                 <View style={styles.errorContainer}>
                     <View style={styles.errorIconContainer}>
@@ -182,20 +180,22 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
 
         if (accounts && accounts.length > 0) {
             return (
-                <ScrollView
+                <FlatList
+                    data={accounts}
+                    renderItem={renderAccountItem}
+                    keyExtractor={keyExtractor}
                     style={styles.accountsList}
                     showsVerticalScrollIndicator={false}
-                >
-                    {accounts.map((account, index) => (
-                        <AccountItem
-                            key={account.id}
-                            account={account}
-                            onPress={handleAccountPress}
-                            onLongPress={handleAccountLongPress}
-                            isLast={index === accounts.length - 1}
-                        />
-                    ))}
-                </ScrollView>
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    getItemLayout={(_, index) => ({
+                        length: 72, // Altura aproximada de cada item
+                        offset: 72 * index,
+                        index,
+                    })}
+                />
             );
         }
 
@@ -222,7 +222,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                 </TouchableOpacity>
             </View>
         );
-    }, [loading, accounts, handleAccountPress, handleCreateAccount, isRefreshing, hasLoadError, loadAccounts, handleAccountLongPress]);
+    }, [loading, accounts, handleAccountPress, handleCreateAccount, isRefreshing, hasLoadError, loadAccounts, handleAccountLongPress, renderAccountItem, keyExtractor]);
 
     return (
         <ModalOptions
@@ -300,32 +300,6 @@ const styles = StyleSheet.create({
         height: 22,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    skeletonContainer: {
-        paddingVertical: spacing.small,
-    },
-    skeletonItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: spacing.medium,
-        paddingHorizontal: spacing.small,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f5f5f5',
-    },
-    skeletonAvatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#f0f0f0',
-        marginRight: 12,
-    },
-    skeletonTextContainer: {
-        flex: 1,
-    },
-    skeletonText: {
-        height: 16,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 4,
     },
     headerTitleContainer: {
         flexDirection: 'row',

@@ -37,7 +37,10 @@ const CommunitiesHeader = memo((): React.ReactElement => {
             </MaskedView>
 
             <View style={styles.placeholder}>
-                <Image source={{ uri: user?.avatar_url || PLACEHOLDER_AVATAR_URL }} style={{ width: 35, height: 35, borderRadius: 50 }} />
+                <Image
+                    source={user?.avatar_url ? { uri: user.avatar_url } : PLACEHOLDER_AVATAR_URL}
+                    style={{ width: 35, height: 35, borderRadius: 50 }}
+                />
             </View>
         </View>
     );

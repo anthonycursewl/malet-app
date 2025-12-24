@@ -70,7 +70,6 @@ export default function TransactionDetail() {
   };
 
   const handleCopyId = () => {
-    // In a real app with expo-clipboard: await Clipboard.setStringAsync(transaction.id.toString());
     Alert.alert('Copiado', `ID ${transaction.id} copiado al portapapeles`);
   };
 

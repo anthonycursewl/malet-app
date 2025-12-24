@@ -2,7 +2,7 @@ import GarzonDashboard from '@/components/garzon/GarzonDashboard';
 import GarzonHeader from '@/components/garzon/GarzonHeader';
 import GarzonLoginForm from '@/components/garzon/GarzonLoginForm';
 import { useGarzonStore } from '@/shared/stores/useGarzonStore';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +18,10 @@ export default function GarzonScreen() {
         refreshDashboard,
     } = useGarzonStore();
 
+    // Auto-refresh state
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+    const [autoRefreshInterval, setAutoRefreshInterval] = useState(30);
+
     const handleLogin = useCallback(async (credentials: { username: string; password: string }) => {
         const success = await login(credentials);
         return success;
@@ -31,6 +35,11 @@ export default function GarzonScreen() {
         await refreshDashboard();
     }, [refreshDashboard]);
 
+    const handleAutoRefreshChange = useCallback((enabled: boolean, interval: number) => {
+        setAutoRefreshEnabled(enabled);
+        setAutoRefreshInterval(interval);
+    }, []);
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -40,6 +49,9 @@ export default function GarzonScreen() {
                 onLogout={handleLogout}
                 isLoading={isLoading}
                 isAuthenticated={isAuthenticated}
+                autoRefreshEnabled={autoRefreshEnabled}
+                autoRefreshInterval={autoRefreshInterval}
+                onAutoRefreshChange={handleAutoRefreshChange}
             />
 
             {isAuthenticated && dashboardData ? (

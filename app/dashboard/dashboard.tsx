@@ -15,26 +15,255 @@ import IconPlus from "@/svgs/dashboard/IconPlus";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ModalAccountsRef {
     openModal: () => void;
 }
 
-const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Value, logoFadeAnim: Animated.Value }) => (
-    <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
-        <Animated.View style={{ opacity: logoFadeAnim }}>
-            <IconAt width={100} height={100} />
+// Solar System Loading Screen
+const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Value, logoFadeAnim: Animated.Value }) => {
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const dotAnim1 = useRef(new Animated.Value(0)).current;
+    const dotAnim2 = useRef(new Animated.Value(0)).current;
+    const dotAnim3 = useRef(new Animated.Value(0)).current;
+    const progressAnim = useRef(new Animated.Value(0)).current;
+
+    // Orbit animations - different speeds for each planet
+    const orbit1Anim = useRef(new Animated.Value(0)).current;
+    const orbit2Anim = useRef(new Animated.Value(0)).current;
+    const orbit3Anim = useRef(new Animated.Value(0)).current;
+
+    // Orbit configuration
+    const orbits = [
+        { anim: orbit1Anim, radius: 50, duration: 3000, label: '💰', size: 18 },
+        { anim: orbit2Anim, radius: 75, duration: 5000, label: '📊', size: 16 },
+        { anim: orbit3Anim, radius: 100, duration: 7000, label: '💳', size: 14 },
+    ];
+
+    useEffect(() => {
+        // Subtle logo pulse (sun glow effect)
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.05,
+                    duration: 2000,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 2000,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+
+        // Start all orbit animations
+        orbits.forEach(({ anim, duration }) => {
+            Animated.loop(
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                })
+            ).start();
+        });
+
+        // Dots animation
+        const animateDots = () => {
+            Animated.sequence([
+                Animated.timing(dotAnim1, { toValue: 1, duration: 250, useNativeDriver: true }),
+                Animated.timing(dotAnim2, { toValue: 1, duration: 250, useNativeDriver: true }),
+                Animated.timing(dotAnim3, { toValue: 1, duration: 250, useNativeDriver: true }),
+                Animated.delay(400),
+                Animated.parallel([
+                    Animated.timing(dotAnim1, { toValue: 0, duration: 150, useNativeDriver: true }),
+                    Animated.timing(dotAnim2, { toValue: 0, duration: 150, useNativeDriver: true }),
+                    Animated.timing(dotAnim3, { toValue: 0, duration: 150, useNativeDriver: true }),
+                ]),
+                Animated.delay(150),
+            ]).start(() => animateDots());
+        };
+        animateDots();
+
+        // Progress bar animation
+        Animated.loop(
+            Animated.timing(progressAnim, {
+                toValue: 1,
+                duration: 2000,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: false,
+            })
+        ).start();
+    }, []);
+
+    const progressWidth = progressAnim.interpolate({
+        inputRange: [0, 0.5, 1],
+        outputRange: ['0%', '70%', '100%'],
+    });
+
+    return (
+        <Animated.View style={[loadingStyles.container, { opacity: fadeAnim }]}>
+            {/* Solar System Container */}
+            <View style={loadingStyles.solarSystem}>
+                {/* Orbit paths (visual circles) */}
+                {orbits.map((orbit, index) => (
+                    <View
+                        key={`orbit-path-${index}`}
+                        style={[
+                            loadingStyles.orbitPath,
+                            {
+                                width: orbit.radius * 2,
+                                height: orbit.radius * 2,
+                                borderRadius: orbit.radius,
+                            }
+                        ]}
+                    />
+                ))}
+
+                {/* Orbiting planets */}
+                {orbits.map((orbit, index) => {
+                    const rotation = orbit.anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                    });
+
+                    return (
+                        <Animated.View
+                            key={`planet-${index}`}
+                            style={[
+                                loadingStyles.orbitContainer,
+                                {
+                                    width: orbit.radius * 2,
+                                    height: orbit.radius * 2,
+                                    transform: [{ rotate: rotation }],
+                                }
+                            ]}
+                        >
+                            <View style={[loadingStyles.planet, { top: -orbit.size / 2 }]}>
+                                <TextMalet style={[loadingStyles.planetLabel, { fontSize: orbit.size }]}>
+                                    {orbit.label}
+                                </TextMalet>
+                            </View>
+                        </Animated.View>
+                    );
+                })}
+
+                {/* Sun (Logo) with glow effect */}
+                <Animated.View style={[
+                    loadingStyles.sunContainer,
+                    {
+                        opacity: logoFadeAnim,
+                        transform: [{ scale: pulseAnim }]
+                    }
+                ]}>
+                    <View style={loadingStyles.sunGlow} />
+                    <IconAt width={48} height={48} />
+                </Animated.View>
+            </View>
+
+            {/* Text with animated dots */}
+            <View style={loadingStyles.textContainer}>
+                <TextMalet style={loadingStyles.title}>Verificando sesión</TextMalet>
+                <View style={loadingStyles.dotsContainer}>
+                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim1 }]} />
+                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim2 }]} />
+                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim3 }]} />
+                </View>
+            </View>
+
+            {/* Minimal progress indicator */}
+            <View style={loadingStyles.progressContainer}>
+                <Animated.View style={[loadingStyles.progressBar, { width: progressWidth }]} />
+            </View>
         </Animated.View>
-        <TextMalet style={{ marginTop: 20 }}>Verificando sesión...</TextMalet>
-        <ActivityIndicator
-            size="small"
-            color={'rgb(10, 10, 10)'}
-            style={{ marginTop: 20 }}
-        />
-    </Animated.View>
-));
+    );
+});
+
+const loadingStyles = StyleSheet.create({
+    container: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        zIndex: 100,
+    },
+    solarSystem: {
+        width: 220,
+        height: 220,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    orbitPath: {
+        position: 'absolute',
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        borderStyle: 'dashed',
+    },
+    orbitContainer: {
+        position: 'absolute',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    planet: {
+        position: 'absolute',
+        alignSelf: 'center',
+    },
+    planetLabel: {
+        textAlign: 'center',
+    },
+    sunContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sunGlow: {
+        position: 'absolute',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    },
+    textContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    title: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#64748b',
+        letterSpacing: -0.2,
+    },
+    dotsContainer: {
+        flexDirection: 'row',
+        marginLeft: 2,
+        gap: 3,
+    },
+    dot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: '#64748b',
+    },
+    progressContainer: {
+        width: 120,
+        height: 3,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: '#1a1a1a',
+        borderRadius: 1.5,
+    },
+});
+
 
 const BalanceSection = memo((({
     balance,
