@@ -10,49 +10,48 @@ import { TouchableOpacity, View } from "react-native"
 import { ContainerDash } from "../ContainerDash"
 
 export const DashboardOptions = ({ styles }: { styles: any }) => {
+
+    const current_options = [
+        {
+            icon: <IconAt width={18} height={18} />,
+            onPress: () => router.push('/profile')
+        },
+        {
+            icon: <IconAI width={18} height={18} fill="#313131ff" />,
+            onPress: () => router.push('/ai' as any)
+        },
+        {
+            icon: <IconNotes width={18} height={18} fill="#313131ff" />,
+            onPress: () => router.push('/chat/' as any)
+        },
+        {
+            icon: <IconBudget width={18} height={18} fill="#313131ff" />,
+            onPress: () => router.push('/calculator' as any)
+        },
+        {
+            icon: <IconGarzon width={18} height={18} fill="#313131ff" />,
+            onPress: () => router.push('/garzon' as any)
+        },
+        {
+            icon: <IconWalletGarzon width={18} height={18} fill="#313131ff" />,
+            onPress: () => router.push('/garzon/wallet' as any)
+        },
+        {
+            icon: <IconWarning width={18} height={18} fill="#313131ff" />,
+            onPress: () => { }
+        }
+    ]
+
+
     return (
         <View style={styles.iconsContainer}>
-
-            <TouchableOpacity onPress={() => router.push('/profile')}>
-                <ContainerDash>
-                    <IconAt width={18} height={18} />
-                </ContainerDash>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/ai' as any)}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconAI width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/chat/' as any)}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconNotes width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/calculator' as any)}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconBudget width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/garzon' as any)}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconGarzon width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push('/garzon/wallet' as any)}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconWalletGarzon width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { }}>
-                <ContainerDash style={{ marginLeft: 8 }}>
-                    <IconWarning width={18} height={18} fill="#313131ff" />
-                </ContainerDash>
-            </TouchableOpacity>
+            {current_options.map((option, index) => (
+                <TouchableOpacity key={index} onPress={option.onPress}>
+                    <ContainerDash style={index === 0 ? {} : { marginLeft: 8 }}>
+                        {option.icon}
+                    </ContainerDash>
+                </TouchableOpacity>
+            ))}
         </View>
     )
 }
