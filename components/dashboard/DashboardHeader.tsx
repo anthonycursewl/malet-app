@@ -1,21 +1,14 @@
-import { ContainerDash } from "@/components/dashboard/ContainerDash";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { VERIFICATION_DETAILS, VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconVerified from "@/svgs/common/IconVerified";
-import IconWarning from "@/svgs/common/IconWarning";
-import IconAI from "@/svgs/dashboard/IconAI";
-import IconAt from "@/svgs/dashboard/IconAt";
-import IconBudget from "@/svgs/dashboard/IconBudget";
-import IconGarzon from "@/svgs/dashboard/IconGarzon";
-import IconNotes from "@/svgs/dashboard/IconNotes";
-import IconWalletGarzon from "@/svgs/dashboard/IconWalletGarzon";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { memo, useCallback, useState } from "react";
 import { Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import Button from "./Button/Button";
-import ModalOptions from "./shared/ModalOptions";
+import Button from "../Button/Button";
+import ModalOptions from "../shared/ModalOptions";
+import { DashboardOptions } from "./DashboardOptions/DashboardOptions";
 
 const PLACEHOLDER_AVATAR = require("@/assets/images/placeholders/placeholder_avatar.png");
 const PLACEHOLDER_BANNER = require("@/assets/images/placeholders/placeholder_banner.png");
@@ -174,49 +167,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
             </View>
 
             {showOptions && (
-                <View style={styles.iconsContainer}>
-
-                    <TouchableOpacity onPress={() => router.push('/profile')}>
-                        <ContainerDash>
-                            <IconAt width={18} height={18} />
-                        </ContainerDash>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/ai' as any)}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconAI width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/chat/' as any)}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconNotes width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/calculator' as any)}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconBudget width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/garzon' as any)}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconGarzon width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/garzon/wallet' as any)}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconWalletGarzon width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { }}>
-                        <ContainerDash style={{ marginLeft: 8 }}>
-                            <IconWarning width={18} height={18} fill="#313131ff" />
-                        </ContainerDash>
-                    </TouchableOpacity>
-                </View>
+                <DashboardOptions styles={styles} />
             )}
 
             {verification && (

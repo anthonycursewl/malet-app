@@ -1,6 +1,6 @@
-import DashboardHeader from "@/components/DashboardHeader";
-import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import ChatItem from "@/components/chat/ChatItem";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import React from "react";
 import { FlatList, StyleSheet, View } from "react-native";

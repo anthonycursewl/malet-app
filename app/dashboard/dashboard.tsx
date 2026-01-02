@@ -1,6 +1,6 @@
 import Button from "@/components/Button/Button";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import LastTransactions from "@/components/dashboard/LastTransactions";
-import DashboardHeader from "@/components/DashboardHeader";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { parseDate } from "@/shared/services/date/parseDate";

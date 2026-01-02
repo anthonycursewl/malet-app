@@ -1,5 +1,5 @@
 import Button from "@/components/Button/Button";
-import { VERIFICATION_TYPES } from "@/components/DashboardHeader";
+import { VERIFICATION_TYPES } from "@/components/dashboard/DashboardHeader";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
