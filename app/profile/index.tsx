@@ -8,6 +8,7 @@ import { useWalletStore } from "@/shared/stores/useWalletStore";
 import { spacing } from "@/shared/theme";
 import IconAbout from "@/svgs/common/IconAbout";
 import IconHelp from "@/svgs/common/IconHelp";
+import IconLink from "@/svgs/common/IconLink";
 import IconNotification from "@/svgs/common/IconNotification";
 import IconPeople from "@/svgs/common/IconPeople";
 import IconSecurity from "@/svgs/common/IconSecurity";
@@ -120,6 +121,10 @@ export default function ProfileView() {
         Alert.alert('Próximamente', 'Esta función estará disponible pronto.');
     };
 
+    const handleIntegrations = () => {
+        router.push('/profile/integrations');
+    };
+
     const verificationType = user?.verification_type?.type;
     const verificationTypeColor = verificationType ? VERIFICATION_TYPES[verificationType]?.color : undefined;
 
@@ -173,6 +178,20 @@ export default function ProfileView() {
                             title="Seguridad"
                             subtitle="Contraseña y autenticación"
                             onPress={handleSecurity}
+                            showBorder={false}
+                        />
+                    </View>
+                </View>
+
+                {/* Integrations Section */}
+                <View style={styles.section}>
+                    <TextMalet style={styles.sectionTitle}>Integraciones</TextMalet>
+                    <View style={styles.optionsGroup}>
+                        <ProfileOption
+                            icon={<IconLink width={25} height={25} fill="#161616ff" />}
+                            title="Aplicaciones conectadas"
+                            subtitle="Conecta Malet con servicios de terceros"
+                            onPress={handleIntegrations}
                             showBorder={false}
                         />
                     </View>
