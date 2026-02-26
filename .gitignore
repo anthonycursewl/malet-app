@@ -37,3 +37,4 @@ yarn-error.*
 /docs
 
 app-example
+/android

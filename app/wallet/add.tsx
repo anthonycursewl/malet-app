@@ -5,8 +5,9 @@ import { TransactionItem } from "@/shared/entities/TransactionItem";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
+import { Feather } from '@expo/vector-icons';
 import { useGlobalSearchParams, useRouter } from "expo-router";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Animated, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -21,7 +22,6 @@ const THEME = {
   accent: '#000000',
   error: '#E00000',
   success: '#0070F3',
-  // Transaction colors
   expense: '#FF6B6B',      // Soft red
   expenseBg: '#FFF5F5',    // Very soft red bg
   saving: '#51CF66',       // Soft green  
@@ -52,10 +52,12 @@ const AnimatedHeader = memo(({ onBack, title }: { onBack: () => void; title: str
 // 2. Type Selector: Premium Pill Toggle
 const TypeSelector = memo(({
   type,
-  onTypeChange
+  onTypeChange,
+  disabled
 }: {
-  type: 'expense' | 'saving';
+  type: 'expense' | 'saving' | 'pending_payment';
   onTypeChange: (type: 'expense' | 'saving') => void;
+  disabled?: boolean;
 }) => {
   const animatedValue = useRef(new Animated.Value(type === 'expense' ? 0 : 1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -85,30 +87,40 @@ const TypeSelector = memo(({
 
   const translateX = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [4, 164],
+    outputRange: [5, 165],
   });
 
   return (
-    <View style={styles.selectorContainer}>
+    <View style={[styles.selectorContainer, disabled && { opacity: 0.3 }]} pointerEvents={disabled ? 'none' : 'auto'}>
       <Animated.View style={[styles.selectorTrack, { transform: [{ scale: scaleAnim }] }]}>
-        <Animated.View style={[styles.selectorIndicator, { transform: [{ translateX }] }]} />
+        <Animated.View style={[
+          styles.selectorIndicator,
+          { transform: [{ translateX }] },
+          type === 'pending_payment' && { opacity: 0 }
+        ]} />
         <TouchableOpacity
           style={styles.selectorTab}
           onPress={() => onTypeChange('expense')}
           activeOpacity={1}
         >
-          <TextMalet style={[styles.selectorText, type === 'expense' && styles.selectorTextActive]}>
-            Egreso
-          </TextMalet>
+          <View style={styles.tabContent}>
+            <Feather name="arrow-down-right" size={16} color={type === 'expense' ? '#FF6B6B' : '#94a3b8'} />
+            <TextMalet style={[styles.selectorText, type === 'expense' && { color: '#FF6B6B', fontWeight: '700' }]}>
+              Egreso
+            </TextMalet>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.selectorTab}
           onPress={() => onTypeChange('saving')}
           activeOpacity={1}
         >
-          <TextMalet style={[styles.selectorText, type === 'saving' && styles.selectorTextActive]}>
-            Ingreso
-          </TextMalet>
+          <View style={styles.tabContent}>
+            <Feather name="arrow-up-right" size={16} color={type === 'saving' ? '#51CF66' : '#94a3b8'} />
+            <TextMalet style={[styles.selectorText, type === 'saving' && { color: '#51CF66', fontWeight: '700' }]}>
+              Ingreso
+            </TextMalet>
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -279,7 +291,7 @@ export default function AddWallet() {
   const [formData, setFormData] = useState<Omit<TransactionItem, 'id' | 'issued_at'>>({
     name: '',
     amount: '',
-    type: type as 'expense' | 'saving',
+    type: type as 'expense' | 'saving' | 'pending_payment',
     account_id: selectedAccount?.id || '',
   });
 
@@ -305,11 +317,9 @@ export default function AddWallet() {
   const handleSubmit = useCallback(async () => {
     if (!validateForm()) return;
 
-    // Normalize amount: ensure it has proper decimal format
     const normalizedAmount = formData.amount.replace(/,/g, '.');
     const amount = parseFloat(normalizedAmount) || 0;
 
-    // Ensure amount is valid
     if (amount <= 0) {
       setErrors(prev => ({ ...prev, amount: 'Monto inválido' }));
       return;
@@ -317,7 +327,7 @@ export default function AddWallet() {
 
     const transactionData = {
       name: formData.name.trim(),
-      amount: amount.toFixed(2), // Always send with 2 decimal places
+      amount: amount.toFixed(2),
       type: formData.type,
       account_id: formData.account_id,
     };
@@ -327,7 +337,9 @@ export default function AddWallet() {
     const transaction = await addTransaction(transactionData);
 
     if (transaction) {
-      updateBalanceInMemory(formData.account_id, amount, formData.type === 'expense' ? 'expense' : 'saving');
+      if (formData.type !== 'pending_payment') {
+        updateBalanceInMemory(formData.account_id, amount, formData.type === 'expense' ? 'expense' : 'saving');
+      }
       router.back();
     }
   }, [validateForm, formData, addTransaction, updateBalanceInMemory, router]);
@@ -352,6 +364,7 @@ export default function AddWallet() {
           <TypeSelector
             type={formData.type}
             onTypeChange={(t) => setFormData(prev => ({ ...prev, type: t }))}
+            disabled={isPending}
           />
 
           <AmountInput
@@ -381,7 +394,14 @@ export default function AddWallet() {
 
             <PendingToggle
               isPending={isPending}
-              onToggle={setIsPending}
+              onToggle={(val) => {
+                setIsPending(val);
+                if (val) {
+                  setFormData(prev => ({ ...prev, type: 'pending_payment' }));
+                } else {
+                  setFormData(prev => ({ ...prev, type: 'expense' }));
+                }
+              }}
             />
           </View>
 
@@ -452,34 +472,32 @@ const styles = StyleSheet.create({
   headerRightPlaceholder: {
     width: 40,
   },
-
-  // 2. Type Selector - Premium Pill
   selectorContainer: {
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 24,
     marginBottom: 16,
   },
   selectorTrack: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 14,
-    padding: 4,
-    width: 320,
-    height: 48,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 18,
+    padding: 5,
+    width: 330,
+    height: 52,
   },
   selectorIndicator: {
     position: 'absolute',
-    width: 154,
-    height: 40,
-    backgroundColor: THEME.bg,
-    borderRadius: 10,
-    top: 4,
+    width: 160,
+    height: 42,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    top: 5,
     left: 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   selectorTab: {
     flex: 1,
@@ -487,15 +505,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   selectorText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#999',
-    letterSpacing: 0.2,
-  },
-  selectorTextActive: {
-    color: THEME.text,
     fontWeight: '600',
+    color: '#94a3b8',
+    letterSpacing: 0.3,
   },
 
   // 3. Amount - Minimalist

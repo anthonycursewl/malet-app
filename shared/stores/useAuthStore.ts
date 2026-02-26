@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { MALET_API_URL } from "../config/malet.config";
 import { UserPrimitives } from "../entities/User";
 import { secureFetch } from "../http/secureFetch";
+import { BiometricService } from "../services/auth/biometric.service";
 
 interface LoginResponse {
     access_token: string;
@@ -14,12 +15,18 @@ interface AuthStore {
     setLoading: (loading: boolean) => void;
     error: string | null;
     setError: (error: string | null) => void;
+    token: string | null;
+    setToken: (token: string | null) => void;
     user: UserPrimitives;
     setUser: (user: UserPrimitives) => void;
+    isBiometricAuthenticated: boolean;
+    setBiometricAuthenticated: (value: boolean) => void;
 
     // Auth methods
-    register: (user: Omit<UserPrimitives, 'id' | 'role' | 'created_at'>) => Promise<boolean>;
+    register: (user: Pick<UserPrimitives, 'name' | 'username' | 'email' | 'password'>) => Promise<boolean>;
     login: (credentials: { email: string; password: string }) => Promise<boolean>;
+    loginWithGoogle: (token: string) => Promise<boolean>;
+    loginWithBiometrics: () => Promise<boolean>;
     logout: () => Promise<boolean>;
     verifySession: () => Promise<boolean>;
 }
@@ -29,6 +36,8 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     setLoading: (loading: boolean) => set({ loading }),
     error: null,
     setError: (error: string | null) => set({ error }),
+    token: null,
+    setToken: (token: string | null) => set({ token }),
     user: {
         id: '',
         name: '',
@@ -42,8 +51,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
     },
     setUser: (user: UserPrimitives) => set({ user }),
+    isBiometricAuthenticated: false,
+    setBiometricAuthenticated: (value: boolean) => set({ isBiometricAuthenticated: value }),
 
-    register: async (user: Omit<UserPrimitives, 'id' | 'role' | 'created_at'>) => {
+    register: async (user: Pick<UserPrimitives, 'name' | 'username' | 'email' | 'password'>) => {
         const { error } = await secureFetch({
             url: MALET_API_URL + '/users/save',
             method: 'POST',
@@ -73,16 +84,44 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
-        // Esperar a que el token se guarde antes de continuar
         await AsyncStorage.setItem('token', response.access_token);
+        get().setToken(response.access_token);
         get().setUser(response.user);
         get().setError(null);
+        get().setBiometricAuthenticated(true);
+
+        await BiometricService.askBiometricPermissionAndSave(response.access_token);
+
+        return true;
+    },
+
+    loginWithGoogle: async (token: string) => {
+        const { error, response } = await secureFetch<LoginResponse>({
+            url: MALET_API_URL + '/auth/google/mobile',
+            method: 'POST',
+            body: { idToken: token },
+            setLoading: get().setLoading,
+        })
+
+        if (error || !response) {
+            get().setError(error ?? 'Error al iniciar sesión con Google');
+            return false;
+        }
+
+        await AsyncStorage.setItem('token', response.access_token);
+        get().setToken(response.access_token);
+        get().setUser(response.user);
+        get().setError(null);
+        get().setBiometricAuthenticated(true);
+
+        await BiometricService.askBiometricPermissionAndSave(response.access_token);
 
         return true;
     },
 
     logout: async () => {
         await AsyncStorage.removeItem('token');
+        await BiometricService.clearStoredToken();
         set({
             user: {
                 id: '',
@@ -95,13 +134,71 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
                 verification_type_id: null,
                 verification_type: null,
             },
-            error: null
+            token: null,
+            error: null,
+            isBiometricAuthenticated: false
         });
         return true;
     },
 
+    loginWithBiometrics: async () => {
+        const supported = await BiometricService.isSupported();
+        if (!supported) {
+            get().setError('La biometría no está disponible');
+            return false;
+        }
+
+        const savedToken = await BiometricService.getStoredToken();
+        if (!savedToken) {
+            get().setError('Inicia sesión normalmente primero');
+            return false;
+        }
+
+        const success = await BiometricService.authenticate();
+        if (!success) return false;
+
+        get().setLoading(true);
+        await AsyncStorage.setItem('token', savedToken);
+        get().setToken(savedToken);
+        get().setBiometricAuthenticated(true);
+
+        const isValid = await get().verifySession();
+        get().setLoading(false);
+
+        if (!isValid) {
+            get().setError('Sesión expirada');
+            await BiometricService.clearStoredToken();
+            return false;
+        }
+
+        return true;
+    },
+
     verifySession: async () => {
-        const token = await AsyncStorage.getItem('token');
+        let token = await AsyncStorage.getItem('token');
+
+        const { isBiometricAuthenticated, setBiometricAuthenticated } = get();
+
+        // Evaluar biometría al iniciar la aplicación si ya hay sesión pero no se ha autenticado biometría
+        if (!isBiometricAuthenticated) {
+            const isSupported = await BiometricService.isSupported();
+            const hasStoredToken = await BiometricService.hasStoredToken();
+
+            if (isSupported && hasStoredToken) {
+                const authenticated = await BiometricService.authenticate();
+                if (!authenticated) {
+                    return false;
+                }
+
+                setBiometricAuthenticated(true);
+                const bioToken = await BiometricService.getStoredToken();
+                if (bioToken) {
+                    token = bioToken;
+                    await AsyncStorage.setItem('token', token);
+                }
+            }
+        }
+
         if (!token) {
             return false;
         }
@@ -114,13 +211,18 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
         if (error || !response) {
             await AsyncStorage.removeItem('token');
-            set({ error: error ?? 'Error al verificar sesión' });
+            set({
+                token: null,
+                error: error ?? 'Error al verificar sesión'
+            });
             return false;
         }
 
         set({
+            token,
             error: null,
-            user: response
+            user: response,
+            isBiometricAuthenticated: true
         })
         return true;
     }

@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   StyleSheet,
   TouchableWithoutFeedback,
   View,
@@ -11,7 +13,7 @@ import {
 } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MODAL_HEIGHT = SCREEN_HEIGHT * 0.6;
+const DEFAULT_HEIGHT_RATIO = 0.6;
 
 interface ModalOptionsProps {
   visible: boolean;
@@ -19,6 +21,8 @@ interface ModalOptionsProps {
   children?: React.ReactNode;
   gesturesEnabled?: boolean;
   isOnTop?: boolean;
+  /** A value between 0 and 1 representing the fraction of the screen height, or a fixed pixel number (> 1). Default: 0.6 */
+  heightRatio?: number;
 }
 
 export default function ModalOptions({
@@ -27,13 +31,27 @@ export default function ModalOptions({
   children,
   gesturesEnabled = true,
   isOnTop = false,
+  heightRatio = DEFAULT_HEIGHT_RATIO,
 }: ModalOptionsProps) {
+  // Compute the resolved height once based on the prop.
+  // If the value is <= 1 we treat it as a ratio, otherwise as fixed pixels.
+  const modalHeight = useMemo(
+    () => (heightRatio <= 1 ? SCREEN_HEIGHT * heightRatio : heightRatio),
+    [heightRatio],
+  );
+
   const [isModalRendered, setIsModalRendered] = useState(visible);
-  const translateY = useRef(new Animated.Value(MODAL_HEIGHT)).current;
+  const translateY = useRef(new Animated.Value(modalHeight)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+
+  // Keep a ref so the PanResponder always reads the latest height without re-creating.
+  const modalHeightRef = useRef(modalHeight);
+  modalHeightRef.current = modalHeight;
 
   useEffect(() => {
     if (visible) {
+      // Reset translateY to the current height before animating in
+      translateY.setValue(modalHeightRef.current);
       setIsModalRendered(true);
       Animated.parallel([
         Animated.spring(translateY, {
@@ -50,7 +68,7 @@ export default function ModalOptions({
     } else {
       Animated.parallel([
         Animated.timing(translateY, {
-          toValue: MODAL_HEIGHT,
+          toValue: modalHeightRef.current,
           duration: 250,
           useNativeDriver: true,
         }),
@@ -90,6 +108,15 @@ export default function ModalOptions({
     })
   ).current;
 
+  // Stable dynamic style – only recalculated when modalHeight changes
+  const modalStyle = useMemo(
+    () => ({
+      ...styles.modal,
+      height: modalHeight,
+    }),
+    [modalHeight],
+  );
+
   if (!isModalRendered) {
     return null;
   }
@@ -118,22 +145,31 @@ export default function ModalOptions({
         <Animated.View style={[styles.backdrop, animatedStyles.backdrop, !isOnTop && { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]} />
       </TouchableWithoutFeedback>
 
-      <Animated.View
-        style={[styles.modal, animatedStyles.modal]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardAvoidingView}
+        pointerEvents="box-none"
       >
-        <View style={styles.header} {...panHandlers}>
-          <View style={styles.dragHandle} />
-        </View>
+        <Animated.View
+          style={[modalStyle, animatedStyles.modal]}
+        >
+          <View style={styles.header} {...panHandlers}>
+            <View style={styles.dragHandle} />
+          </View>
 
-        <View style={styles.content}>
-          {children}
-        </View>
-      </Animated.View>
+          <View style={styles.content}>
+            {children}
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    ...StyleSheet.absoluteFillObject,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -142,7 +178,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: MODAL_HEIGHT,
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

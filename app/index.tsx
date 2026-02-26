@@ -1,10 +1,13 @@
 import Button from "@/components/Button/Button";
 import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { useGoogleAuth } from "@/shared/hooks/useGoogleAuth";
+import { BiometricService } from "@/shared/services/auth/biometric.service";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
+import IconGoogle from "@/svgs/auth/IconGoogle";
 import IconWallet from "@/svgs/auth/IconWallet";
 import IconAt from "@/svgs/dashboard/IconAt";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +17,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -32,7 +36,9 @@ export default function Index() {
     password: '',
   });
 
-  const { login, loading, setError } = useAuthStore();
+  const { login, loading, setError, verifySession, loginWithBiometrics } = useAuthStore();
+  const { signInWithGoogle, request } = useGoogleAuth();
+  const [showBiometric, setShowBiometric] = useState(false);
 
   // Animaciones
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -53,10 +59,15 @@ export default function Index() {
     startPulseAnimation();
 
     const checkAuth = async () => {
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
+      const isValid = await verifySession();
+      if (isValid) {
         router.replace('/dashboard/dashboard');
+        return;
       }
+
+      // Si no es válido o no hay sesión, revisar si podemos mostrar biometría
+      const canShow = await BiometricService.isSupported() && await BiometricService.hasStoredToken();
+      setShowBiometric(canShow);
     };
 
     checkAuth();
@@ -192,6 +203,29 @@ export default function Index() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    console.log('--- Starting Google Login ---');
+    try {
+      const success = await signInWithGoogle();
+      console.log('--- Google Login Result:', success);
+      if (success) {
+        console.log('--- Navigating to Dashboard ---');
+        router.replace('/dashboard/dashboard');
+      } else {
+        console.log('--- Google Login Failed or Cancelled ---');
+      }
+    } catch (error) {
+      console.error('--- Google Login Error:', error);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    const success = await loginWithBiometrics();
+    if (success) {
+      router.replace('/dashboard/dashboard');
+    }
+  };
+
   const logoRotation = logoRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ['-15deg', '0deg'],
@@ -299,18 +333,31 @@ export default function Index() {
                   transform: [{ scale: buttonScale }],
                 },
               ]}>
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#1a1a1a" />
-                    <TextMalet style={styles.loadingText}>Iniciando sesión...</TextMalet>
-                  </View>
-                ) : (
-                  <Button
-                    text="Iniciar Sesión"
-                    onPress={handleSubmit}
-                    style={styles.loginButton}
-                  />
-                )}
+                <View style={styles.loginActionsContainer}>
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#1a1a1a" />
+                      <TextMalet style={styles.loadingText}>Iniciando sesión...</TextMalet>
+                    </View>
+                  ) : (
+                    <>
+                      <Button
+                        text="Iniciar Sesión"
+                        onPress={handleSubmit}
+                        style={[styles.loginButton, showBiometric && styles.loginButtonWithBiometric]}
+                      />
+                      {showBiometric && (
+                        <TouchableOpacity
+                          style={styles.biometricButton}
+                          onPress={handleBiometricLogin}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="finger-print-outline" size={28} color="#1a1a1a" />
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
               </Animated.View>
 
               {/* Footer */}
@@ -332,18 +379,19 @@ export default function Index() {
                     onPress={() => Alert.alert('BRD', 'Inicio de sesión con BRD próximamente')}
                   >
                     <View style={styles.brdIconContainer}>
-                      <TextMalet style={styles.brdIconText}>BRD</TextMalet>
+                      <Image source={{ uri: 'https://bucket.breadriuss.com/brd/BRD_LOGO.webp' }} style={{ width: 24, height: 24 }} resizeMode="contain" />
                     </View>
-                    <TextMalet style={styles.socialButtonText}>BRD</TextMalet>
+                    <TextMalet style={styles.socialButtonText}>Breadriuss</TextMalet>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.socialButton, styles.googleButton]}
                     activeOpacity={0.8}
-                    onPress={() => Alert.alert('Google', 'Inicio de sesión con Google próximamente')}
+                    onPress={handleGoogleLogin}
+                    disabled={!request}
                   >
                     <View style={styles.googleIconContainer}>
-                      <TextMalet style={styles.googleIconText}>G</TextMalet>
+                      <IconGoogle width={20} height={20} />
                     </View>
                     <TextMalet style={styles.socialButtonTextDark}>Google</TextMalet>
                   </TouchableOpacity>
@@ -479,6 +527,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   loadingContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -550,8 +599,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
     gap: 10,
   },
   brdButton: {
@@ -566,7 +615,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -599,5 +647,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  loginActionsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+    alignItems: 'center',
+  },
+  loginButtonWithBiometric: {
+    flex: 1,
+  },
+  biometricButton: {
+    width: 54,
+    height: 54,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
 });

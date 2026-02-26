@@ -1,4 +1,4 @@
-export type TransactionType = 'expense' | 'saving';
+export type TransactionType = 'expense' | 'saving' | 'pending_payment';
 
 export interface TransactionItem {
     id: number;

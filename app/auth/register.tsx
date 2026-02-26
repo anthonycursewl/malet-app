@@ -9,9 +9,11 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+type RegisterPayload = Pick<UserPrimitives, 'name' | 'username' | 'email' | 'password'>;
+
 export default function Register() {
   const [step, setStep] = useState(1);
-  const [userData, setUserData] = useState<Omit<UserPrimitives, 'id' | 'role' | 'created_at'>>({
+  const [userData, setUserData] = useState<RegisterPayload>({
     name: '',
     username: '',
     email: '',
@@ -39,7 +41,7 @@ export default function Register() {
     }
   };
 
-  const handleInputChange = (field: keyof UserPrimitives, value: string) => {
+  const handleInputChange = (field: keyof RegisterPayload, value: string) => {
     setUserData(prev => ({
       ...prev,
       [field]: value

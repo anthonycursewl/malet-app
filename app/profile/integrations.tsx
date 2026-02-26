@@ -1,4 +1,6 @@
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
+import { ShimmerEffect } from "@/components/malet-ai/ShimmerEffect";
+import { SkeletonLoader } from "@/components/malet-ai/SkeletonLoader";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { MALET_API_URL } from "@/shared/config/malet.config";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
@@ -9,6 +11,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Animated,
+    Easing,
     Linking,
     RefreshControl,
     ScrollView,
@@ -49,7 +53,7 @@ const FALLBACK_INTEGRATIONS: IntegrationStatus[] = [
             id: 'wheek',
             displayName: 'Wheek',
             description: 'Sistema de inventario, facturación y gestión empresarial. Conecta tu cuenta para sincronizar datos.',
-            icon: '🐹',
+            icon: 'WK',
             brandColor: '#FF6B35',
             enabled: true,
             comingSoon: false,
@@ -61,7 +65,7 @@ const FALLBACK_INTEGRATIONS: IntegrationStatus[] = [
             id: 'google',
             displayName: 'Google',
             description: 'Sincroniza con tu cuenta de Google para acceder a más funcionalidades.',
-            icon: '🔍',
+            icon: 'GO',
             brandColor: '#4285F4',
             enabled: false,
             comingSoon: true,
@@ -73,7 +77,7 @@ const FALLBACK_INTEGRATIONS: IntegrationStatus[] = [
             id: 'apple',
             displayName: 'Apple',
             description: 'Conecta tu Apple ID para una experiencia más integrada.',
-            icon: '🍎',
+            icon: 'AP',
             brandColor: '#000000',
             enabled: false,
             comingSoon: true,
@@ -162,8 +166,8 @@ const IntegrationCard = ({
     const handleAction = () => {
         if (provider.comingSoon) {
             Alert.alert(
-                'Próximamente',
-                `La integración con ${provider.displayName} estará disponible pronto.`
+                'Proximamente',
+                `La integracion con ${provider.displayName} estara disponible pronto.`
             );
             return;
         }
@@ -183,90 +187,133 @@ const IntegrationCard = ({
         if (metadata.email) info.push(metadata.email);
         if (metadata.businessName) info.push(metadata.businessName);
 
-        return info.length > 0 ? info.join(' • ') : null;
+        return info.length > 0 ? info.join(' - ') : null;
     };
 
     const connectionInfo = getConnectionInfo();
 
+    // Entrance + subtle press feedback
+    const anim = React.useRef(new Animated.Value(0)).current;
+    const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+    React.useEffect(() => {
+        Animated.timing(anim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [anim]);
+
+    const animatedCardStyle = {
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+    } as const;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, { toValue: 0.98, useNativeDriver: true, friction: 8 }).start();
+    };
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, friction: 8 }).start();
+    };
+
+    const animatedPillStyle = { transform: [{ scale: scaleAnim }] } as const;
+
+    const initials = (provider.displayName || '')
+        .split(' ')
+        .map(s => s[0] || '')
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
-        <View style={[
-            styles.integrationCard,
-            provider.comingSoon && styles.comingSoonCard
-        ]}>
-            <View style={styles.integrationHeader}>
-                <View style={[
-                    styles.integrationIconContainer,
-                    { backgroundColor: `${provider.brandColor}15` }
-                ]}>
-                    <TextMalet style={styles.integrationEmoji}>
-                        {provider.icon}
-                    </TextMalet>
+        <Animated.View
+            accessible
+            accessibilityLabel={`Integracion ${provider.displayName} - ${connected ? 'conectada' : 'no conectada'}`}
+            style={[styles.integrationCard, provider.comingSoon && styles.comingSoonCard, animatedCardStyle]}
+        >
+            <View style={styles.cardRow}>
+                <View style={[styles.providerIcon, { backgroundColor: `${provider.brandColor}12` }]}>
+                    <TextMalet style={styles.providerInitials}>{initials}</TextMalet>
                 </View>
-                <View style={styles.integrationInfo}>
-                    <View style={styles.integrationNameRow}>
-                        <TextMalet style={styles.integrationName}>
+
+                <View style={styles.providerInfo}>
+                    <View style={styles.providerHeaderRow}>
+                        <TextMalet style={styles.providerName} numberOfLines={1}>
                             {provider.displayName}
                         </TextMalet>
-                        {provider.comingSoon && (
-                            <View style={styles.comingSoonBadge}>
-                                <TextMalet style={styles.comingSoonText}>
-                                    Próximamente
-                                </TextMalet>
-                            </View>
-                        )}
-                        {connected && !provider.comingSoon && (
-                            <View style={styles.connectedBadge}>
-                                <TextMalet style={styles.connectedText}>
-                                    Conectado
-                                </TextMalet>
-                            </View>
-                        )}
+                        <View
+                            style={[
+                                styles.statusBadge,
+                                connected
+                                    ? styles.statusBadgeConnected
+                                    : provider.comingSoon
+                                        ? styles.statusBadgeSoon
+                                        : styles.statusBadgeAvailable,
+                            ]}
+                        >
+                            <TextMalet
+                                style={[
+                                    styles.statusBadgeText,
+                                    connected
+                                        ? styles.statusBadgeTextConnected
+                                        : provider.comingSoon
+                                            ? styles.statusBadgeTextSoon
+                                            : styles.statusBadgeTextAvailable,
+                                ]}
+                            >
+                                {connected ? 'Conectada' : provider.comingSoon ? 'Proximamente' : 'Disponible'}
+                            </TextMalet>
+                        </View>
                     </View>
-                    <TextMalet style={styles.integrationDescription}>
+
+                    <TextMalet style={styles.providerDesc} numberOfLines={2}>
                         {provider.description}
                     </TextMalet>
-                    {connectionInfo && (
-                        <TextMalet style={styles.connectionInfo}>
-                            {connectionInfo}
-                        </TextMalet>
-                    )}
+                    {connectionInfo && <TextMalet style={styles.connectionInfo}>{connectionInfo}</TextMalet>}
+
+                    <View style={styles.cardFooterRow}>
+                        <View style={styles.cardFooterMeta}>
+                            {connected && !provider.comingSoon && (
+                                <TextMalet style={styles.connectedAt} numberOfLines={1}>
+                                    {connectedAt ? `Conectado - ${new Date(connectedAt).toLocaleDateString()}` : 'Conectado'}
+                                </TextMalet>
+                            )}
+                            {provider.comingSoon && (
+                                <TextMalet style={styles.comingSoonHint}>Disponible pronto</TextMalet>
+                            )}
+                        </View>
+
+                        {!provider.comingSoon && (
+                            <Animated.View style={animatedPillStyle}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.actionPill,
+                                        connected ? styles.disconnectPill : styles.connectPill,
+                                        !connected ? { borderColor: provider.brandColor } : null,
+                                    ]}
+                                    onPress={handleAction}
+                                    onPressIn={handlePressIn}
+                                    onPressOut={handlePressOut}
+                                    disabled={isLoading}
+                                    activeOpacity={0.86}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`${connected ? 'Desconectar' : 'Conectar'} ${provider.displayName}`}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator size="small" color={connected ? '#dc3545' : provider.brandColor} />
+                                    ) : (
+                                        <TextMalet style={[styles.actionPillText, connected ? styles.disconnectPillText : { color: provider.brandColor }]}>
+                                            {connected ? 'Desconectar' : 'Conectar'}
+                                        </TextMalet>
+                                    )}
+                                </TouchableOpacity>
+                            </Animated.View>
+                        )}
+                    </View>
                 </View>
             </View>
-
-            <TouchableOpacity
-                style={[
-                    styles.actionButton,
-                    connected && styles.disconnectButton,
-                    provider.comingSoon && styles.disabledButton,
-                    { borderColor: connected ? '#dc3545' : provider.brandColor }
-                ]}
-                onPress={handleAction}
-                disabled={isLoading}
-                activeOpacity={0.7}
-            >
-                {isLoading ? (
-                    <ActivityIndicator
-                        size="small"
-                        color={connected ? '#dc3545' : provider.brandColor}
-                    />
-                ) : (
-                    <TextMalet
-                        style={[
-                            styles.actionButtonText,
-                            { color: connected ? '#dc3545' : provider.brandColor },
-                            provider.comingSoon && styles.disabledButtonText
-                        ]}
-                    >
-                        {provider.comingSoon
-                            ? 'No disponible'
-                            : connected
-                                ? 'Desconectar'
-                                : 'Conectar'
-                        }
-                    </TextMalet>
-                )}
-            </TouchableOpacity>
-        </View>
+        </Animated.View>
     );
 };
 
@@ -287,7 +334,7 @@ export default function IntegrationsView() {
 
         try {
             const data = await integrationsService.getIntegrations(token);
-            setIntegrations(data);
+            setIntegrations(Array.isArray(data) ? data : FALLBACK_INTEGRATIONS);
         } catch (error) {
             console.error('Error loading integrations:', error);
             setIntegrations(FALLBACK_INTEGRATIONS);
@@ -345,8 +392,7 @@ export default function IntegrationsView() {
 
             Alert.alert(
                 '¡Conexión exitosa!',
-                `Tu cuenta de Malet ha sido conectada con ${integrations.find(i => i.provider.id === providerId)?.provider.displayName
-                }. (Modo demo)`,
+                `Tu cuenta de Malet ha sido conectada con ${integrations?.find?.(i => i?.provider?.id === providerId)?.provider?.displayName ?? providerId}. (Modo demo)`,
                 [{ text: 'Entendido', style: 'default' }]
             );
         } finally {
@@ -395,9 +441,10 @@ export default function IntegrationsView() {
     };
 
     // Calcular estadísticas
-    const connectedCount = integrations.filter(i => i.connected).length;
-    const enabledProviders = integrations.filter(i => i.provider.enabled);
-    const comingSoonProviders = integrations.filter(i => i.provider.comingSoon);
+    const safeIntegrations = Array.isArray(integrations) ? integrations : [];
+    const connectedCount = safeIntegrations.filter(i => i?.connected).length;
+    const enabledProviders = safeIntegrations.filter(i => i?.provider?.enabled);
+    const comingSoonProviders = safeIntegrations.filter(i => i?.provider?.comingSoon);
 
     return (
         <LayoutAuthenticated>
@@ -414,18 +461,14 @@ export default function IntegrationsView() {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        style={styles.backButton}
-                    >
-                        <TextMalet style={styles.backText}>←</TextMalet>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <TextMalet style={styles.backChevron}>{'<'}</TextMalet>
                         <TextMalet style={styles.backText}>Volver</TextMalet>
                     </TouchableOpacity>
 
                     <TextMalet style={styles.headerTitle}>Integraciones</TextMalet>
                     <TextMalet style={styles.headerSubtitle}>
-                        Conecta tu cuenta de Malet con aplicaciones de terceros
-                        para potenciar tu experiencia.
+                        Conecta tu cuenta de Malet con aplicaciones de terceros para potenciar tu experiencia.
                     </TextMalet>
                 </View>
 
@@ -444,12 +487,22 @@ export default function IntegrationsView() {
 
                 {/* Loading State */}
                 {isLoading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#1e88e5" />
-                        <TextMalet style={styles.loadingText}>
-                            Cargando integraciones...
-                        </TextMalet>
-                    </View>
+                    <>
+                        <SkeletonLoader />
+                        <View style={{ paddingHorizontal: spacing.medium, marginTop: spacing.large }}>
+                            {[0, 1, 2].map(i => (
+                                <View key={i} style={[styles.integrationCard, { height: 88, justifyContent: 'center', paddingVertical: 12 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <ShimmerEffect style={{ width: 52, height: 52, borderRadius: 12 }} />
+                                        <View style={{ flex: 1 }}>
+                                            <ShimmerEffect style={{ width: '40%', height: 16, borderRadius: 8, marginBottom: 8 }} />
+                                            <ShimmerEffect style={{ width: '60%', height: 12, borderRadius: 6 }} />
+                                        </View>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </>
                 ) : (
                     <>
                         {/* Enabled Integrations */}
@@ -522,39 +575,57 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
+        paddingHorizontal: spacing.small,
     },
     header: {
-        marginTop: 10,
-        marginBottom: 24,
+        marginTop: spacing.small,
+        marginBottom: spacing.large,
+        padding: spacing.small + 2,
+        borderRadius: 16,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
     },
     backButton: {
-        marginBottom: 12,
-        gap: 20,
+        alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 8,
+        marginBottom: spacing.small + 2,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#eef2f7',
+    },
+    backChevron: {
+        fontSize: 14,
+        color: '#334155',
+        fontWeight: '700',
     },
     backText: {
-        fontSize: 18,
-        color: '#666',
-        fontWeight: '500',
+        fontSize: 13,
+        color: '#334155',
+        fontWeight: '600',
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 26,
+        lineHeight: 32,
         fontWeight: '700',
-        color: '#1a1a1a',
-        marginBottom: 8,
+        color: '#0f1724',
+        marginBottom: 10,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
+        color: '#6b7280',
+        lineHeight: 22,
+        maxWidth: '96%',
     },
     statsCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#e3f2fd',
         borderRadius: 16,
-        padding: spacing.medium,
+        padding: spacing.small + 2,
         marginBottom: spacing.large,
         borderWidth: 1,
         borderColor: '#bbdefb',
@@ -607,12 +678,134 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     integrationCard: {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: 'transparent',
         borderRadius: 16,
-        padding: spacing.medium,
-        marginBottom: spacing.small + 4,
+        paddingVertical: spacing.small - 2,
+        paddingHorizontal: spacing.small,
+        marginBottom: spacing.small + 6,
         borderWidth: 1,
-        borderColor: '#e9ecef',
+        borderColor: '#dbe4ef',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0,
+        shadowRadius: 16,
+        elevation: 0,
+    },
+    cardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    providerIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    providerInitials: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#111827',
+    },
+    providerInfo: {
+        flex: 1,
+        minHeight: 56,
+        justifyContent: 'center',
+    },
+    providerHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    providerName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#0f1724',
+        flexShrink: 1,
+    },
+    statusBadge: {
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    statusBadgeAvailable: {
+        backgroundColor: '#eff6ff',
+        borderColor: '#bfdbfe',
+    },
+    statusBadgeConnected: {
+        backgroundColor: '#ecfdf3',
+        borderColor: '#bbf7d0',
+    },
+    statusBadgeSoon: {
+        backgroundColor: '#f8fafc',
+        borderColor: '#e2e8f0',
+    },
+    statusBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    statusBadgeTextAvailable: {
+        color: '#1d4ed8',
+    },
+    statusBadgeTextConnected: {
+        color: '#15803d',
+    },
+    statusBadgeTextSoon: {
+        color: '#64748b',
+    },
+    providerDesc: {
+        fontSize: 13,
+        color: '#64748b',
+        marginTop: 5,
+    },
+    cardFooterRow: {
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    cardFooterMeta: {
+        flex: 1,
+        minHeight: 18,
+        justifyContent: 'center',
+    },
+    actionPill: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        borderWidth: 1.2,
+        backgroundColor: '#ffffff',
+        minWidth: 98,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    connectPill: {
+        backgroundColor: '#f8fbff',
+    },
+    actionPillText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    disconnectPill: {
+        borderColor: '#fecaca',
+        backgroundColor: '#fff7f7',
+    },
+    disconnectPillText: {
+        color: '#b91c1c',
+    },
+    connectedAt: {
+        fontSize: 11,
+        color: '#94a3b8',
+    },
+    comingSoonHint: {
+        fontSize: 11,
+        color: '#64748b',
+        fontWeight: '600',
     },
     comingSoonCard: {
         opacity: 0.7,
@@ -721,3 +914,4 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
 });
+

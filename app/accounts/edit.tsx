@@ -18,7 +18,7 @@ import { router, useLocalSearchParams } from "expo-router";
 export default function EditAccount() {
     const { accountId } = useLocalSearchParams<{ accountId: string }>();
     const { user } = useAuthStore();
-    const { updateAccount, loading, error, accounts } = useAccountStore();
+    const { updateAccount, deleteAccount, loading, error, accounts } = useAccountStore();
     const [modalCurrencyOpen, setModalCurrencyOpen] = useState(false);
 
     const [balanceInput, setBalanceInput] = useState('');
@@ -29,7 +29,6 @@ export default function EditAccount() {
         icon: undefined,
     });
 
-    // Load account data
     useEffect(() => {
         if (accountId && accounts.length > 0) {
             const account = accounts.find(acc => acc.id === accountId);
@@ -106,6 +105,31 @@ export default function EditAccount() {
         }
     };
 
+    const handleDelete = () => {
+        Alert.alert(
+            "¿Mover cuenta a la papelera?",
+            "Esta cuenta se moverá a la papelera. Podrás recuperarla desde allí o se eliminará para siempre en 30 días.",
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Mover a la papelera",
+                    style: "destructive",
+                    onPress: async () => {
+                        if (!accountId) return;
+                        const success = await deleteAccount(accountId);
+                        if (success) {
+                            Alert.alert(
+                                'Malet | Éxito',
+                                'Cuenta movida a la papelera correctamente.',
+                                [{ text: 'OK', onPress: () => router.back() }]
+                            );
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <LayoutAuthenticated>
             <KeyboardAvoidingView
@@ -162,6 +186,13 @@ export default function EditAccount() {
                             <TextMalet style={styles.helperText}>
                                 Actualiza el balance solo si es necesario corregir un error.
                             </TextMalet>
+                        </View>
+
+                        <View style={styles.dangerZone}>
+                            <TextMalet style={styles.dangerTitle}>Zona de peligro</TextMalet>
+                            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} disabled={loading}>
+                                <TextMalet style={styles.deleteButtonText}>Mover cuenta a la papelera</TextMalet>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </ScrollView>
@@ -254,5 +285,30 @@ const styles = StyleSheet.create({
     },
     createButton: {
         width: '100%',
+    },
+    dangerZone: {
+        marginTop: 20,
+        paddingTop: 20,
+        borderTopWidth: 1,
+        borderTopColor: '#ffe5e5',
+        gap: 12,
+    },
+    dangerTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#ff4444',
+    },
+    deleteButton: {
+        backgroundColor: '#fff0f0',
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ffcaca',
+    },
+    deleteButtonText: {
+        color: '#ff4444',
+        fontWeight: '600',
+        fontSize: 15,
     },
 });

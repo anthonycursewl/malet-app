@@ -8,13 +8,16 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { BadgeDollarSign } from 'lucide-react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function TransactionDetail() {
   const { transaction_id } = useLocalSearchParams();
   const router = useRouter();
-  const { transactions } = useWalletStore();
-  const { accounts } = useAccountStore();
+  const [isCompleting, setIsCompleting] = useState(false);
+  const { transactions, completePendingTransaction } = useWalletStore();
+  const { accounts, getAllAccountsByUserId, updateBalanceInMemory } = useAccountStore();
   const transaction = transactions.find(t => t.id.toString() === transaction_id);
   const account = accounts.find(a => a.id === transaction?.account_id);
 
@@ -32,10 +35,27 @@ export default function TransactionDetail() {
   }
 
   const isExpense = transaction.type === 'expense';
-  const statusColor = isExpense ? colors.error.main : colors.success.main;
-  const statusBg = isExpense ? '#FFEBEE' : '#E8F5E9';
-  const statusIcon = isExpense ? 'arrow-upward' : 'check';
-  const statusText = isExpense ? 'GASTO REALIZADO' : 'INGRESO COMPLETADO';
+  const isPending = transaction.type === 'pending_payment';
+
+  let statusColor = colors.success.main;
+  let statusBg = '#E8F5E9';
+  let statusIcon: keyof typeof MaterialIcons.glyphMap = 'arrow-downward';
+  let statusText = 'INGRESO COMPLETADO';
+  let gradientColors: readonly [string, string] = ['rgba(120, 255, 165, 0.12)', 'rgba(141, 255, 184, 0)'];
+
+  if (isExpense) {
+    statusColor = colors.error.main;
+    statusBg = '#FFEBEE';
+    statusIcon = 'arrow-upward';
+    statusText = 'GASTO REALIZADO';
+    gradientColors = ['rgba(255, 82, 82, 0.12)', 'rgba(255, 82, 82, 0)'];
+  } else if (isPending) {
+    statusColor = '#F5C842';
+    statusBg = '#FFF8E1';
+    statusIcon = 'schedule';
+    statusText = 'PAGO PENDIENTE';
+    gradientColors = ['rgba(245, 200, 66, 0.12)', 'rgba(245, 200, 66, 0)'];
+  }
 
   const amountParts = parseFloat(transaction.amount).toFixed(2).split('.');
   const amountInteger = amountParts[0];
@@ -80,9 +100,35 @@ export default function TransactionDetail() {
     ]);
   };
 
-  const gradientColors = isExpense
-    ? ['rgba(255, 82, 82, 0.12)', 'rgba(255, 82, 82, 0)'] as const
-    : ['rgba(120, 255, 165, 0.12)', 'rgba(141, 255, 184, 0)'] as const;
+  const handleComplete = (type: 'expense' | 'saving') => {
+    // This connects to the real API update endpoint
+    const title = type === 'expense' ? 'Marcar como Egreso' : 'Marcar como Ingreso';
+    const message = `¿Confirmas que deseas finalizar esta transacción y registrarla como un ${type === 'expense' ? 'egreso' : 'ingreso'}?`;
+
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Confirmar',
+        style: 'default',
+        onPress: async () => {
+          setIsCompleting(true);
+          const success = await completePendingTransaction(transaction.id.toString(), type);
+          if (success) {
+            updateBalanceInMemory(
+              transaction.account_id,
+              parseFloat(transaction.amount),
+              type
+            );
+            getAllAccountsByUserId();
+            Alert.alert('Éxito', `Transacción marcada como ${type === 'expense' ? 'Egreso' : 'Ingreso'}`);
+          } else {
+            Alert.alert('Error', 'No se ha podido procesar el cambio en el servidor.');
+          }
+          setIsCompleting(false);
+        }
+      }
+    ]);
+  };
 
   return (
     <View style={styles.container}>
@@ -188,7 +234,9 @@ export default function TransactionDetail() {
 
             <View style={styles.detailRow}>
               <TextMalet style={styles.detailLabel}>Tipo</TextMalet>
-              <TextMalet style={styles.detailValue}>{isExpense ? 'Gasto' : 'Ingreso'}</TextMalet>
+              <TextMalet style={styles.detailValue}>
+                {isPending ? 'Pendiente' : (isExpense ? 'Gasto' : 'Ingreso')}
+              </TextMalet>
             </View>
 
             <View style={styles.detailRow}>
@@ -196,6 +244,40 @@ export default function TransactionDetail() {
               <TextMalet style={styles.detailValue}>{'Etiqueta 1, Etiqueta 2'}</TextMalet>
             </View>
           </View>
+
+          {/* Pending Actions */}
+          {isPending && (
+            <View style={styles.pendingActionsContainer}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                <BadgeDollarSign size={20} />
+                <TextMalet style={styles.pendingActionsTitle}>Finalizar Transacción</TextMalet>
+              </View>
+
+              <TextMalet style={styles.pendingActionsDescription}>
+                Selecciona la categoría real para cerrar este pago pendiente:
+              </TextMalet>
+              <View style={styles.pendingButtonsRow}>
+                {isCompleting ? (
+                  <View style={{ padding: 12, width: '100%', alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.primary.main} />
+                    <TextMalet style={{ marginTop: 8, color: colors.text.secondary, fontSize: 13 }}>Procesando...</TextMalet>
+                  </View>
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.btnExpense} onPress={() => handleComplete('expense')}>
+                      <MaterialIcons name="arrow-upward" size={20} color={colors.error.main} />
+                      <TextMalet style={[styles.btnActionText, { color: colors.error.main }]}>Egreso</TextMalet>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.btnIncome} onPress={() => handleComplete('saving')}>
+                      <MaterialIcons name="arrow-downward" size={20} color={colors.success.main} />
+                      <TextMalet style={[styles.btnActionText, { color: colors.success.main }]}>Ingreso</TextMalet>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Actions Section */}
           <View style={styles.actionsSection}>
@@ -408,6 +490,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     backgroundColor: 'transparent',
+  },
+  pendingActionsContainer: {
+    marginBottom: 24,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dbdbdbff',
+  },
+  pendingActionsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  pendingActionsDescription: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  pendingButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  btnExpense: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 82, 82, 0.2)',
+    gap: 6,
+  },
+  btnIncome: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(120, 255, 165, 0.5)',
+    gap: 6,
+  },
+  btnActionText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

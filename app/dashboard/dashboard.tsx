@@ -2,6 +2,7 @@ import Button from "@/components/Button/Button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
+import UpdatesModal from "@/components/Modals/UpdatesModal/UpdatesModal";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { parseDate } from "@/shared/services/date/parseDate";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
@@ -12,173 +13,74 @@ import IconAt from "@/svgs/dashboard/IconAt";
 import IconCommunities from "@/svgs/dashboard/IconCommunities";
 import IconMinus from "@/svgs/dashboard/IconMinus";
 import IconPlus from "@/svgs/dashboard/IconPlus";
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
+
+// lucide icon 
+import { AtSign, Wallet } from 'lucide-react-native';
 
 interface ModalAccountsRef {
     openModal: () => void;
 }
 
-// Solar System Loading Screen
 const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Value, logoFadeAnim: Animated.Value }) => {
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const dotAnim1 = useRef(new Animated.Value(0)).current;
-    const dotAnim2 = useRef(new Animated.Value(0)).current;
-    const dotAnim3 = useRef(new Animated.Value(0)).current;
-    const progressAnim = useRef(new Animated.Value(0)).current;
-
-    // Orbit animations - different speeds for each planet
-    const orbit1Anim = useRef(new Animated.Value(0)).current;
-    const orbit2Anim = useRef(new Animated.Value(0)).current;
-    const orbit3Anim = useRef(new Animated.Value(0)).current;
-
-    // Orbit configuration
-    const orbits = [
-        { anim: orbit1Anim, radius: 50, duration: 3000, label: '💰', size: 18 },
-        { anim: orbit2Anim, radius: 75, duration: 5000, label: '📊', size: 16 },
-        { anim: orbit3Anim, radius: 100, duration: 7000, label: '💳', size: 14 },
-    ];
+    const shimmerAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Subtle logo pulse (sun glow effect)
         Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.05,
-                    duration: 2000,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 2000,
-                    easing: Easing.inOut(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
-
-        // Start all orbit animations
-        orbits.forEach(({ anim, duration }) => {
-            Animated.loop(
-                Animated.timing(anim, {
-                    toValue: 1,
-                    duration,
-                    easing: Easing.linear,
-                    useNativeDriver: true,
-                })
-            ).start();
-        });
-
-        // Dots animation
-        const animateDots = () => {
-            Animated.sequence([
-                Animated.timing(dotAnim1, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.timing(dotAnim2, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.timing(dotAnim3, { toValue: 1, duration: 250, useNativeDriver: true }),
-                Animated.delay(400),
-                Animated.parallel([
-                    Animated.timing(dotAnim1, { toValue: 0, duration: 150, useNativeDriver: true }),
-                    Animated.timing(dotAnim2, { toValue: 0, duration: 150, useNativeDriver: true }),
-                    Animated.timing(dotAnim3, { toValue: 0, duration: 150, useNativeDriver: true }),
-                ]),
-                Animated.delay(150),
-            ]).start(() => animateDots());
-        };
-        animateDots();
-
-        // Progress bar animation
-        Animated.loop(
-            Animated.timing(progressAnim, {
+            Animated.timing(shimmerAnim, {
                 toValue: 1,
                 duration: 2000,
-                easing: Easing.inOut(Easing.ease),
+                easing: Easing.linear,
                 useNativeDriver: false,
             })
         ).start();
     }, []);
 
-    const progressWidth = progressAnim.interpolate({
-        inputRange: [0, 0.5, 1],
-        outputRange: ['0%', '70%', '100%'],
+    const shimmerTranslate = shimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-80, 150],
     });
 
     return (
         <Animated.View style={[loadingStyles.container, { opacity: fadeAnim }]}>
-            {/* Solar System Container */}
-            <View style={loadingStyles.solarSystem}>
-                {/* Orbit paths (visual circles) */}
-                {orbits.map((orbit, index) => (
-                    <View
-                        key={`orbit-path-${index}`}
-                        style={[
-                            loadingStyles.orbitPath,
-                            {
-                                width: orbit.radius * 2,
-                                height: orbit.radius * 2,
-                                borderRadius: orbit.radius,
-                            }
-                        ]}
-                    />
-                ))}
-
-                {/* Orbiting planets */}
-                {orbits.map((orbit, index) => {
-                    const rotation = orbit.anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '360deg'],
-                    });
-
-                    return (
-                        <Animated.View
-                            key={`planet-${index}`}
-                            style={[
-                                loadingStyles.orbitContainer,
-                                {
-                                    width: orbit.radius * 2,
-                                    height: orbit.radius * 2,
-                                    transform: [{ rotate: rotation }],
-                                }
-                            ]}
-                        >
-                            <View style={[loadingStyles.planet, { top: -orbit.size / 2 }]}>
-                                <TextMalet style={[loadingStyles.planetLabel, { fontSize: orbit.size }]}>
-                                    {orbit.label}
-                                </TextMalet>
-                            </View>
-                        </Animated.View>
-                    );
-                })}
-
-                {/* Sun (Logo) with glow effect */}
-                <Animated.View style={[
-                    loadingStyles.sunContainer,
-                    {
-                        opacity: logoFadeAnim,
-                        transform: [{ scale: pulseAnim }]
-                    }
-                ]}>
-                    <View style={loadingStyles.sunGlow} />
-                    <IconAt width={48} height={48} />
+            <View style={loadingStyles.content}>
+                <Animated.View style={[loadingStyles.logoContainer, { opacity: logoFadeAnim }]}>
+                    <IconAt width={56} height={56} />
                 </Animated.View>
-            </View>
 
-            {/* Text with animated dots */}
-            <View style={loadingStyles.textContainer}>
-                <TextMalet style={loadingStyles.title}>Verificando sesión</TextMalet>
-                <View style={loadingStyles.dotsContainer}>
-                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim1 }]} />
-                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim2 }]} />
-                    <Animated.View style={[loadingStyles.dot, { opacity: dotAnim3 }]} />
+                {/* Thin metallic shimmer bar */}
+                <View style={loadingStyles.loadingBarContainer}>
+                    <LinearGradient
+                        colors={['#e2e8f0', '#cbd5e1', '#e2e8f0']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <Animated.View
+                        style={[
+                            loadingStyles.shimmerWrapper,
+                            { transform: [{ translateX: shimmerTranslate }, { skewX: '-20deg' }] }
+                        ]}
+                    >
+                        <LinearGradient
+                            colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.9)', 'rgba(255, 255, 255, 0)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    </Animated.View>
                 </View>
             </View>
 
-            {/* Minimal progress indicator */}
-            <View style={loadingStyles.progressContainer}>
-                <Animated.View style={[loadingStyles.progressBar, { width: progressWidth }]} />
+            <View style={loadingStyles.footer}>
+                <TextMalet style={loadingStyles.footerTextLight}>from</TextMalet>
+                <TextMalet style={loadingStyles.footerTextBold}>Breadriuss</TextMalet>
             </View>
         </Animated.View>
     );
@@ -187,96 +89,74 @@ const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Val
 const loadingStyles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
         backgroundColor: '#fff',
         zIndex: 100,
-    },
-    solarSystem: {
-        width: 220,
-        height: 220,
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 32,
+        paddingVertical: 50,
     },
-    orbitPath: {
-        position: 'absolute',
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        borderStyle: 'dashed',
-    },
-    orbitContainer: {
-        position: 'absolute',
+    content: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    planet: {
-        position: 'absolute',
-        alignSelf: 'center',
-    },
-    planetLabel: {
-        textAlign: 'center',
-    },
-    sunContainer: {
+    logoContainer: {
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 20,
     },
-    sunGlow: {
-        position: 'absolute',
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-    },
-    textContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 32,
-    },
-    title: {
-        fontSize: 15,
-        fontWeight: '500',
-        color: '#64748b',
-        letterSpacing: -0.2,
-    },
-    dotsContainer: {
-        flexDirection: 'row',
-        marginLeft: 2,
-        gap: 3,
-    },
-    dot: {
-        width: 3,
+    loadingBarContainer: {
+        width: 130,
         height: 3,
-        borderRadius: 1.5,
-        backgroundColor: '#64748b',
-    },
-    progressContainer: {
-        width: 120,
-        height: 3,
-        backgroundColor: '#f1f5f9',
-        borderRadius: 1.5,
+        borderRadius: 2,
         overflow: 'hidden',
+        position: 'relative',
+        backgroundColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 1,
     },
-    progressBar: {
-        height: '100%',
-        backgroundColor: '#1a1a1a',
-        borderRadius: 1.5,
+    shimmerWrapper: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        width: '40%',
+        left: 0,
     },
+    footer: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    footerTextLight: {
+        fontSize: 13,
+        color: '#94a3b8',
+    },
+    footerTextBold: {
+        fontSize: 16,
+        color: '#1e293b',
+        marginTop: 2,
+    }
 });
-
 
 const BalanceSection = memo((({
     balance,
     onOpenModal,
     accountName,
-    accountNumber
+    accountNumber,
+    isBalanceHidden,
+    onToggleHidden
 }: {
     balance: string,
     onOpenModal: () => void,
     accountName: string,
-    accountNumber: string
+    accountNumber: string,
+    isBalanceHidden: boolean,
+    onToggleHidden: () => void
 }) => {
     const maskedAccountNumber = accountNumber.slice(0, 4) + ' ***';
+    const displayBalance = isBalanceHidden ? '***.*****' : balance;
 
     return (
         <View style={styles.balanceSection}>
@@ -297,11 +177,20 @@ const BalanceSection = memo((({
                     <IconArrow width={12} height={12} />
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={onOpenModal}>
+                <Pressable onPress={onOpenModal}>
                     <View style={styles.balanceCard}>
-                        <TextMalet style={styles.balanceValue} numberOfLines={1}>{balance}</TextMalet>
+                        <TouchableOpacity onPress={onOpenModal} style={{ flexShrink: 1 }}>
+                            <TextMalet style={styles.balanceValue} numberOfLines={1}>{displayBalance}</TextMalet>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={onToggleHidden} style={styles.eyeButtonInner}>
+                            {isBalanceHidden ? (
+                                <Feather name="eye-off" size={20} color="#666" />
+                            ) : (
+                                <Feather name="eye" size={20} color="#666" />
+                            )}
+                        </TouchableOpacity>
                     </View>
-                </TouchableOpacity>
+                </Pressable>
             </View>
             <View style={styles.actionsContainer}>
                 <Link push href='/wallet/add?type=expense'>
@@ -318,7 +207,7 @@ const BalanceSection = memo((({
 export default function Dashboard() {
     const { user, verifySession } = useAuthStore();
     const { previewTransactions, getPreviewTransactions, error, loading, tasas, getTasas } = useWalletStore();
-    const { selectedAccount } = useAccountStore();
+    const { selectedAccount, isBalanceHidden, toggleBalanceHidden } = useAccountStore();
 
     const [loadingSession, setLoadingSession] = useState(false);
     const [modalAccountsVisible, setModalAccountsVisible] = useState(false);
@@ -462,67 +351,112 @@ export default function Dashboard() {
                     onOpenModal={handleOpenModal}
                     accountName={selectedAccount?.name || 'General'}
                     accountNumber={selectedAccount?.id || '0000'}
+                    isBalanceHidden={isBalanceHidden}
+                    onToggleHidden={toggleBalanceHidden}
                 />
 
                 {/* Tasas de Cambio Section */}
                 <View style={styles.tasasContainer}>
-                    <TextMalet style={styles.tasasHeader}>Tasas de Cambio</TextMalet>
+                    <TextMalet style={styles.tasasHeader}>Malet | Utilidades</TextMalet>
 
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        {/* BCV Rate Card with enhanced style */}
-                        <LinearGradient
-                            colors={['#f0f0f059', '#eeeeeead']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 0.5, y: 0 }}
-                            style={styles.tasaCard}
+                    <View>
+                        <ScrollView
+                            horizontal={true}
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ gap: 10, paddingRight: 20 }}
                         >
-                            <Animated.View style={{ opacity: fadeTasaAnim }}>
-                                {tasas && tasas.length > 0 ? (
-                                    <>
-                                        <TextMalet style={{ marginBottom: 2, fontWeight: '600' }}>
-                                            Tasa {tasas[currentTasaIndex]?.nombre}
-                                        </TextMalet>
-                                        <TextMalet style={{ fontSize: 13 }}>
-                                            1 USD = Bs {tasas[currentTasaIndex]?.promedio}
-                                        </TextMalet>
-                                        <TextMalet style={{ color: '#555', fontSize: 12 }}>
-                                            {parseDate(tasas[currentTasaIndex]?.fechaActualizacion)}
-                                        </TextMalet>
-
-                                    </>
-                                ) : (
-                                    <View style={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                                        <ActivityIndicator size="small" color="#000" />
-                                    </View>
-                                )}
-                            </Animated.View>
-                        </LinearGradient>
-
-                        <TouchableOpacity onPress={() => router.push('/communities' as any)} style={{ width: '49%' }}>
+                            {/* BCV Rate Card with enhanced style */}
                             <LinearGradient
-                                colors={['#ffffff', '#ffffffff']}
+                                colors={['#f0f0f059', '#eeeeeead']}
                                 start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={{ padding: 10, borderRadius: 10, width: '100%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                    <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
-                                    <TextMalet>Comunidades</TextMalet>
-                                </View>
+                                end={{ x: 0.5, y: 0 }}
+                                style={styles.tasaCard}
+                            >
+                                <Animated.View style={{ opacity: fadeTasaAnim }}>
+                                    {tasas && tasas.length > 0 ? (
+                                        <>
+                                            <TextMalet style={{ marginBottom: 2, fontWeight: '600', marginTop: 4 }}>
+                                                Tasa {tasas[currentTasaIndex]?.nombre}
+                                            </TextMalet>
+                                            <TextMalet style={{ fontSize: 13 }}>
+                                                1 USD = Bs {tasas[currentTasaIndex]?.promedio}
+                                            </TextMalet>
+                                            <TextMalet style={{ color: '#555', fontSize: 12 }}>
+                                                {parseDate(tasas[currentTasaIndex]?.fechaActualizacion)}
+                                            </TextMalet>
 
-                                <View>
-                                    <View style={{ flexDirection: 'row', gap: 2 }}>
-                                        <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
-                                        <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
-                                    </View>
-                                </View>
-
+                                        </>
+                                    ) : (
+                                        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+                                            <ActivityIndicator size="small" color="#000" />
+                                        </View>
+                                    )}
+                                </Animated.View>
                             </LinearGradient>
-                        </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push('/s-accounts/main')} style={{ width: 170 }}>
+                                <LinearGradient
+                                    colors={['#ffffff', '#e1d7ffff']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ padding: 10, borderRadius: 10, width: '100%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5', overflow: 'hidden' }}>
+
+                                    <View style={[StyleSheet.absoluteFill, { opacity: 0.1, zIndex: 0 }]}>
+                                        <Svg width="100%" height="100%">
+                                            <Defs>
+                                                <Pattern id="gridPattern" width="16" height="16" patternUnits="userSpaceOnUse">
+                                                    <Path d="M 16 0 L 0 0 0 16" fill="none" stroke="#252525" strokeWidth="1" />
+                                                </Pattern>
+                                            </Defs>
+                                            <Rect width="100%" height="100%" fill="url(#gridPattern)" />
+                                        </Svg>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, zIndex: 1 }}>
+                                        <Wallet size={15} color={'#505050ff'} fill={'#ecececff'} />
+                                        <TextMalet>S-Accounts </TextMalet>
+                                    </View>
+
+                                    <View style={{ zIndex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                            <AtSign size={15} color={'#505050ff'} />
+                                            <TextMalet style={{ fontSize: 11 }}>Get Started with</TextMalet>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                            <TextMalet style={{ fontSize: 11 }}>M-Account</TextMalet>
+                                        </View>
+                                    </View>
+
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push('/communities' as any)} style={{ width: 170 }}>
+                                <LinearGradient
+                                    colors={['#ffffff', '#ffffffff']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{ padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
+                                        <TextMalet>Comunidades</TextMalet>
+                                    </View>
+
+                                    <View>
+                                        <View style={{ flexDirection: 'row', gap: 2 }}>
+                                            <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
+                                            <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
+                                        </View>
+                                    </View>
+
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                        </ScrollView>
                     </View>
                 </View>
 
@@ -558,6 +492,7 @@ export default function Dashboard() {
             </View>
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
+            <UpdatesModal />
         </SafeAreaView>
     );
 };
@@ -589,7 +524,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#dbd9d9ff',
         borderStyle: 'dashed',
-        width: '48%',
+        width: 170,
     },
     tasaItem: {
         backgroundColor: 'rgb(245, 245, 245)',
@@ -666,6 +601,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 6,
+        width: '100%',
     },
     accountInfo: {
         flex: 1,
@@ -689,15 +625,24 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgb(250, 250, 250)',
         borderRadius: 10,
         padding: 8,
+        width: '100%',
         paddingVertical: 8,
         borderWidth: 1,
         borderColor: 'rgba(0, 0, 0, 0.08)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        alignSelf: 'flex-start',
     },
     balanceValue: {
         fontSize: 20,
-        fontWeight: '700',
-        color: 'rgba(20, 20, 20, 1)',
-        letterSpacing: -0.3,
+        fontWeight: 'bold',
+        color: '#1a1a1a', // Rich dark color
+        letterSpacing: -0.5,
+    },
+    eyeButtonInner: {
+        padding: 4,
     },
     actionsContainer: {
         flexDirection: 'row',

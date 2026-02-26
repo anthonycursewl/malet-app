@@ -68,7 +68,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                 ).start();
             }
 
-            await getAllAccountsByUserId();
+            await getAllAccountsByUserId({ refresh: forceRefresh });
 
             if (isMounted.current) {
                 spinValue.stopAnimation();
@@ -190,6 +190,8 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                     maxToRenderPerBatch={10}
                     windowSize={5}
                     removeClippedSubviews={true}
+                    onEndReached={() => getAllAccountsByUserId({ refresh: false })}
+                    onEndReachedThreshold={0.5}
                     getItemLayout={(_, index) => ({
                         length: 72, // Altura aproximada de cada item
                         offset: 72 * index,
@@ -251,6 +253,12 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                                     />
                                 </Animated.View>
                             </TouchableOpacity>
+                            <TouchableOpacity onPress={() => {
+                                onClose();
+                                setTimeout(() => router.push('/accounts/trash'), 300);
+                            }} style={styles.trashButton}>
+                                <TextMalet style={styles.trashText}>Papelera</TextMalet>
+                            </TouchableOpacity>
                             <TouchableOpacity onPress={handleCreateAccount}>
                                 <IconPlus width={25} height={25} fill={'rgba(29, 29, 29, 1)'} />
                             </TouchableOpacity>
@@ -288,7 +296,18 @@ const styles = StyleSheet.create({
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 15,
+        gap: 12,
+    },
+    trashButton: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        backgroundColor: '#fff0f0',
+        borderRadius: 8,
+    },
+    trashText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#ff4444',
     },
     reloadButton: {
         padding: 4,

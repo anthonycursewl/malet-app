@@ -3,15 +3,18 @@ import Button from "@/components/Button/Button";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
+import ModalOptions from "@/components/shared/ModalOptions";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { Account } from "@/shared/entities/Account";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import IconAt from "@/svgs/dashboard/IconAt";
+import { Feather } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Easing, FlatList, InteractionManager, StyleSheet, View } from 'react-native';
+import { Alert, Animated, Easing, FlatList, InteractionManager, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // Shimmer Effect Component
 const ShimmerEffect = memo(({ style }: { style?: any }) => {
@@ -163,7 +166,6 @@ const AccountBalance = memo(({ selectedAccount }: { selectedAccount: Account }) 
     );
 });
 
-// Empty State Component for No Account Selected
 const EmptyAccountState = memo(() => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -213,7 +215,7 @@ const AnimatedTransactionItem = memo(({ item, index }: { item: any; index: numbe
     const translateY = useRef(new Animated.Value(20)).current;
 
     useEffect(() => {
-        const delay = Math.min(index * 50, 300); // Cap delay at 300ms
+        const delay = Math.min(index * 50, 300);
         const timeout = setTimeout(() => {
             Animated.parallel([
                 Animated.timing(fadeAnim, {
@@ -239,11 +241,10 @@ const AnimatedTransactionItem = memo(({ item, index }: { item: any; index: numbe
     );
 });
 
-// Main Component
 export default function GetAllTransaction() {
     const { user } = useAuthStore();
     const [firstMount, setFirstMount] = useState(true);
-    const [isReady, setIsReady] = useState(false); // Wait for navigation to complete
+    const [isReady, setIsReady] = useState(false);
     const {
         getHistoryTransactions,
         loading: loadingWallet,
@@ -258,33 +259,52 @@ export default function GetAllTransaction() {
         selectedAccount
     } = useAccountStore();
     const [modalVisible, setModalVisible] = useState(false);
+    const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [filterTypes, setFilterTypes] = useState<string[]>([]);
+
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
+    const [datePickerType, setDatePickerType] = useState<'start' | 'end' | null>(null);
+
     const onEndReachedCalledDuringMomentum = useRef(true);
     const contentFadeAnim = useRef(new Animated.Value(0)).current;
 
-    // Memoized handlers
+    const activeFilterTypesStr = useMemo(() => filterTypes.length > 0 ? filterTypes.join(',') : undefined, [filterTypes]);
+    const activeStartDateStr = useMemo(() => startDate ? startDate.toISOString() : undefined, [startDate]);
+    const activeEndDateStr = useMemo(() => endDate ? endDate.toISOString() : undefined, [endDate]);
+
     const handleOpenModal = useCallback(() => setModalVisible(true), []);
     const handleCloseModal = useCallback(() => setModalVisible(false), []);
 
     const handleRefresh = useCallback(() => {
         if (selectedAccount?.id) {
-            getHistoryTransactions(selectedAccount.id, user.id, { refresh: true });
+            getHistoryTransactions(selectedAccount.id, user.id, {
+                refresh: true,
+                types: activeFilterTypesStr,
+                startDate: activeStartDateStr,
+                endDate: activeEndDateStr
+            });
         }
-    }, [selectedAccount?.id, user.id, getHistoryTransactions]);
+    }, [selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr]);
 
     const handleEndReached = useCallback(() => {
         if (loadingWallet || paginationTransactions.isEnd || onEndReachedCalledDuringMomentum.current) {
             return;
         }
         if (selectedAccount?.id) {
-            getHistoryTransactions(selectedAccount.id, user.id, { refresh: false });
+            getHistoryTransactions(selectedAccount.id, user.id, {
+                refresh: false,
+                types: activeFilterTypesStr,
+                startDate: activeStartDateStr,
+                endDate: activeEndDateStr
+            });
         }
-    }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions]);
+    }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr]);
 
     const handleScrollBeginDrag = useCallback(() => {
         onEndReachedCalledDuringMomentum.current = false;
     }, []);
 
-    // Memoized FlatList props
     const keyExtractor = useCallback((item: any) => item.id.toString(), []);
 
     const renderItem = useCallback(({ item, index }: { item: any; index: number }) => (
@@ -323,16 +343,12 @@ export default function GetAllTransaction() {
         index,
     }), []);
 
-    // Button text memoized
     const buttonText = useMemo(() => {
         return selectedAccount
             ? `${selectedAccount.name} ${selectedAccount.currency}`
             : 'Seleccionar cuenta';
     }, [selectedAccount]);
 
-    // Effects
-
-    // Wait for navigation animation to complete before doing heavy work
     useEffect(() => {
         const interactionPromise = InteractionManager.runAfterInteractions(() => {
             setIsReady(true);
@@ -347,7 +363,6 @@ export default function GetAllTransaction() {
         }
     }, [error]);
 
-    // Load accounts only after ready
     useEffect(() => {
         if (!isReady) return;
 
@@ -356,7 +371,6 @@ export default function GetAllTransaction() {
         }
     }, [isReady, accounts.length, getAllAccountsByUserId]);
 
-    // Load transactions only after ready
     useEffect(() => {
         if (!isReady) return;
 
@@ -367,7 +381,6 @@ export default function GetAllTransaction() {
 
                 if (isSameAccount) {
                     setFirstMount(false);
-                    // Animate content in
                     Animated.timing(contentFadeAnim, {
                         toValue: 1,
                         duration: 400,
@@ -379,9 +392,13 @@ export default function GetAllTransaction() {
                 setFirstMount(true);
                 contentFadeAnim.setValue(0);
                 clearStore();
-                await getHistoryTransactions(selectedAccount.id, user.id, { refresh: true });
+                await getHistoryTransactions(selectedAccount.id, user.id, {
+                    refresh: true,
+                    types: activeFilterTypesStr,
+                    startDate: activeStartDateStr,
+                    endDate: activeEndDateStr
+                });
                 setFirstMount(false);
-                // Animate content in
                 Animated.timing(contentFadeAnim, {
                     toValue: 1,
                     duration: 400,
@@ -398,7 +415,63 @@ export default function GetAllTransaction() {
         };
 
         getData();
-    }, [isReady, selectedAccount?.id, user.id]);
+    }, [isReady, selectedAccount?.id, user.id, activeFilterTypesStr, activeStartDateStr, activeEndDateStr]);
+
+    const applyFilters = () => {
+        setFilterModalVisible(false);
+        if (selectedAccount?.id && isReady) {
+            clearStore();
+            getHistoryTransactions(selectedAccount.id, user.id, {
+                refresh: true,
+                types: activeFilterTypesStr,
+                startDate: activeStartDateStr,
+                endDate: activeEndDateStr
+            });
+        }
+    };
+
+    const toggleFilterType = (type: string) => {
+        if (filterTypes.includes(type)) {
+            setFilterTypes(prev => prev.filter(t => t !== type));
+        } else {
+            setFilterTypes(prev => [...prev, type]);
+        }
+    };
+
+    const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        const currentDate = selectedDate;
+
+        if (Platform.OS === 'android') {
+            setDatePickerType(null);
+        }
+
+        if (currentDate) {
+            if (datePickerType === 'start') {
+                setStartDate(currentDate);
+                if (endDate && currentDate > endDate) {
+                    setEndDate(null);
+                }
+            } else if (datePickerType === 'end') {
+                setEndDate(currentDate);
+                if (startDate && currentDate < startDate) {
+                    setStartDate(null);
+                }
+            }
+        }
+    };
+
+    const clearFilters = () => {
+        setFilterTypes([]);
+        setStartDate(null);
+        setEndDate(null);
+    };
+
+    const formatDateForDisplay = (date: Date | null) => {
+        if (!date) return null;
+        return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const hasActiveFilters = filterTypes.length > 0 || startDate !== null || endDate !== null;
 
     const showSkeleton = !isReady || (firstMount && selectedAccount?.id);
 
@@ -411,6 +484,9 @@ export default function GetAllTransaction() {
                     <Animated.View style={[styles.contentContainer, { opacity: contentFadeAnim }]}>
                         <View style={styles.headerSection}>
                             <TextMalet style={styles.pageTitle}>Todas las Transacciones</TextMalet>
+                            <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButton}>
+                                <Feather name="filter" size={20} color={hasActiveFilters ? '#10b981' : '#64748b'} />
+                            </TouchableOpacity>
                         </View>
 
                         <AccountCard user={user} selectedAccount={selectedAccount} />
@@ -462,6 +538,142 @@ export default function GetAllTransaction() {
                 visible={modalVisible}
                 onClose={handleCloseModal}
             />
+
+            <ModalOptions
+                visible={filterModalVisible}
+                onClose={() => setFilterModalVisible(false)}
+            >
+                <View style={styles.filterModalContainer}>
+                    <View style={styles.filterModalHeader}>
+                        <TextMalet style={styles.filterModalTitle}>Filtros Avanzados</TextMalet>
+                        {hasActiveFilters && (
+                            <TouchableOpacity onPress={clearFilters}>
+                                <TextMalet style={styles.clearFiltersText}>Limpiar</TextMalet>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false} style={styles.filterModalScroll}>
+                        {/* Transaction Types Section */}
+                        <View style={styles.filterSection}>
+                            <TextMalet style={styles.filterSectionTitle}>Tipos de Transacción</TextMalet>
+                            <View style={styles.filterOptionsGrid}>
+                                <TouchableOpacity
+                                    style={[styles.filterOption, filterTypes.includes('expense') && styles.filterOptionActive]}
+                                    onPress={() => toggleFilterType('expense')}
+                                >
+                                    <Feather name="arrow-down-right" size={16} color={filterTypes.includes('expense') ? '#fff' : '#64748b'} />
+                                    <TextMalet style={[styles.filterOptionText, filterTypes.includes('expense') && { color: '#fff' }]}>Egresos</TextMalet>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.filterOption, filterTypes.includes('saving') && styles.filterOptionActive]}
+                                    onPress={() => toggleFilterType('saving')}
+                                >
+                                    <Feather name="arrow-up-right" size={16} color={filterTypes.includes('saving') ? '#fff' : '#64748b'} />
+                                    <TextMalet style={[styles.filterOptionText, filterTypes.includes('saving') && { color: '#fff' }]}>Ingresos</TextMalet>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.filterOption, filterTypes.includes('pending_payment') && styles.filterOptionActiveWarning]}
+                                    onPress={() => toggleFilterType('pending_payment')}
+                                >
+                                    <Feather name="clock" size={16} color={filterTypes.includes('pending_payment') ? '#fff' : '#64748b'} />
+                                    <TextMalet style={[styles.filterOptionText, filterTypes.includes('pending_payment') && { color: '#fff' }]}>Pendientes</TextMalet>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Date Range Section */}
+                        <View style={styles.filterSection}>
+                            <TextMalet style={styles.filterSectionTitle}>Rango de Fechas</TextMalet>
+
+                            <View style={styles.dateSelectorsRow}>
+                                <TouchableOpacity
+                                    style={[styles.datePickerButton, startDate && styles.datePickerButtonActive]}
+                                    onPress={() => setDatePickerType('start')}
+                                >
+                                    <Feather name="calendar" size={16} color={startDate ? '#10b981' : '#64748b'} />
+                                    <View>
+                                        <TextMalet style={styles.datePickerLabel}>Desde</TextMalet>
+                                        <TextMalet style={[styles.datePickerValue, startDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
+                                            {formatDateForDisplay(startDate) || 'Inicio'}
+                                        </TextMalet>
+                                    </View>
+                                </TouchableOpacity>
+
+                                <Feather name="arrow-right" size={16} color="#cbd5e1" />
+
+                                <TouchableOpacity
+                                    style={[styles.datePickerButton, endDate && styles.datePickerButtonActive]}
+                                    onPress={() => setDatePickerType('end')}
+                                >
+                                    <Feather name="calendar" size={16} color={endDate ? '#10b981' : '#64748b'} />
+                                    <View>
+                                        <TextMalet style={styles.datePickerLabel}>Hasta</TextMalet>
+                                        <TextMalet style={[styles.datePickerValue, endDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
+                                            {formatDateForDisplay(endDate) || 'Fin'}
+                                        </TextMalet>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+
+                            {(startDate || endDate) && (
+                                <TouchableOpacity
+                                    style={styles.clearDatesButton}
+                                    onPress={() => {
+                                        setStartDate(null);
+                                        setEndDate(null);
+                                    }}
+                                >
+                                    <TextMalet style={styles.clearDatesText}>Resetear fechas</TextMalet>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* iOS Inline Date Picker Rendering */}
+                        {Platform.OS === 'ios' && datePickerType && (
+                            <View style={styles.iosDatePickerContainer}>
+                                <View style={styles.iosDatePickerHeader}>
+                                    <TextMalet style={styles.iosDatePickerTitle}>
+                                        Selecciona la fecha {datePickerType === 'start' ? 'inicial' : 'final'}
+                                    </TextMalet>
+                                    <TouchableOpacity onPress={() => setDatePickerType(null)}>
+                                        <TextMalet style={styles.iosDatePickerDone}>Listo</TextMalet>
+                                    </TouchableOpacity>
+                                </View>
+                                <DateTimePicker
+                                    value={(datePickerType === 'start' ? startDate : endDate) || new Date()}
+                                    mode="date"
+                                    display="inline"
+                                    onChange={onDateChange}
+                                    maximumDate={new Date()} // Don't allow future dates
+                                />
+                            </View>
+                        )}
+
+                    </ScrollView>
+
+                    <View style={styles.filterModalFooter}>
+                        <Button
+                            text={`Aplicar Filtros`}
+                            onPress={applyFilters}
+                            style={{ width: '100%' }}
+                        />
+                    </View>
+                </View>
+            </ModalOptions>
+
+            {/* Android Modal Date Picker */}
+            {Platform.OS === 'android' && datePickerType && (
+                <DateTimePicker
+                    value={(datePickerType === 'start' ? startDate : endDate) || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={onDateChange}
+                    maximumDate={new Date()}
+                />
+            )}
         </View>
     );
 }
@@ -476,10 +688,18 @@ const styles = StyleSheet.create({
     },
     headerSection: {
         paddingBottom: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     pageTitle: {
         fontSize: 16,
         fontWeight: '600',
+    },
+    filterButton: {
+        padding: 6,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 8,
     },
     // Balance styles
     balanceContainer: {
@@ -654,5 +874,156 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 22,
         maxWidth: 280,
+    },
+    // Filter Modal Styles
+    filterModalContainer: {
+        flex: 1,
+        paddingTop: 10,
+        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    },
+    filterModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    filterModalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#1a1a1a',
+        letterSpacing: -0.5,
+    },
+    clearFiltersText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#FF6B6B',
+    },
+    filterModalScroll: {
+        flex: 1,
+    },
+    filterSection: {
+        marginBottom: 28,
+    },
+    filterSectionTitle: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#94a3b8',
+        marginBottom: 16,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    filterOptionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    filterOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#f1f5f9',
+        borderRadius: 14,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        gap: 8,
+        backgroundColor: '#f8fafc',
+    },
+    filterOptionActive: {
+        backgroundColor: '#1a1a1a',
+        borderColor: '#1a1a1a',
+    },
+    filterOptionActiveWarning: {
+        backgroundColor: '#F5C842',
+        borderColor: '#F5C842',
+    },
+    filterOptionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    dateSelectorsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    datePickerButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderWidth: 1.5,
+        borderColor: '#f1f5f9',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        gap: 10,
+    },
+    datePickerButtonActive: {
+        borderColor: '#e2e8f0',
+        backgroundColor: '#fff',
+    },
+    datePickerLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#94a3b8',
+        textTransform: 'uppercase',
+        marginBottom: 2,
+    },
+    datePickerValue: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748b',
+    },
+    clearDatesButton: {
+        alignSelf: 'flex-start',
+        paddingVertical: 4,
+    },
+    clearDatesText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#64748b',
+        textDecorationLine: 'underline',
+    },
+    iosDatePickerContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        marginTop: 10,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+            },
+        }),
+    },
+    iosDatePickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    iosDatePickerTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#1a1a1a',
+    },
+    iosDatePickerDone: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#10b981',
+    },
+    filterModalFooter: {
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
+        marginTop: 'auto',
     },
 });

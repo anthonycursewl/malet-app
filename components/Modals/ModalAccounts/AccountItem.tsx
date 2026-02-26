@@ -1,5 +1,6 @@
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { Account } from "@/shared/entities/Account";
+import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { colors, spacing } from "@/shared/theme";
 import { memo } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
@@ -13,6 +14,9 @@ interface AccountItemProps {
 
 export const AccountItem = memo(({ account, onPress, isLast, onLongPress }: AccountItemProps) => {
   const { name, balance } = account;
+  const { isBalanceHidden } = useAccountStore();
+
+  const displayBalance = isBalanceHidden ? '••••••' : `$${balance.toFixed(2)}`;
 
   return (
     <TouchableOpacity
@@ -31,7 +35,7 @@ export const AccountItem = memo(({ account, onPress, isLast, onLongPress }: Acco
             {name}
           </TextMalet>
           <TextMalet style={styles.balance}>
-            ${balance.toFixed(2)}
+            {displayBalance}
           </TextMalet>
         </View>
       </View>
