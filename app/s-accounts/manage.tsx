@@ -3,7 +3,7 @@ import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useSharedAccountStore } from "@/shared/stores/useSharedAccountStore";
 import { router, useLocalSearchParams } from "expo-router";
-import { ChevronLeft } from "lucide-react-native";
+import { AlertCircle, ChevronLeft, Info } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,8 +38,9 @@ export default function ManageSAccount() {
             Alert.alert("Error", "El nombre es obligatorio");
             return;
         }
-        if (!identificationNumber.trim()) {
-            Alert.alert("Error", "El Documento de Identidad es obligatorio");
+
+        if (!accountId.trim()) {
+            Alert.alert("Error", "El ID de Cuenta es obligatorio");
             return;
         }
 
@@ -62,6 +63,14 @@ export default function ManageSAccount() {
             });
             if (created) router.back();
         }
+    };
+
+    const showOptionalTooltip = () => {
+        Alert.alert("Información", "Este campo es opcional.");
+    };
+
+    const showMandatoryTooltip = () => {
+        Alert.alert("Información", "Este campo es obligatorio.");
     };
 
     return (
@@ -92,7 +101,12 @@ export default function ManageSAccount() {
                 >
                     <View style={styles.form}>
                         <View style={styles.inputContainer}>
-                            <TextMalet style={styles.inputLabel}>Nombre (*)</TextMalet>
+                            <View style={styles.labelWithInfo}>
+                                <TextMalet style={styles.inputLabel}>Nombre</TextMalet>
+                                <TouchableOpacity onPress={showMandatoryTooltip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <AlertCircle size={14} color="#ff6b6bff" />
+                                </TouchableOpacity>
+                            </View>
                             <Input
                                 placeholder="Ej: Pago de Alquiler"
                                 value={name}
@@ -101,7 +115,12 @@ export default function ManageSAccount() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <TextMalet style={styles.inputLabel}>ID de Cuenta (Opcional)</TextMalet>
+                            <View style={styles.labelWithInfo}>
+                                <TextMalet style={styles.inputLabel}>ID de Cuenta</TextMalet>
+                                <TouchableOpacity onPress={showMandatoryTooltip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <AlertCircle size={14} color="#ff6b6bff" />
+                                </TouchableOpacity>
+                            </View>
                             <Input
                                 placeholder="Ej: ABC-123-XYZ"
                                 value={accountId}
@@ -110,7 +129,12 @@ export default function ManageSAccount() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <TextMalet style={styles.inputLabel}>Documento de Identidad (*)</TextMalet>
+                            <View style={styles.labelWithInfo}>
+                                <TextMalet style={styles.inputLabel}>Documento de Identidad</TextMalet>
+                                <TouchableOpacity onPress={showOptionalTooltip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Info size={14} color="#666" />
+                                </TouchableOpacity>
+                            </View>
                             <Input
                                 placeholder="Ej: V-12345678"
                                 value={identificationNumber}
@@ -119,7 +143,12 @@ export default function ManageSAccount() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <TextMalet style={styles.inputLabel}>Teléfono asociado (Opcional)</TextMalet>
+                            <View style={styles.labelWithInfo}>
+                                <TextMalet style={styles.inputLabel}>Teléfono asociado</TextMalet>
+                                <TouchableOpacity onPress={showOptionalTooltip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Info size={14} color="#666" />
+                                </TouchableOpacity>
+                            </View>
                             <Input
                                 placeholder="Ej: +123456789"
                                 value={phone}
@@ -129,7 +158,12 @@ export default function ManageSAccount() {
                         </View>
 
                         <View style={styles.inputContainer}>
-                            <TextMalet style={styles.inputLabel}>Email asociado (Opcional)</TextMalet>
+                            <View style={styles.labelWithInfo}>
+                                <TextMalet style={styles.inputLabel}>Email asociado</TextMalet>
+                                <TouchableOpacity onPress={showOptionalTooltip} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Info size={14} color="#666" />
+                                </TouchableOpacity>
+                            </View>
                             <Input
                                 placeholder="Ej: amigo@example.com"
                                 value={email}
@@ -201,6 +235,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#1a1a1a',
         paddingLeft: 4,
+    },
+    labelWithInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     footer: {
         padding: 16,

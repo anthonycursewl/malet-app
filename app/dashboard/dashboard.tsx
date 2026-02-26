@@ -19,10 +19,18 @@ import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Defs, Path, Pattern, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, Pattern, Rect } from 'react-native-svg';
 
 // lucide icon 
-import { AtSign, Wallet } from 'lucide-react-native';
+import { AtSign, Layers, TrendingUp, Wallet } from 'lucide-react-native';
+
+const SHOW_S_ACCOUNTS_NEW_TAG = (() => {
+    const releaseDate = new Date('2026-02-26');
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - releaseDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= 10;
+})();
 
 interface ModalAccountsRef {
     openModal: () => void;
@@ -219,6 +227,8 @@ export default function Dashboard() {
     const modalAccountsRef = useRef<ModalAccountsRef>(null);
     // Animated value for fading tasa text on change
     const fadeTasaAnim = useRef(new Animated.Value(1)).current;
+    // Low-speed background animation for the rates card
+    const tasaBgAnim = useRef(new Animated.Value(0)).current;
 
     const startAnimation = useCallback(() => {
         Animated.timing(fadeAnim, {
@@ -332,6 +342,22 @@ export default function Dashboard() {
     }, [currentTasaIndex]);
 
     useEffect(() => {
+        Animated.loop(
+            Animated.timing(tasaBgAnim, {
+                toValue: 1,
+                duration: 15000,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            })
+        ).start();
+    }, [tasaBgAnim]);
+
+    const tasaBgTranslate = tasaBgAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -30],
+    });
+
+    useEffect(() => {
         if (error) {
             Alert.alert('Malet | Error', error);
         }
@@ -357,7 +383,10 @@ export default function Dashboard() {
 
                 {/* Tasas de Cambio Section */}
                 <View style={styles.tasasContainer}>
-                    <TextMalet style={styles.tasasHeader}>Malet | Utilidades</TextMalet>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+                        <Layers size={15} color="#222222ff" />
+                        <TextMalet style={styles.tasasHeader}>Malet | Suite</TextMalet>
+                    </View>
 
                     <View>
                         <ScrollView
@@ -365,30 +394,60 @@ export default function Dashboard() {
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={{ gap: 10, paddingRight: 20 }}
                         >
-                            {/* BCV Rate Card with enhanced style */}
+                            {/* BCV Rate Card with premium style */}
                             <LinearGradient
-                                colors={['#f0f0f059', '#eeeeeead']}
+                                colors={['#ffffff', '#fcfcfcff']}
                                 start={{ x: 0, y: 0 }}
-                                end={{ x: 0.5, y: 0 }}
-                                style={styles.tasaCard}
+                                end={{ x: 1, y: 1 }}
+                                style={[styles.tasaCard, { overflow: 'hidden' }]}
                             >
-                                <Animated.View style={{ opacity: fadeTasaAnim }}>
+                                {/* Animated background texture */}
+                                <Animated.View style={[StyleSheet.absoluteFill, {
+                                    opacity: 0.15,
+                                    transform: [{ translateX: tasaBgTranslate }]
+                                }]}>
+                                    <Svg width="250%" height="100%">
+                                        <Defs>
+                                            <Pattern id="dotsPattern" width="15" height="15" patternUnits="userSpaceOnUse">
+                                                <Circle cx="2" cy="2" r="1" fill="#141414ff" />
+                                            </Pattern>
+                                        </Defs>
+                                        <Rect width="100%" height="100%" fill="url(#dotsPattern)" />
+                                    </Svg>
+                                </Animated.View>
+
+                                {/* Fade mask for the texture */}
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,1)', 'rgba(39, 39, 39, 0.02)', 'rgba(255,255,255,0.8)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={StyleSheet.absoluteFill}
+                                />
+
+                                <Animated.View style={{ opacity: fadeTasaAnim, flex: 1, justifyContent: 'space-between', zIndex: 1 }}>
                                     {tasas && tasas.length > 0 ? (
                                         <>
-                                            <TextMalet style={{ marginBottom: 2, fontWeight: '600', marginTop: 4 }}>
-                                                Tasa {tasas[currentTasaIndex]?.nombre}
-                                            </TextMalet>
-                                            <TextMalet style={{ fontSize: 13 }}>
-                                                1 USD = Bs {tasas[currentTasaIndex]?.promedio}
-                                            </TextMalet>
-                                            <TextMalet style={{ color: '#555', fontSize: 12 }}>
-                                                {parseDate(tasas[currentTasaIndex]?.fechaActualizacion)}
-                                            </TextMalet>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <TrendingUp size={14} color="#64748b" />
+                                                <TextMalet style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>
+                                                    Tasa {tasas[currentTasaIndex]?.nombre}
+                                                </TextMalet>
+                                            </View>
 
+                                            <View>
+                                                <TextMalet style={{ fontSize: 18, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 1 }}>
+                                                    Bs {tasas[currentTasaIndex]?.promedio}
+                                                </TextMalet>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <TextMalet style={{ color: '#94a3b8', fontSize: 10 }}>
+                                                        1 USD • {parseDate(tasas[currentTasaIndex]?.fechaActualizacion).split(',')[0]}
+                                                    </TextMalet>
+                                                </View>
+                                            </View>
                                         </>
                                     ) : (
-                                        <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                                            <ActivityIndicator size="small" color="#000" />
+                                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                            <ActivityIndicator size="small" color="#6366f1" />
                                         </View>
                                     )}
                                 </Animated.View>
@@ -414,7 +473,12 @@ export default function Dashboard() {
 
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, zIndex: 1 }}>
                                         <Wallet size={15} color={'#505050ff'} fill={'#ecececff'} />
-                                        <TextMalet>S-Accounts </TextMalet>
+                                        <TextMalet style={{ fontWeight: '500' }}>S-Accounts</TextMalet>
+                                        {SHOW_S_ACCOUNTS_NEW_TAG && (
+                                            <View style={styles.newBadge}>
+                                                <TextMalet style={styles.newBadgeText}>NEW</TextMalet>
+                                            </View>
+                                        )}
                                     </View>
 
                                     <View style={{ zIndex: 1 }}>
@@ -435,7 +499,7 @@ export default function Dashboard() {
                                     colors={['#ffffff', '#ffffffff']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
-                                    style={{ padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: '#f5f5f5' }}>
+                                    style={{ padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: '#f5f5f5', paddingBottom: 15 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                         <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
                                         <TextMalet>Comunidades</TextMalet>
@@ -511,19 +575,29 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     tasasHeader: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
-        marginBottom: 5,
+    },
+    newBadge: {
+        backgroundColor: '#6366f1',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        marginLeft: 2,
+    },
+    newBadgeText: {
+        fontSize: 8,
+        fontWeight: 'bold',
+        color: '#fff',
+        letterSpacing: 0.5,
     },
     // Card style for BCV rate with subtle gradient and shadow
     tasaCard: {
         backgroundColor: '#fff',
-        borderRadius: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 10,
+        borderRadius: 10,
+        padding: 10,
         borderWidth: 1,
-        borderColor: '#dbd9d9ff',
-        borderStyle: 'dashed',
+        borderColor: '#f5f5f5',
         width: 170,
     },
     tasaItem: {

@@ -43,6 +43,12 @@
       ],
       "expo-font",
       "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Malet usa reconocimiento facial para proteger tu cuenta e iniciar sesión de forma segura."
+        }
+      ],
       "@react-native-google-signin/google-signin",
       "expo-secure-store",
       "@react-native-community/datetimepicker"
