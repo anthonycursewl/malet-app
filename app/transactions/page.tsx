@@ -241,7 +241,24 @@ export default function TransactionDetail() {
 
             <View style={styles.detailRow}>
               <TextMalet style={styles.detailLabel}>Etiquetas</TextMalet>
-              <TextMalet style={styles.detailValue}>{'Etiqueta 1, Etiqueta 2'}</TextMalet>
+              <View style={styles.tagsContainer}>
+                {transaction.tags && transaction.tags.length > 0 ? (
+                  transaction.tags.map(tag => {
+                    const color = tag.color || '#999';
+                    const name = tag.name.startsWith('#') ? tag.name : '#' + tag.name;
+                    return (
+                      <View key={tag.id} style={[styles.tagChip, { backgroundColor: color + '15', borderColor: color }]}>
+                        <TextMalet style={[styles.tagText, { color }]}>
+                          <TextMalet style={[styles.tagInitial, { color }]}>{name.charAt(0).toUpperCase()}</TextMalet>
+                          {name.slice(1).toLowerCase()}
+                        </TextMalet>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <TextMalet style={styles.detailValue}>Sin etiquetas</TextMalet>
+                )}
+              </View>
             </View>
           </View>
 
@@ -541,6 +558,40 @@ const styles = StyleSheet.create({
   btnActionText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  moreCounter: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  moreCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  tagInitial: {
+    fontWeight: '700',
+    fontSize: 13,
   },
 });
 

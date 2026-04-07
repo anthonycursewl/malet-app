@@ -26,6 +26,7 @@ export default function ModalCurrencies({
                 data={currencies}
                 keyExtractor={(item: typeof currencies[0]) => item.name}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
                 renderItem={({ item }: { item: typeof currencies[0] }) => (
                     <TouchableOpacity
                         style={styles.currencyOption}
@@ -59,10 +60,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 16,
-        paddingHorizontal: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: '#ccccccff',
+        borderStyle: 'dashed',
+        borderRadius: 12,
     },
     currencyInfo: {
         flexDirection: 'row',
@@ -71,14 +74,16 @@ const styles = StyleSheet.create({
     },
     currencyFlag: {
         width: 32,
-        height: 24,
-        borderRadius: 4,
+        height: 32,
+        borderRadius: 99,
     },
     currencyLabel: {
         fontSize: 15,
         color: '#333',
     },
-
+    listContent: {
+        gap: 10,
+    },
     checkmark: {
         fontSize: 20,
         color: '#4CAF50',

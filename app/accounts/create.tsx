@@ -39,8 +39,6 @@ export default function Create() {
         }
     }, [error])
 
-    let accountNumber = '123456789012';
-
     const handleTextChange = (field: 'name' | 'currency', value: string) => {
         setAccountDetails(prev => ({ ...prev, [field]: value }));
     };

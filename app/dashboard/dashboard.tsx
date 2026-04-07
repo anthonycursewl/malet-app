@@ -532,15 +532,11 @@ export default function Dashboard() {
                     keyExtractor={(item) => item.id.toString()}
                     showsVerticalScrollIndicator={false}
                     style={styles.transactionsList}
-                    ListHeaderComponent={
-                        <TextMalet style={styles.listHeader}>
-                            Transacciones recientes
-                        </TextMalet>
-                    }
+                    ListHeaderComponent={null}
                     renderItem={({ item }) => <LastTransactions item={item} />}
                     ListEmptyComponent={
                         <TextMalet style={styles.emptyListText}>
-                            No hay transacciones recientes.
+                            No hay movimientos aún.
                         </TextMalet>
                     }
                     onRefresh={handleRefresh}

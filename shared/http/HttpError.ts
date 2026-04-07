@@ -1,3 +1,5 @@
+import NetInfo from '@react-native-community/netinfo';
+
 /**
  * HttpError - Error universal para peticiones HTTP
  * Maneja todos los tipos de errores de red, timeout, parsing y servidor
@@ -297,6 +299,11 @@ export async function fetchWithConfig(
     init?: RequestInit,
     config?: HttpRequestConfig
 ): Promise<Response> {
+    const netState = await NetInfo.fetch();
+    if (netState.isConnected === false) {
+        throw HttpError.network();
+    }
+
     const { timeout, retries, retryDelay } = { ...DEFAULT_CONFIG, ...config };
 
     let lastError: HttpError | null = null;

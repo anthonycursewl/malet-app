@@ -1,10 +1,15 @@
+import { TransactionTag } from "./TagItem";
+
 export type TransactionType = 'expense' | 'saving' | 'pending_payment';
 
 export interface TransactionItem {
-    id: number;
+    id: string;
     name: string;
     amount: string;
     type: TransactionType;
     account_id: string;
+    currency_code?: string;
+    tags?: TransactionTag[];
+    tag_ids?: string[];
     issued_at: Date;
 }

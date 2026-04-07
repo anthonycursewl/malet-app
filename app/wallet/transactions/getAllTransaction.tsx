@@ -1,4 +1,3 @@
-import { AccountCard } from "@/components/AccountCard/AccountCard";
 import Button from "@/components/Button/Button";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
@@ -10,9 +9,9 @@ import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import IconAt from "@/svgs/dashboard/IconAt";
-import { Feather } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Calendar, Clock, Eye, EyeOff, SlidersHorizontal } from "lucide-react-native";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, Easing, FlatList, InteractionManager, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -95,34 +94,22 @@ const SkeletonLoader = memo(() => {
 
     return (
         <Animated.View style={[styles.skeletonContainer, { opacity: fadeAnim }]}>
-            {/* Header */}
-            <ShimmerEffect style={{ width: '55%', height: 22, marginBottom: 16, borderRadius: 6 }} />
-
-            {/* Card Skeleton */}
-            <View style={styles.skeletonCard}>
-                <ShimmerEffect style={{ width: '75%', height: 22, marginBottom: 16, borderRadius: 6 }} />
-                <View style={styles.skeletonFooter}>
-                    <View>
-                        <ShimmerEffect style={{ width: 90, height: 12, marginBottom: 8, borderRadius: 4 }} />
-                        <ShimmerEffect style={{ width: 110, height: 16, borderRadius: 4 }} />
-                    </View>
-                    <ShimmerEffect style={[styles.skeletonCircle, { width: 24, height: 24 }]} />
+            {/* Minimal Navbar Skeleton */}
+            <View style={styles.skeletonNavbar}>
+                <ShimmerEffect style={{ width: 60, height: 24, borderRadius: 4 }} />
+                <View style={{ alignItems: 'center', gap: 4 }}>
+                    <ShimmerEffect style={{ width: 100, height: 20, borderRadius: 4 }} />
+                    <ShimmerEffect style={{ width: 140, height: 12, borderRadius: 4 }} />
                 </View>
+                <ShimmerEffect style={{ width: 30, height: 30, borderRadius: 8 }} />
             </View>
-
-            {/* Balance Skeleton */}
-            <View style={styles.skeletonBalance}>
-                <ShimmerEffect style={{ width: 100, height: 12, marginBottom: 8, borderRadius: 4 }} />
-                <ShimmerEffect style={{ width: 150, height: 28, borderRadius: 6 }} />
-            </View>
-
-            {/* Transactions Header */}
-            <ShimmerEffect style={{ width: '45%', height: 20, marginBottom: 12, borderRadius: 6 }} />
 
             {/* Transaction Items with staggered animation */}
-            {[0, 1, 2, 3, 4].map((index) => (
-                <SkeletonTransactionItem key={index} delay={index * 80} />
-            ))}
+            <View style={{ paddingHorizontal: 16 }}>
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+                    <SkeletonTransactionItem key={index} delay={index * 80} />
+                ))}
+            </View>
         </Animated.View>
     );
 });
@@ -203,43 +190,14 @@ const EmptyAccountState = memo(() => {
                 No has seleccionado una cuenta
             </TextMalet>
             <TextMalet style={styles.emptyStateDescription}>
-                Selecciona una cuenta para ver tus transacciones recientes.
+                Selecciona una cuenta para ver tus movimientos.
             </TextMalet>
         </Animated.View>
     );
 });
 
-// Animated List Item Wrapper
-const AnimatedTransactionItem = memo(({ item, index }: { item: any; index: number }) => {
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const translateY = useRef(new Animated.Value(20)).current;
-
-    useEffect(() => {
-        const delay = Math.min(index * 50, 300);
-        const timeout = setTimeout(() => {
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(translateY, {
-                    toValue: 0,
-                    duration: 300,
-                    easing: Easing.out(Easing.ease),
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }, delay);
-        return () => clearTimeout(timeout);
-    }, [index]);
-
-    return (
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY }] }}>
-            <LastTransactions item={item} />
-        </Animated.View>
-    );
-});
+// List item simply returned directly since the whole list is already faded in.
+// Removed AnimatedTransactionItem to prevent React Native performance warnings and memory leaks on rapid scroll.
 
 export default function GetAllTransaction() {
     const { user } = useAuthStore();
@@ -256,7 +214,9 @@ export default function GetAllTransaction() {
         accounts,
         error,
         getAllAccountsByUserId,
-        selectedAccount
+        selectedAccount,
+        isBalanceHidden,
+        toggleBalanceHidden
     } = useAccountStore();
     const [modalVisible, setModalVisible] = useState(false);
     const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -266,7 +226,6 @@ export default function GetAllTransaction() {
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [datePickerType, setDatePickerType] = useState<'start' | 'end' | null>(null);
 
-    const onEndReachedCalledDuringMomentum = useRef(true);
     const contentFadeAnim = useRef(new Animated.Value(0)).current;
 
     const activeFilterTypesStr = useMemo(() => filterTypes.length > 0 ? filterTypes.join(',') : undefined, [filterTypes]);
@@ -288,7 +247,7 @@ export default function GetAllTransaction() {
     }, [selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr]);
 
     const handleEndReached = useCallback(() => {
-        if (loadingWallet || paginationTransactions.isEnd || onEndReachedCalledDuringMomentum.current) {
+        if (loadingWallet || paginationTransactions.isEnd) {
             return;
         }
         if (selectedAccount?.id) {
@@ -301,19 +260,13 @@ export default function GetAllTransaction() {
         }
     }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr]);
 
-    const handleScrollBeginDrag = useCallback(() => {
-        onEndReachedCalledDuringMomentum.current = false;
-    }, []);
-
     const keyExtractor = useCallback((item: any) => item.id.toString(), []);
 
-    const renderItem = useCallback(({ item, index }: { item: any; index: number }) => (
-        <AnimatedTransactionItem item={item} index={index} />
+    const renderItem = useCallback(({ item }: { item: any }) => (
+        <LastTransactions item={item} />
     ), []);
 
-    const ListHeaderComponent = useMemo(() => (
-        <TextMalet style={styles.listHeader}>Transacciones recientes</TextMalet>
-    ), []);
+    const ListHeaderComponent = useMemo(() => null, []);
 
     const ListEmptyComponent = useMemo(() => {
         if (loadingWallet) return null;
@@ -327,21 +280,19 @@ export default function GetAllTransaction() {
     }, [loadingWallet, selectedAccount?.id]);
 
     const ListFooterComponent = useMemo(() => {
-        if (!loadingWallet || transactions.length === 0) return null;
+        if (!loadingWallet || transactions.length === 0 || paginationTransactions.isEnd) return null;
         return (
-            <View style={styles.loadingFooter}>
-                <View style={styles.loadingDot} />
-                <View style={[styles.loadingDot, { animationDelay: '0.2s' }]} />
-                <View style={[styles.loadingDot, { animationDelay: '0.4s' }]} />
+            <View style={{
+                paddingHorizontal: 0,
+                paddingBottom: 10,
+                height: 180,
+                overflow: 'hidden'
+            }}>
+                <SkeletonTransactionItem delay={0} />
+                <SkeletonTransactionItem delay={100} />
             </View>
         );
-    }, [loadingWallet, transactions.length]);
-
-    const getItemLayout = useCallback((data: any, index: number) => ({
-        length: 72,
-        offset: 72 * index,
-        index,
-    }), []);
+    }, [loadingWallet, transactions.length, paginationTransactions.isEnd]);
 
     const buttonText = useMemo(() => {
         return selectedAccount
@@ -475,54 +426,124 @@ export default function GetAllTransaction() {
 
     const showSkeleton = !isReady || (firstMount && selectedAccount?.id);
 
+    useEffect(() => {
+        if (!isReady) {
+            const timer = setTimeout(() => setIsReady(true), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isReady]);
+
+    const formattedBalance = useMemo(() => {
+        if (!selectedAccount) return '';
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(selectedAccount.balance);
+    }, [selectedAccount?.balance]);
+
     return (
         <View style={styles.container}>
             <LayoutAuthenticated>
                 {showSkeleton ? (
                     <SkeletonLoader />
                 ) : (
-                    <Animated.View style={[styles.contentContainer, { opacity: contentFadeAnim }]}>
-                        <View style={styles.headerSection}>
-                            <TextMalet style={styles.pageTitle}>Todas las Transacciones</TextMalet>
-                            <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButton}>
-                                <Feather name="filter" size={20} color={hasActiveFilters ? '#10b981' : '#64748b'} />
+                    <View style={styles.contentContainer}>
+                        {/* New Minimal Header */}
+                        <View style={styles.navbar}>
+                            <IconAt width={25} height={25} />
+
+                            <View style={styles.centerBalance}>
+                                {selectedAccount && (
+                                    <TouchableOpacity
+                                        onPress={toggleBalanceHidden}
+                                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <TextMalet style={{ fontSize: 18, color: '#6e6e6eff' }}>
+                                            {isBalanceHidden ? (
+                                                `$***.**`
+                                            ) : (
+                                                <>
+                                                    ${formattedBalance.split('.')[0]}
+                                                    <TextMalet style={{ fontSize: 16, color: '#a8a8a8ff' }}>
+                                                        .{formattedBalance.split('.')[1]}
+                                                    </TextMalet>
+                                                </>
+                                            )}
+
+                                            <TextMalet style={{ fontSize: 16, color: '#8d8d8dff' }}>
+                                                {' ' + selectedAccount.currency}
+                                            </TextMalet>
+                                        </TextMalet>
+
+                                        <View style={{ marginTop: 2 }}>
+                                            {isBalanceHidden ? (
+                                                <Eye size={14} color="#a0a0a0ff" />
+                                            ) : (
+                                                <EyeOff size={14} color="#a0a0a0ff" />
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                    <TextMalet style={{ fontSize: 10, color: '#a0a0a0ff' }}>
+                                        {selectedAccount?.name || 'Selecciona una cuenta.'}
+                                    </TextMalet>
+                                    {selectedAccount?.name && (
+                                        <TextMalet style={{ fontSize: 10, color: '#a0a0a0ff' }}>
+                                            |
+                                        </TextMalet>
+                                    )}
+                                    {
+                                        selectedAccount?.id && (
+                                            <TextMalet style={{ fontSize: 10, color: '#a0a0a0ff' }}>
+                                                {'**** ' + selectedAccount?.id.slice(8, 12)}
+                                            </TextMalet>
+                                        )
+                                    }
+
+                                </View>
+                            </View>
+
+                            <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButtonNoBg}>
+                                <SlidersHorizontal size={20} color={hasActiveFilters ? '#10b981' : '#64748b'} />
                             </TouchableOpacity>
                         </View>
 
-                        <AccountCard user={user} selectedAccount={selectedAccount} />
-
-                        {selectedAccount ? (
-                            <>
-                                <AccountBalance selectedAccount={selectedAccount} />
-
-                                <FlatList
-                                    key={`transactions-${selectedAccount.id}`}
-                                    data={transactions}
-                                    keyExtractor={keyExtractor}
-                                    renderItem={renderItem}
-                                    showsVerticalScrollIndicator={false}
-                                    style={styles.transactionsList}
-                                    ListHeaderComponent={ListHeaderComponent}
-                                    ListEmptyComponent={ListEmptyComponent}
-                                    ListFooterComponent={ListFooterComponent}
-                                    onRefresh={handleRefresh}
-                                    refreshing={loadingWallet && transactions.length === 0}
-                                    onEndReached={handleEndReached}
-                                    onEndReachedThreshold={0.4}
-                                    onScrollBeginDrag={handleScrollBeginDrag}
-                                    getItemLayout={getItemLayout}
-                                    // Performance optimizations
-                                    initialNumToRender={8}
-                                    maxToRenderPerBatch={8}
-                                    windowSize={5}
-                                    removeClippedSubviews={true}
-                                    updateCellsBatchingPeriod={50}
-                                />
-                            </>
-                        ) : (
-                            <EmptyAccountState />
-                        )}
-                    </Animated.View>
+                        <Animated.View style={[styles.listWrapper, { opacity: contentFadeAnim }]}>
+                            {selectedAccount ? (
+                                <>
+                                    <FlatList
+                                        key={`transactions-${selectedAccount.id}`}
+                                        data={transactions}
+                                        keyExtractor={keyExtractor}
+                                        renderItem={renderItem}
+                                        showsVerticalScrollIndicator={false}
+                                        style={styles.transactionsList}
+                                        ListHeaderComponent={
+                                            <View style={{ paddingTop: 10 }}>
+                                                {ListHeaderComponent}
+                                            </View>
+                                        }
+                                        ListEmptyComponent={ListEmptyComponent}
+                                        ListFooterComponent={ListFooterComponent}
+                                        onRefresh={handleRefresh}
+                                        refreshing={loadingWallet && transactions.length === 0}
+                                        onEndReached={handleEndReached}
+                                        onEndReachedThreshold={0.4}
+                                        initialNumToRender={8}
+                                        maxToRenderPerBatch={8}
+                                        windowSize={5}
+                                        removeClippedSubviews={true}
+                                        updateCellsBatchingPeriod={50}
+                                    />
+                                </>
+                            ) : (
+                                <EmptyAccountState />
+                            )}
+                        </Animated.View>
+                    </View>
                 )}
             </LayoutAuthenticated>
 
@@ -562,7 +583,7 @@ export default function GetAllTransaction() {
                                     style={[styles.filterOption, filterTypes.includes('expense') && styles.filterOptionActive]}
                                     onPress={() => toggleFilterType('expense')}
                                 >
-                                    <Feather name="arrow-down-right" size={16} color={filterTypes.includes('expense') ? '#fff' : '#64748b'} />
+                                    <ArrowDownRight size={16} color={filterTypes.includes('expense') ? '#fff' : '#64748b'} />
                                     <TextMalet style={[styles.filterOptionText, filterTypes.includes('expense') && { color: '#fff' }]}>Egresos</TextMalet>
                                 </TouchableOpacity>
 
@@ -570,7 +591,7 @@ export default function GetAllTransaction() {
                                     style={[styles.filterOption, filterTypes.includes('saving') && styles.filterOptionActive]}
                                     onPress={() => toggleFilterType('saving')}
                                 >
-                                    <Feather name="arrow-up-right" size={16} color={filterTypes.includes('saving') ? '#fff' : '#64748b'} />
+                                    <ArrowUpRight size={16} color={filterTypes.includes('saving') ? '#fff' : '#64748b'} />
                                     <TextMalet style={[styles.filterOptionText, filterTypes.includes('saving') && { color: '#fff' }]}>Ingresos</TextMalet>
                                 </TouchableOpacity>
 
@@ -578,7 +599,7 @@ export default function GetAllTransaction() {
                                     style={[styles.filterOption, filterTypes.includes('pending_payment') && styles.filterOptionActiveWarning]}
                                     onPress={() => toggleFilterType('pending_payment')}
                                 >
-                                    <Feather name="clock" size={16} color={filterTypes.includes('pending_payment') ? '#fff' : '#64748b'} />
+                                    <Clock size={16} color={filterTypes.includes('pending_payment') ? '#fff' : '#64748b'} />
                                     <TextMalet style={[styles.filterOptionText, filterTypes.includes('pending_payment') && { color: '#fff' }]}>Pendientes</TextMalet>
                                 </TouchableOpacity>
                             </View>
@@ -593,7 +614,7 @@ export default function GetAllTransaction() {
                                     style={[styles.datePickerButton, startDate && styles.datePickerButtonActive]}
                                     onPress={() => setDatePickerType('start')}
                                 >
-                                    <Feather name="calendar" size={16} color={startDate ? '#10b981' : '#64748b'} />
+                                    <Calendar size={16} color={startDate ? '#10b981' : '#64748b'} />
                                     <View>
                                         <TextMalet style={styles.datePickerLabel}>Desde</TextMalet>
                                         <TextMalet style={[styles.datePickerValue, startDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
@@ -602,13 +623,13 @@ export default function GetAllTransaction() {
                                     </View>
                                 </TouchableOpacity>
 
-                                <Feather name="arrow-right" size={16} color="#cbd5e1" />
+                                <ArrowRight size={16} color="#cbd5e1" />
 
                                 <TouchableOpacity
                                     style={[styles.datePickerButton, endDate && styles.datePickerButtonActive]}
                                     onPress={() => setDatePickerType('end')}
                                 >
-                                    <Feather name="calendar" size={16} color={endDate ? '#10b981' : '#64748b'} />
+                                    <Calendar size={16} color={endDate ? '#10b981' : '#64748b'} />
                                     <View>
                                         <TextMalet style={styles.datePickerLabel}>Hasta</TextMalet>
                                         <TextMalet style={[styles.datePickerValue, endDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
@@ -647,7 +668,7 @@ export default function GetAllTransaction() {
                                     mode="date"
                                     display="inline"
                                     onChange={onDateChange}
-                                    maximumDate={new Date()} // Don't allow future dates
+                                    maximumDate={new Date()}
                                 />
                             </View>
                         )}
@@ -685,21 +706,39 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         flex: 1,
+        marginHorizontal: -14,
     },
-    headerSection: {
-        paddingBottom: 15,
+    navbar: {
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 5,
     },
-    pageTitle: {
-        fontSize: 16,
-        fontWeight: '600',
+    logo: {
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: 1,
     },
-    filterButton: {
-        padding: 6,
-        backgroundColor: '#f1f5f9',
-        borderRadius: 8,
+    centerBalance: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    miniBalance: {
+        fontSize: 12,
+        color: '#94a3b8',
+        fontWeight: '500',
+    },
+    filterButtonNoBg: {
+        padding: 8,
+    },
+    navbarRight: {
+        paddingRight: 4,
+    },
+    listWrapper: {
+        flex: 1,
+        marginTop: -10, // Pull list up slightly
     },
     // Balance styles
     balanceContainer: {
@@ -742,6 +781,7 @@ const styles = StyleSheet.create({
     // List styles
     transactionsList: {
         flex: 1,
+        paddingHorizontal: 16,
     },
     listHeader: {
         fontSize: 18,
@@ -776,33 +816,21 @@ const styles = StyleSheet.create({
     },
     // Skeleton styles
     skeletonContainer: {
-        paddingTop: 4,
+        flex: 1,
+        marginHorizontal: -14, // Exact offset for LayoutAuthenticated
     },
-    skeletonCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    skeletonFooter: {
+    skeletonNavbar: {
+        height: 60,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 12,
+        justifyContent: 'space-between',
+        paddingHorizontal: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+        marginBottom: 10,
     },
     skeletonCircle: {
         borderRadius: 50,
-    },
-    skeletonBalance: {
-        backgroundColor: '#f8f9fa',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 16,
     },
     skeletonTransaction: {
         flexDirection: 'row',
@@ -812,6 +840,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 12,
         marginBottom: 10,
+        width: '100%',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,

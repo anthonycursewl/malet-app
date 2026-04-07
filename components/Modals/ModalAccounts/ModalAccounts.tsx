@@ -8,6 +8,7 @@ import IconAt from "@/svgs/dashboard/IconAt";
 import IconPlus from "@/svgs/dashboard/IconPlus";
 import IconReload from "@/svgs/dashboard/IconReload";
 import { router } from "expo-router";
+import { Trash2 } from "lucide-react-native";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
     Animated,
@@ -257,7 +258,7 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
                                 onClose();
                                 setTimeout(() => router.push('/accounts/trash'), 300);
                             }} style={styles.trashButton}>
-                                <TextMalet style={styles.trashText}>Papelera</TextMalet>
+                                <Trash2 size={20} color="#ff4444" />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleCreateAccount}>
                                 <IconPlus width={25} height={25} fill={'rgba(29, 29, 29, 1)'} />
@@ -299,15 +300,11 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     trashButton: {
-        paddingVertical: 4,
-        paddingHorizontal: 8,
+        padding: 2,
         backgroundColor: '#fff0f0',
-        borderRadius: 8,
-    },
-    trashText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#ff4444',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     reloadButton: {
         padding: 4,
