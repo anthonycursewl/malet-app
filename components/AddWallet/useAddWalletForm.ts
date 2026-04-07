@@ -112,6 +112,7 @@ export function useAddWalletForm() {
       type: formData.type,
       account_id: formData.account_id,
       tag_ids: formData.tag_ids ?? [],
+      currency_code: selectedAccount?.currency || 'USD',
     };
 
     const transaction = await addTransaction(transactionData as any);
