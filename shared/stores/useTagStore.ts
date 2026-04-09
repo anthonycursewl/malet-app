@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { MALET_API_URL } from '../config/malet.config';
 import { TransactionTag, normalizeHexColor, normalizePalette } from '../entities/TagItem';
@@ -38,6 +39,20 @@ export const useTagStore = create<TagStoreState>((set, get) => ({
   error: null,
 
   loadTags: async () => {
+    const cachedTagsData = await AsyncStorage.getItem('cached_tags_data');
+
+    if (cachedTagsData) {
+      const { date, tags } = JSON.parse(cachedTagsData);
+      const diff = new Date().getTime() - new Date(date).getTime();
+
+      const FIVE_MINUTES = 5 * 60 * 1000;
+
+      if (diff < FIVE_MINUTES) {
+        set({ tags, loading: false, error: null });
+        return;
+      }
+    }
+
     set({ loading: true });
     const { error, response } = await secureFetch<TransactionTag[]>({
       url: `${MALET_API_URL}/tags`,
@@ -50,11 +65,19 @@ export const useTagStore = create<TagStoreState>((set, get) => ({
       return;
     }
 
+    const newCache = {
+      date: new Date().toISOString(),
+      tags: response,
+    };
+    await AsyncStorage.setItem('cached_tags_data', JSON.stringify(newCache));
+
     set({ tags: response, error: null, loading: false });
   },
 
   addTag: async (tag) => {
     set({ loading: true });
+
+    await AsyncStorage.removeItem('cached_tags_data');
 
     // Normalize before sending
     const body: CreateTagPayload = {
@@ -81,7 +104,9 @@ export const useTagStore = create<TagStoreState>((set, get) => ({
   },
 
   updateTag: async (id, updates) => {
+
     set({ loading: true });
+    await AsyncStorage.removeItem('cached_tags_data');
 
     const body: UpdateTagPayload = {};
     if (updates.name) body.name = updates.name;
@@ -105,6 +130,8 @@ export const useTagStore = create<TagStoreState>((set, get) => ({
 
   deleteTag: async (id) => {
     set({ loading: true });
+    await AsyncStorage.removeItem('cached_tags_data');
+
     const { error } = await secureFetch<{ success: boolean }>({
       url: `${MALET_API_URL}/tags/${id}`,
       method: 'DELETE',

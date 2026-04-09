@@ -28,7 +28,7 @@ interface WalletStore {
     };
     setPaginationTransactions: (pagination: { cursor: string | null; take: number; isEnd: boolean }) => void;
     addTransaction: (transaction: Omit<TransactionItem, 'id' | 'issued_at'>) => Promise<TransactionItem | undefined>;
-    getHistoryTransactions: (account_id: string, user_id?: string, options?: { refresh?: boolean, types?: string, startDate?: string, endDate?: string }) => Promise<void>;
+    getHistoryTransactions: (account_id: string, user_id?: string, options?: { refresh?: boolean, types?: string, startDate?: string, endDate?: string, tags?: string }) => Promise<void>;
     getPreviewTransactions: (account_id: string, user_id?: string) => Promise<void>;
     completePendingTransaction: (id: string, type: 'saving' | 'expense') => Promise<boolean>;
     logoutWallet: () => void;
@@ -107,7 +107,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     },
 
     getHistoryTransactions: async (account_id, user_id = '', options = {}) => {
-        const { refresh = false, types, startDate, endDate } = options;
+        const { refresh = false, types, startDate, endDate, tags } = options;
         const state = get();
         const { setLoading, setError, paginationTransactions, transactions } = state;
 
@@ -122,13 +122,16 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             url += `&cursor=${cursor}`;
         }
         if (types) {
-            url += `&types=${types}`;
+            url += `&types=${encodeURIComponent(types)}`;
         }
         if (startDate) {
-            url += `&startDate=${startDate}`;
+            url += `&startDate=${encodeURIComponent(startDate)}`;
         }
         if (endDate) {
-            url += `&endDate=${endDate}`;
+            url += `&endDate=${encodeURIComponent(endDate)}`;
+        }
+        if (tags) {
+            url += `&tags=${encodeURIComponent(tags)}`;
         }
 
         const { error, response } = await secureFetch<{ data: TransactionItem[]; nextCursor: string | null }>({

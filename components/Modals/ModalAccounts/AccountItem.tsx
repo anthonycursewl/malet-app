@@ -3,7 +3,10 @@ import { Account } from "@/shared/entities/Account";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { colors, spacing } from "@/shared/theme";
 import { memo } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+
+// Service to get current icon 
+import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
 
 interface AccountItemProps {
   account: Account;
@@ -27,6 +30,10 @@ export const AccountItem = memo(({ account, onPress, isLast, onLongPress }: Acco
     >
       <View style={styles.content}>
         <View style={styles.iconContainer}>
+          <Image
+            source={{ uri: getCurrencyIcon(account.currency) }}
+            style={{ width: 18, height: 18, borderRadius: 4, position: 'absolute', top: 25, right: 1 }}
+          />
           <TextMalet style={styles.iconText}>{name.charAt(0).toUpperCase()}</TextMalet>
         </View>
 
@@ -65,6 +72,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
     marginRight: spacing.medium,
   },
   iconText: {
