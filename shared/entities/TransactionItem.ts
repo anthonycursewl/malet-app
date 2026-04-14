@@ -4,6 +4,7 @@ export type TransactionType = 'expense' | 'saving' | 'pending_payment';
 
 export interface TransactionItem {
     id: string;
+    index_id: number
     name: string;
     amount: string;
     type: TransactionType;
@@ -12,4 +13,5 @@ export interface TransactionItem {
     tags?: TransactionTag[];
     tag_ids?: string[];
     issued_at: Date;
+    deleted_at?: Date;
 }

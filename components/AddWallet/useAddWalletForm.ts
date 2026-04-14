@@ -8,6 +8,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { SuccessData } from './SuccessScreen';
 import { FormDataType, FormErrors } from './types';
+import SoundManager from '@/utils/soundManager';
+import { usePreferencesStore } from '@/shared/stores/usePreferencesStore';
 
 export function useAddWalletForm() {
   const { type } = useGlobalSearchParams();
@@ -118,6 +120,24 @@ export function useAddWalletForm() {
     const transaction = await addTransaction(transactionData as any);
 
     if (transaction) {
+      // play confirmation sound / haptic if user allows
+      try {
+        const soundsOn = usePreferencesStore.getState().sounds;
+        const hapticsOn = usePreferencesStore.getState().haptics;
+        if (soundsOn) {
+          SoundManager.playSound('confirm').catch(() => {});
+        }
+        if (hapticsOn) {
+          try {
+            const Haptics = require('expo-haptics');
+            if (Haptics && Haptics.notificationAsync) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (e) {
+            // ignore if not installed
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
       if (formData.type !== 'pending_payment') {
         updateBalanceInMemory(formData.account_id, amount, formData.type === 'expense' ? 'expense' : 'saving');
       }

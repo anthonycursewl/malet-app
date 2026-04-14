@@ -17,11 +17,12 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Path, Pattern, Rect } from 'react-native-svg';
 
 // lucide icon 
+import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
 import { AtSign, Layers, TrendingUp, Wallet } from 'lucide-react-native';
 
 const SHOW_S_ACCOUNTS_NEW_TAG = (() => {
@@ -153,6 +154,7 @@ const BalanceSection = memo((({
     onOpenModal,
     accountName,
     accountNumber,
+    accountCurrency,
     isBalanceHidden,
     onToggleHidden
 }: {
@@ -160,6 +162,7 @@ const BalanceSection = memo((({
     onOpenModal: () => void,
     accountName: string,
     accountNumber: string,
+    accountCurrency: string,
     isBalanceHidden: boolean,
     onToggleHidden: () => void
 }) => {
@@ -187,6 +190,7 @@ const BalanceSection = memo((({
 
                 <Pressable onPress={onOpenModal}>
                     <View style={styles.balanceCard}>
+                        <Image source={{ uri: getCurrencyIcon(accountCurrency) }} style={{ width: 20, height: 20 }} />
                         <TouchableOpacity onPress={onOpenModal} style={{ flexShrink: 1 }}>
                             <TextMalet style={styles.balanceValue} numberOfLines={1}>{displayBalance}</TextMalet>
                         </TouchableOpacity>
@@ -377,6 +381,7 @@ export default function Dashboard() {
                     onOpenModal={handleOpenModal}
                     accountName={selectedAccount?.name || 'General'}
                     accountNumber={selectedAccount?.id || '0000'}
+                    accountCurrency={selectedAccount?.currency || 'USD'}
                     isBalanceHidden={isBalanceHidden}
                     onToggleHidden={toggleBalanceHidden}
                 />

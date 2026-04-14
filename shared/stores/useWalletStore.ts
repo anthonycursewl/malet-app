@@ -28,9 +28,11 @@ interface WalletStore {
     };
     setPaginationTransactions: (pagination: { cursor: string | null; take: number; isEnd: boolean }) => void;
     addTransaction: (transaction: Omit<TransactionItem, 'id' | 'issued_at'>) => Promise<TransactionItem | undefined>;
-    getHistoryTransactions: (account_id: string, user_id?: string, options?: { refresh?: boolean, types?: string, startDate?: string, endDate?: string, tags?: string }) => Promise<void>;
+    getHistoryTransactions: (account_id: string, user_id?: string, options?: { refresh?: boolean, types?: string, deleted?: boolean, startDate?: string, endDate?: string, tags?: string }) => Promise<void>;
     getPreviewTransactions: (account_id: string, user_id?: string) => Promise<void>;
     completePendingTransaction: (id: string, type: 'saving' | 'expense') => Promise<boolean>;
+    deleteTransaction: (id: string) => Promise<boolean>;
+    restoreTransaction: (id: string) => Promise<boolean>;
     logoutWallet: () => void;
     clearStore: () => void;
 
@@ -107,7 +109,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     },
 
     getHistoryTransactions: async (account_id, user_id = '', options = {}) => {
-        const { refresh = false, types, startDate, endDate, tags } = options;
+        const { refresh = false, types, deleted, startDate, endDate, tags } = options;
         const state = get();
         const { setLoading, setError, paginationTransactions, transactions } = state;
 
@@ -130,6 +132,11 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         if (endDate) {
             url += `&endDate=${encodeURIComponent(endDate)}`;
         }
+
+        if (deleted) {
+            url += `&deleted=${deleted}`;
+        }
+
         if (tags) {
             url += `&tags=${encodeURIComponent(tags)}`;
         }
@@ -139,6 +146,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             method: 'GET',
             setLoading: setLoading,
         });
+
+        console.log(response)
 
         if (error || !response) {
             setError(error || 'Failed to fetch transactions');
@@ -216,6 +225,44 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         );
         get().setPreviewTransactions(updatedPreview);
 
+        return true;
+    },
+
+    deleteTransaction: async (id: string): Promise<boolean> => {
+        const { error, response } = await secureFetch<TransactionItem>({
+            url: `${MALET_API_URL}/transactions/delete/${id}`,
+            method: 'DELETE',
+            setLoading: get().setLoading,
+        });
+
+        if (error || !response) {
+            get().setError(error || 'Failed to delete transaction');
+            return false;
+        }
+
+        get().setError(null);
+
+        const updatedTransactions = get().transactions.filter(t => t.index_id.toString() !== id.toString());
+        get().setTransactions(updatedTransactions);
+
+        const updatedPreview = get().previewTransactions.filter(t => t.index_id.toString() !== id.toString());
+        get().setPreviewTransactions(updatedPreview);
+        return true;
+    },
+
+    restoreTransaction: async (id: string): Promise<boolean> => {
+        const { error, response } = await secureFetch<TransactionItem>({
+            url: `${MALET_API_URL}/transactions/restore/${id}`,
+            method: 'POST',
+            setLoading: get().setLoading,
+        });
+
+        if (error || !response) {
+            get().setError(error || 'Failed to restore transaction');
+            return false;
+        }
+
+        get().setError(null);
         return true;
     },
 

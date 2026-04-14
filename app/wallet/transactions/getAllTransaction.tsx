@@ -46,7 +46,9 @@ export default function GetAllTransaction() {
         setEndDate,
         onToggleTag,
         hasActiveFilters,
-        buttonText
+        buttonText,
+        filterDeleted,
+        setFilterDeleted
     } = useTransactions();
 
     return (
@@ -140,6 +142,8 @@ export default function GetAllTransaction() {
                 datePickerType={datePickerType}
                 setDatePickerType={setDatePickerType}
                 toggleFilterType={toggleFilterType}
+                filterDeleted={filterDeleted}
+                setFilterDeleted={setFilterDeleted}
                 clearFilters={clearFilters}
                 onDateChange={onDateChange}
                 setStartDate={setStartDate}

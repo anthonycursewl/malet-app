@@ -1,4 +1,4 @@
-import { StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
     filterModalContainer: {
@@ -10,17 +10,15 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 5,
     },
     filterModalTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
+        fontSize: 20,
         color: '#1a1a1a',
         letterSpacing: -0.5,
     },
     clearFiltersText: {
         fontSize: 14,
-        fontWeight: '600',
         color: '#FF6B6B',
     },
     filterModalScroll: {
@@ -30,12 +28,11 @@ export const styles = StyleSheet.create({
         marginBottom: 28,
     },
     filterSectionTitle: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#94a3b8',
+        fontSize: 12,
+        color: '#838383ff',
         marginBottom: 16,
         textTransform: 'uppercase',
-        letterSpacing: 1,
+        letterSpacing: .5,
     },
     filterOptionsGrid: {
         flexDirection: 'row',

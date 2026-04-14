@@ -29,6 +29,7 @@ export function useTransactions() {
     const [modalVisible, setModalVisible] = useState(false);
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [filterTypes, setFilterTypes] = useState<string[]>([]);
+    const [filterDeleted, setFilterDeleted] = useState<boolean>(false);
 
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
@@ -180,6 +181,7 @@ export function useTransactions() {
             getHistoryTransactions(selectedAccount.id, user.id, {
                 refresh: true,
                 types: activeFilterTypesStr,
+                deleted: filterDeleted,
                 startDate: activeStartDateStr,
                 endDate: activeEndDateStr,
                 tags: debouncedTags
@@ -269,6 +271,8 @@ export function useTransactions() {
         setStartDate,
         setEndDate,
         onToggleTag,
+        setFilterDeleted,
+        filterDeleted,
 
         // Derived
         hasActiveFilters,

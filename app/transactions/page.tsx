@@ -1,22 +1,24 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
+import { getCurrencyIcon } from '@/shared/services/currency/currencyService';
 import { useAccountStore } from '@/shared/stores/useAccountStore';
 import { useWalletStore } from '@/shared/stores/useWalletStore';
 import { colors, spacing } from '@/shared/theme';
 import IconAt from '@/svgs/dashboard/IconAt';
 import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BadgeDollarSign } from 'lucide-react-native';
+import { BadgeDollarSign, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function TransactionDetail() {
   const { transaction_id } = useLocalSearchParams();
   const router = useRouter();
   const [isCompleting, setIsCompleting] = useState(false);
-  const { transactions, completePendingTransaction } = useWalletStore();
+  const { transactions, completePendingTransaction, deleteTransaction, restoreTransaction } = useWalletStore();
   const { accounts, getAllAccountsByUserId, updateBalanceInMemory } = useAccountStore();
   const transaction = transactions.find(t => t.id.toString() === transaction_id);
   const account = accounts.find(a => a.id === transaction?.account_id);
@@ -89,19 +91,46 @@ export default function TransactionDetail() {
     }
   };
 
-  const handleCopyId = () => {
-    Alert.alert('Copiado', `ID ${transaction.id} copiado al portapapeles`);
+  const handleCopyId = async () => {
+    await Clipboard.setStringAsync(transaction.index_id.toString());
+    Alert.alert('Copiado', `ID de transacción copiado al portapapeles`);
   };
 
-  const handleDelete = () => {
+
+  const handleDelete = async () => {
     Alert.alert('Eliminar', '¿Estás seguro de que deseas eliminar esta transacción?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => console.log('Delete') }
     ]);
+
+    const sucess = await deleteTransaction(transaction.index_id.toString());
+    if (!sucess) {
+      Alert.alert('Error | Malet', 'No se ha podido eliminar la transacción.');
+      return;
+    }
+    Alert.alert('Eliminado | Malet', 'Transacción eliminada correctamente.');
+    getAllAccountsByUserId({ refresh: true });
+    router.back();
+  };
+
+  const handleRestore = async () => {
+    Alert.alert('Restaurar', '¿Estás seguro de que deseas restaurar esta transacción?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Restaurar', style: 'default', onPress: () => { restoreTx() } }
+    ]);
+
+    const restoreTx = async () => {
+      const sucess = await restoreTransaction(transaction.index_id.toString());
+      if (!sucess) {
+        Alert.alert('Error | Malet', 'No se ha podido restaurar la transacción.');
+        return;
+      }
+      Alert.alert('Restaurado | Malet', 'Transacción restaurada correctamente.');
+      router.back();
+    }
   };
 
   const handleComplete = (type: 'expense' | 'saving') => {
-    // This connects to the real API update endpoint
     const title = type === 'expense' ? 'Marcar como Egreso' : 'Marcar como Ingreso';
     const message = `¿Confirmas que deseas finalizar esta transacción y registrarla como un ${type === 'expense' ? 'egreso' : 'ingreso'}?`;
 
@@ -176,7 +205,7 @@ export default function TransactionDetail() {
               <TextMalet style={styles.amountDecimal}>.{amountDecimal}</TextMalet>
             </View>
 
-            <TextMalet style={styles.subtitle} numberOfLines={1}>
+            <TextMalet style={styles.subtitle}>
               {transaction.name}
             </TextMalet>
 
@@ -216,7 +245,7 @@ export default function TransactionDetail() {
             <View style={styles.detailRow}>
               <TextMalet style={styles.detailLabel}>Cuenta</TextMalet>
               <View style={styles.accountValueContainer}>
-                <MaterialIcons name="account-balance-wallet" size={16} color={colors.text.secondary} style={{ marginRight: 4 }} />
+                <Image source={{ uri: getCurrencyIcon(transaction.currency_code) }} style={{ width: 18, height: 18 }} />
                 <TextMalet style={styles.detailValue}>{formatAccountInfo()}</TextMalet>
               </View>
             </View>
@@ -228,6 +257,19 @@ export default function TransactionDetail() {
               <TextMalet style={styles.detailValue} numberOfLines={1} ellipsizeMode="middle">
                 {transaction.id}
               </TextMalet>
+            </View>
+
+            <View style={styles.detailRow}>
+              <TextMalet style={styles.detailLabel}>ID de Transacción</TextMalet>
+
+              <View style={styles.accountValueContainer}>
+                <TouchableOpacity style={styles.copyButton} onPress={handleCopyId}>
+                  <TextMalet style={styles.detailValue} numberOfLines={1} ellipsizeMode="middle">
+                    {transaction.index_id}
+                  </TextMalet>
+                  <MaterialIcons name="content-copy" size={18} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.separator} />
@@ -247,7 +289,7 @@ export default function TransactionDetail() {
                     const color = tag.color || '#999';
                     const name = tag.name.startsWith('#') ? tag.name : '#' + tag.name;
                     return (
-                      <View key={tag.id} style={[styles.tagChip, { backgroundColor: color + '15', borderColor: color }]}>
+                      <View key={tag.id} style={[styles.tagChip, { borderColor: '#eeeeeeff', borderRadius: 99 }]}>
                         <TextMalet style={[styles.tagText, { color }]}>
                           <TextMalet style={[styles.tagInitial, { color }]}>{name.charAt(0).toUpperCase()}</TextMalet>
                           {name.slice(1).toLowerCase()}
@@ -260,6 +302,7 @@ export default function TransactionDetail() {
                 )}
               </View>
             </View>
+
           </View>
 
           {/* Pending Actions */}
@@ -298,15 +341,20 @@ export default function TransactionDetail() {
 
           {/* Actions Section */}
           <View style={styles.actionsSection}>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyId}>
-              <MaterialIcons name="content-copy" size={20} color={colors.text.primary} />
-              <TextMalet style={styles.copyButtonText}>Copiar ID de Transacción</TextMalet>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
               <MaterialIcons name="share" size={20} color="#fff" />
               <TextMalet style={styles.shareButtonText}>Compartir Recibo</TextMalet>
             </TouchableOpacity>
+
+            {transaction.deleted_at ? (
+              <TouchableOpacity onPress={handleRestore} style={styles.restoreButton}>
+                <RefreshCw size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+                <Trash2 size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
 
         </View>
@@ -438,6 +486,7 @@ const styles = StyleSheet.create({
   accountValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   separator: {
     height: 1,
@@ -445,9 +494,10 @@ const styles = StyleSheet.create({
   },
   actionsSection: {
     gap: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   copyButton: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -468,11 +518,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    shadowColor: "#ff7d5cff",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    width: '75%'
+  },
+  deleteButton: {
+    backgroundColor: '#ff7765ff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '20%'
+  },
+  restoreButton: {
+    backgroundColor: '#3f3f3fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '20%'
   },
   shareButtonText: {
     fontSize: 15,
@@ -563,7 +625,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 5,
     marginTop: 6,
   },
   moreCounter: {
@@ -578,8 +640,8 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   tagChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',

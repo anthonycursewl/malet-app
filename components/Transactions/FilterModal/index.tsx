@@ -2,7 +2,7 @@ import Button from "@/components/Button/Button";
 import ModalOptions from "@/components/shared/ModalOptions";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Calendar, Clock } from "lucide-react-native";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Calendar, Clock, Trash2 } from "lucide-react-native";
 import React from 'react';
 import { Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
@@ -22,6 +22,8 @@ interface FilterModalProps {
     setStartDate: (date: Date | null) => void;
     setEndDate: (date: Date | null) => void;
     applyFilters: () => void;
+    filterDeleted: boolean;
+    setFilterDeleted: (filterDeleted: boolean) => void;
 }
 
 export const FilterModal = ({
@@ -34,13 +36,15 @@ export const FilterModal = ({
     datePickerType,
     setDatePickerType,
     toggleFilterType,
+    filterDeleted,
+    setFilterDeleted,
     clearFilters,
     onDateChange,
     setStartDate,
     setEndDate,
     applyFilters
 }: FilterModalProps) => {
-    
+
     const formatDateForDisplay = (date: Date | null) => {
         if (!date) return null;
         return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -64,6 +68,7 @@ export const FilterModal = ({
                 <ScrollView showsVerticalScrollIndicator={false} style={styles.filterModalScroll}>
                     <View style={styles.filterSection}>
                         <TextMalet style={styles.filterSectionTitle}>Tipos de Transacción</TextMalet>
+
                         <View style={styles.filterOptionsGrid}>
                             <TouchableOpacity
                                 style={[styles.filterOption, filterTypes.includes('expense') && styles.filterOptionActive]}
@@ -87,6 +92,14 @@ export const FilterModal = ({
                             >
                                 <Clock size={16} color={filterTypes.includes('pending_payment') ? '#fff' : '#64748b'} />
                                 <TextMalet style={[styles.filterOptionText, filterTypes.includes('pending_payment') && { color: '#fff' }]}>Pendientes</TextMalet>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.filterOption, filterDeleted && styles.filterOptionActiveWarning]}
+                                onPress={() => setFilterDeleted(!filterDeleted)}
+                            >
+                                <Trash2 size={16} color={filterDeleted ? '#fff' : '#64748b'} />
+                                <TextMalet style={[styles.filterOptionText, filterDeleted && { color: '#fff' }]}>Eliminados</TextMalet>
                             </TouchableOpacity>
                         </View>
                     </View>

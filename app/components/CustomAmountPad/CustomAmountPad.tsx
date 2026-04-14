@@ -1,9 +1,15 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import SoundManager from '@/utils/soundManager'
+import { usePreferencesStore } from '@/shared/stores/usePreferencesStore'
+
+let Haptics: any = null
 
 type Props = {
   value: string
   onChange: (v: string) => void
+  enableSounds?: boolean
+  enableHaptics?: boolean
 }
 
 const KEYS = ['1','2','3','4','5','6','7','8','9','.','0','DEL']
@@ -19,8 +25,31 @@ function formatDisplay(v: string): string {
   return v
 }
 
-export default function CustomAmountPad({ value, onChange }: Props) {
+export default function CustomAmountPad({ value, onChange, enableSounds, enableHaptics }: Props) {
+  const prefsSounds = usePreferencesStore(s => s.sounds)
+  const prefsHaptics = usePreferencesStore(s => s.haptics)
+
+  useEffect(() => {
+    // try to lazy-load Haptics if available
+    try {
+      Haptics = require('expo-haptics');
+    } catch (e) {
+      Haptics = null;
+    }
+  }, []);
+
   const handleKey = (k: string) => {
+    const soundsOn = typeof enableSounds === 'boolean' ? enableSounds : prefsSounds
+    const hapticsOn = typeof enableHaptics === 'boolean' ? enableHaptics : prefsHaptics
+
+    // feedback
+    if (hapticsOn && Haptics && Haptics.selectionAsync) {
+      try { Haptics.selectionAsync(); } catch (e) { }
+    }
+    if (soundsOn) {
+      SoundManager.playSound(k === 'DEL' ? 'delete' : k === '.' ? 'click' : 'click').catch(() => {});
+    }
+
     if (k === 'DEL') {
       onChange((value ?? '').slice(0, -1))
       return
@@ -47,7 +76,13 @@ export default function CustomAmountPad({ value, onChange }: Props) {
       </View>
       <View style={styles.grid}>
         {KEYS.map((k) => (
-          <TouchableOpacity key={k} onPress={() => handleKey(k)} style={styles.key}>
+          <TouchableOpacity
+            key={k}
+            onPress={() => handleKey(k)}
+            style={styles.key}
+            accessibilityRole="button"
+            accessibilityLabel={k === 'DEL' ? 'Borrar' : k === '.' ? 'Punto decimal' : `Tecla ${k}`}
+          >
             <Text style={styles.keyText}>{k}</Text>
           </TouchableOpacity>
         ))}
