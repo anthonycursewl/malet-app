@@ -4,8 +4,9 @@ import TextMalet from '@/components/TextMalet/TextMalet';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { tagModalStyles as styles, tagStyles } from './add.styles';
+import { InputField } from './InputField';
 import { TAG_COLOR_PALETTE, THEME } from './theme';
 
 interface CreateTagModalProps {
@@ -38,19 +39,15 @@ export const CreateTagModal = ({
   return (
     <ModalOptions visible={visible} onClose={onClose} heightRatio={0.8}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <TextMalet style={styles.title}>Crear Nueva Etiqueta</TextMalet>
+        <TextMalet style={styles.title}>Nueva etiqueta</TextMalet>
 
         {/* Name */}
         <View style={styles.section}>
-          <TextMalet style={styles.sectionLabel}>NOMBRE</TextMalet>
-          <TextInput
-            autoCapitalize="none"
-            autoFocus
-            placeholder="#nuevo_tag"
+          <InputField
+            label="Nombre"
+            placeholder="Ej. Supermercado"
             value={newTagName}
-            onChangeText={(val) => onChangeTagName(val.toLowerCase())}
-            style={styles.nameInput}
-            placeholderTextColor="#94a3b8"
+            onChangeText={(v) => onChangeTagName(v)}
           />
         </View>
 

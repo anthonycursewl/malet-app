@@ -1,4 +1,3 @@
-import NetInfo from '@react-native-community/netinfo';
 
 /**
  * HttpError - Error universal para peticiones HTTP
@@ -299,11 +298,6 @@ export async function fetchWithConfig(
     init?: RequestInit,
     config?: HttpRequestConfig
 ): Promise<Response> {
-    const netState = await NetInfo.fetch();
-    if (netState.isConnected === false) {
-        throw HttpError.network();
-    }
-
     const { timeout, retries, retryDelay } = { ...DEFAULT_CONFIG, ...config };
 
     let lastError: HttpError | null = null;

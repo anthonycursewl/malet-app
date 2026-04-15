@@ -4,8 +4,7 @@ import TextMalet from '@/components/TextMalet/TextMalet';
 import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Animated, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,8 +24,8 @@ import {
   tagStyles,
   useAddWalletForm,
 } from '@/components/AddWallet';
-import SoundManager from '@/utils/soundManager';
 import { usePreferencesStore } from '@/shared/stores/usePreferencesStore';
+import SoundManager from '@/utils/soundManager';
 
 export default function AddWallet() {
   const {
@@ -38,17 +37,14 @@ export default function AddWallet() {
     handleNextStep1, handleNextStep2, handlePendingToggle, handleTypeChange, toggleTag, handleCreateTag, handleDeleteTag, handleTogglePaletteColor,
   } = useAddWalletForm();
 
-  // load preferences and sounds on mount
   useEffect(() => {
-    usePreferencesStore.getState().load().catch(() => {});
-    // Try preloading sounds if assets are present — assets not included by default
+    usePreferencesStore.getState().load().catch(() => { });
     SoundManager.preloadSounds({
-      // app-specific developers can replace these with require(...) to include the files
       click: '',
       delete: '',
       confirm: '',
-    }).catch(() => {});
-    return () => { SoundManager.unloadAllSounds().catch(() => {}); };
+    }).catch(() => { });
+    return () => { SoundManager.unloadAllSounds().catch(() => { }); };
   }, []);
 
   const {

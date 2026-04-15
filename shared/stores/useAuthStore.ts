@@ -79,6 +79,8 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             setLoading: get().setLoading,
         })
 
+        console.log('Error en el login aqui ', error)
+
         if (error || !response) {
             get().setError(error ?? 'Error al iniciar sesión');
             return false;
