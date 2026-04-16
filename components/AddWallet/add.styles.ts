@@ -355,7 +355,7 @@ export const footerStyles = StyleSheet.create({
 // ─── Tag Modal ───────────────────────────────────────────
 export const tagModalStyles = StyleSheet.create({
   scrollContent: {
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   title: {
     fontSize: 18,
@@ -371,7 +371,7 @@ export const tagModalStyles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: THEME.textTertiary,
     marginBottom: 8,
     fontWeight: '700',
