@@ -3,7 +3,7 @@ import ModalOptions from '@/components/shared/ModalOptions';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { tagModalStyles as styles, tagStyles } from './add.styles';
 import { InputField } from './InputField';
@@ -35,6 +35,15 @@ export const CreateTagModal = ({
   tagLoading,
 }: CreateTagModalProps) => {
   const router = useRouter();
+
+
+  const formatTagName = useCallback((name: string | null) => {
+    if (!name) return 'ejemplo';
+    if (name.startsWith('#')) {
+      return name.slice(1);
+    }
+    return name;
+  }, [newTagName]);
 
   return (
     <ModalOptions visible={visible} onClose={onClose} heightRatio={0.8}>
@@ -129,11 +138,14 @@ export const CreateTagModal = ({
         <View style={styles.section}>
           <TextMalet style={styles.sectionLabel}>PREVIEW</TextMalet>
           <View style={styles.previewRow}>
-            <View style={[styles.previewChip, { backgroundColor: newTagColor + '20', borderColor: newTagColor }]}>
+
+            <View style={[styles.previewChip, { borderColor: '#e7e7e7ff' }]}>
               <TextMalet style={[styles.previewText, { color: newTagColor }]}>
-                {newTagName.startsWith('#') ? newTagName : '#' + (newTagName || 'ejemplo')}
+                {newTagName.startsWith('#') ? '' : '#'}
+                <TextMalet style={{ color: '#6b6b6bff' }}>{formatTagName(newTagName)}</TextMalet>
               </TextMalet>
             </View>
+
             {newTagPalette.length > 0 && (
               <View style={styles.paletteDots}>
                 {newTagPalette.map((c, i) => (

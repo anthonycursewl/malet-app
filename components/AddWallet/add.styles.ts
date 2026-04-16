@@ -368,7 +368,6 @@ export const tagModalStyles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionCompact: {
-    paddingHorizontal: 24,
     marginBottom: 16,
   },
   sectionLabel: {
@@ -413,8 +412,8 @@ export const tagModalStyles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   previewText: {
     fontWeight: '600',
@@ -443,7 +442,6 @@ export const tagModalStyles = StyleSheet.create({
     fontWeight: '700',
   },
   submitSection: {
-    paddingHorizontal: 24,
     paddingBottom: 12,
   },
   manageLink: {
