@@ -244,7 +244,7 @@ export function useAddWalletForm() {
       setFormData(prev => ({ ...prev, tag_ids: [...(prev.tag_ids ?? []), created.id] }));
       setIsTagModalVisible(false);
     } catch (e) {
-      console.log(`An error has occurred: ${e}`);
+      console.error('Error creating tag:', e);
     }
   }, [newTagName, newTagColor, newTagPalette, addTag]);
 

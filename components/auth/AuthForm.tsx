@@ -1,7 +1,8 @@
-import React from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { Animated, StyleSheet, View, TouchableOpacity } from 'react-native';
 import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { Feather } from '@expo/vector-icons';
 
 interface AuthFormProps {
   formOpacity: any;
@@ -10,6 +11,8 @@ interface AuthFormProps {
   passwordValue: string;
   onEmailChange: (text: string) => void;
   onPasswordChange: (text: string) => void;
+  emailError?: string;
+  passwordError?: string;
 }
 
 const AuthForm = ({
@@ -19,7 +22,11 @@ const AuthForm = ({
   passwordValue,
   onEmailChange,
   onPasswordChange,
+  emailError,
+  passwordError,
 }: AuthFormProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <Animated.View style={[
       styles.formContainer,
@@ -33,13 +40,14 @@ const AuthForm = ({
         <View style={styles.inputWrapper}>
           <Input
             placeholder="tucorreo@ejemplo.com"
-            style={styles.input}
+            style={[styles.input, emailError && styles.inputError]}
             value={emailValue}
             onChangeText={onEmailChange}
             keyboardType="email-address"
             autoCapitalize="none"
           />
         </View>
+        {emailError && <TextMalet style={styles.errorText}>{emailError}</TextMalet>}
       </View>
 
       <View style={styles.inputGroup}>
@@ -47,12 +55,19 @@ const AuthForm = ({
         <View style={styles.inputWrapper}>
           <Input
             placeholder="••••••••"
-            style={styles.input}
+            style={[styles.input, passwordError && styles.inputError]}
             value={passwordValue}
             onChangeText={onPasswordChange}
-            secureTextEntry
+            secureTextEntry={!showPassword}
           />
+          <TouchableOpacity
+            style={styles.togglePassword}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6b7280" />
+          </TouchableOpacity>
         </View>
+        {passwordError && <TextMalet style={styles.errorText}>{passwordError}</TextMalet>}
       </View>
     </Animated.View>
   );
@@ -79,13 +94,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
-    width: '100%',
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  inputError: {
+    borderColor: '#ef4444',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginLeft: 4,
+  },
+  togglePassword: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
   },
 });
 

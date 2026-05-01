@@ -37,6 +37,7 @@ export default function Index() {
 
   const {
     credentials,
+    validationErrors,
     loading,
     showBiometric,
     request,
@@ -78,6 +79,8 @@ export default function Index() {
                 passwordValue={credentials.password}
                 onEmailChange={handleEmailChange}
                 onPasswordChange={handlePasswordChange}
+                emailError={validationErrors?.email}
+                passwordError={validationErrors?.password}
               />
 
               <AuthActions

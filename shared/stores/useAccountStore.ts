@@ -40,7 +40,9 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     deletedAccounts: [],
     paginationAccounts: { cursor: null, take: 15, isEnd: false },
     paginationDeletedAccounts: { cursor: null, take: 15, isEnd: false },
-    setAccounts: (account: Account) => set({ accounts: [...get().accounts, account] }),
+    setAccounts: (newAccount: Account) => set((state) => ({
+        accounts: [...state.accounts.filter(a => a.id !== newAccount.id), newAccount]
+    })),
     selectedAccount: null,
     isBalanceHidden: true,
     toggleBalanceHidden: async () => {
@@ -255,24 +257,24 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
     },
 
     updateBalanceInMemory: (account_id: string, amount: number, type: 'expense' | 'saving') => {
-        const { accounts } = get()
-        const updatedAccounts = accounts.map(acc => {
-            if (acc.id === account_id) {
+        const state = get();
+        const targetAccount = state.accounts.find(a => a.id === account_id);
+        if (!targetAccount) return;
 
-                set({
-                    selectedAccount: {
-                        ...acc,
-                        balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
-                    }
-                })
-                return {
-                    ...acc,
-                    balance: type === 'expense' ? acc.balance - amount : acc.balance + amount
-                }
-            }
-            return acc;
-        })
-        set({ accounts: updatedAccounts })
+        const newBalance = type === 'expense'
+            ? targetAccount.balance - amount
+            : targetAccount.balance + amount;
+
+        const updatedAccounts = state.accounts.map(acc =>
+            acc.id === account_id ? { ...acc, balance: newBalance } : acc
+        );
+
+        set({
+            accounts: updatedAccounts,
+            selectedAccount: state.selectedAccount?.id === account_id
+                ? { ...state.selectedAccount, balance: newBalance }
+                : state.selectedAccount
+        });
     },
 
     logoutAccount: async () => {

@@ -147,7 +147,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             setLoading: setLoading,
         });
 
-        console.log(response)
+        
 
         if (error || !response) {
             setError(error || 'Failed to fetch transactions');

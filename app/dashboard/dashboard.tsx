@@ -303,7 +303,7 @@ export default function Dashboard() {
         return selectedAccount
             ? `${selectedAccount.balance.toFixed(2)} ${selectedAccount.currency}`
             : 'General';
-    }, [selectedAccount]);
+    }, [selectedAccount?.balance, selectedAccount?.currency]);
 
     useEffect(() => {
         verifyUserSession();
@@ -317,7 +317,6 @@ export default function Dashboard() {
     useEffect(() => {
         loadTransactions();
         loadTasas();
-        console.log(tasas);
     }, [loadTransactions, loadTasas]);
 
     // Carousel effect: change displayed tasa every 10 seconds

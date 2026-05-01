@@ -100,17 +100,21 @@ export default function TransactionDetail() {
   const handleDelete = async () => {
     Alert.alert('Eliminar', '¿Estás seguro de que deseas eliminar esta transacción?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => console.log('Delete') }
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          const success = await deleteTransaction(transaction.index_id.toString());
+          if (!success) {
+            Alert.alert('Error | Malet', 'No se ha podido eliminar la transacción.');
+            return;
+          }
+          Alert.alert('Eliminado | Malet', 'Transacción eliminada correctamente.');
+          getAllAccountsByUserId({ refresh: true });
+          router.back();
+        }
+      }
     ]);
-
-    const sucess = await deleteTransaction(transaction.index_id.toString());
-    if (!sucess) {
-      Alert.alert('Error | Malet', 'No se ha podido eliminar la transacción.');
-      return;
-    }
-    Alert.alert('Eliminado | Malet', 'Transacción eliminada correctamente.');
-    getAllAccountsByUserId({ refresh: true });
-    router.back();
   };
 
   const handleRestore = async () => {

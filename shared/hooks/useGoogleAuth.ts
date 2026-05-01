@@ -31,44 +31,33 @@ export const useGoogleAuth = () => {
     }, []);
 
     const signInWithGoogle = async () => {
-        console.log('--- useGoogleAuth: Starting signIn ---');
         try {
             await GoogleSignin.hasPlayServices();
-            console.log('--- useGoogleAuth: Play Services OK ---');
 
             const response = await GoogleSignin.signIn();
-            console.log('--- useGoogleAuth: Response Recived ---', JSON.stringify(response));
 
             if (response.type === 'cancelled') {
-                console.log('User cancelled the login flow');
                 return false;
             }
 
             if (response.data) {
                 const idToken = response.data.idToken;
-                console.log('--- useGoogleAuth: ID Token found ---', idToken ? 'YES' : 'NO');
 
                 if (idToken) {
-                    console.log('--- useGoogleAuth: Calling backend login ---');
                     const loginResult = await loginWithGoogle(idToken);
-                    console.log('--- useGoogleAuth: Backend login result:', loginResult);
                     return loginResult;
                 } else {
-                    console.error('--- useGoogleAuth: Error - No ID Token in response data ---');
                     throw new Error('No se obtuvo el ID Token de Google');
                 }
-            } else {
-                console.warn('--- useGoogleAuth: No response.data ---');
             }
 
             return false;
 
         } catch (error: any) {
-            console.error('--- useGoogleAuth: CATCH ERROR ---', error);
             if (error.code === statusCodes.IN_PROGRESS) {
-                console.log('Operation (e.g. sign in) is in progress already');
+                // Operation in progress - ignore
             } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-                console.log('Play services not available or outdated');
+                console.error('Play services not available or outdated');
             } else {
                 console.error('Google Sign-In Error', error);
             }

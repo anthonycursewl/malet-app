@@ -2,14 +2,36 @@ import { useGoogleAuth } from "@/shared/hooks/useGoogleAuth";
 import { BiometricService } from "@/shared/services/auth/biometric.service";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Alert } from "react-native";
+
+const validateEmail = (email: string): { valid: boolean; error?: string } => {
+  if (!email.trim()) {
+    return { valid: false, error: 'El correo es requerido' };
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { valid: false, error: 'Formato de correo inválido' };
+  }
+  return { valid: true };
+};
+
+const validatePassword = (password: string): { valid: boolean; error?: string } => {
+  if (!password) {
+    return { valid: false, error: 'La contraseña es requerida' };
+  }
+  if (password.length < 6) {
+    return { valid: false, error: 'Mínimo 6 caracteres' };
+  }
+  return { valid: true };
+};
 
 export const useLoginLogic = () => {
   const [credentials, setCredentials] = useState<{ email: string; password: string }>({
     email: '',
     password: '',
   });
+  const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({});
 
   const { login, loading, setError, verifySession, loginWithBiometrics, error } = useAuthStore();
   const { signInWithGoogle, request } = useGoogleAuth();
@@ -23,7 +45,6 @@ export const useLoginLogic = () => {
         return;
       }
 
-      // Si no es válido o no hay sesión, revisar si podemos mostrar biometría
       const canShow = await BiometricService.isSupported() && await BiometricService.hasStoredToken();
       setShowBiometric(canShow);
     };
@@ -41,9 +62,20 @@ export const useLoginLogic = () => {
     }
   }, [error])
 
+  const validate = useCallback((): boolean => {
+    const emailValidation = validateEmail(credentials.email);
+    const passwordValidation = validatePassword(credentials.password);
+
+    const errors: { email?: string; password?: string } = {};
+    if (!emailValidation.valid) errors.email = emailValidation.error;
+    if (!passwordValidation.valid) errors.password = passwordValidation.error;
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [credentials.email, credentials.password]);
+
   const handleSubmit = async () => {
-    if (!credentials.email || !credentials.password) {
-      Alert.alert('Malet | Error', 'Por favor, completa todos los campos');
+    if (!validate()) {
       return;
     }
 
@@ -54,15 +86,10 @@ export const useLoginLogic = () => {
   };
 
   const handleGoogleLogin = async () => {
-    console.log('--- Starting Google Login ---');
     try {
       const success = await signInWithGoogle();
-      console.log('--- Google Login Result:', success);
       if (success) {
-        console.log('--- Navigating to Dashboard ---');
         router.replace('/dashboard/dashboard');
-      } else {
-        console.log('--- Google Login Failed or Cancelled ---');
       }
     } catch (error) {
       console.error('--- Google Login Error:', error);
@@ -86,6 +113,7 @@ export const useLoginLogic = () => {
 
   return {
     credentials,
+    validationErrors,
     loading,
     showBiometric,
     request,

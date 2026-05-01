@@ -6,8 +6,8 @@ type Prefs = {
   haptics: boolean;
   loading: boolean;
   load: () => Promise<void>;
-  setSounds: (v: boolean) => Promise<void>;
-  setHaptics: (v: boolean) => Promise<void>;
+  setSounds: (v: boolean) => void;
+  setHaptics: (v: boolean) => void;
 };
 
 const STORAGE_KEY = 'user_prefs_sound_haptics_v1';
@@ -29,20 +29,20 @@ export const usePreferencesStore = create<Prefs>((set, get) => ({
       set({ loading: false });
     }
   },
-  setSounds: async (v: boolean) => {
+  setSounds: (v: boolean) => {
     set({ sounds: v });
     try {
       const cur = { sounds: v, haptics: get().haptics };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cur));
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cur));
     } catch (e) {
       // ignore
     }
   },
-  setHaptics: async (v: boolean) => {
+  setHaptics: (v: boolean) => {
     set({ haptics: v });
     try {
       const cur = { sounds: get().sounds, haptics: v };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cur));
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cur));
     } catch (e) {
       // ignore
     }

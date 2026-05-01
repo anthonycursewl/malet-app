@@ -1,14 +1,16 @@
 {
   "name": "malet-app",
-  "main": "expo-router/entry",
   "version": "1.0.0",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "node __tests__/validation.test.js",
+    "test:run": "node __tests__/validation.test.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
