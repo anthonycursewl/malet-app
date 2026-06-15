@@ -2,7 +2,7 @@ import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Animated, InteractionManager, Platform } from 'react-native';
 
 export function useTransactions() {
@@ -14,7 +14,6 @@ export function useTransactions() {
         loading: loadingWallet,
         transactions,
         paginationTransactions,
-        clearStore
     } = useWalletStore();
 
     const {
@@ -28,9 +27,10 @@ export function useTransactions() {
 
     const [modalVisible, setModalVisible] = useState(false);
     const [filterModalVisible, setFilterModalVisible] = useState(false);
+
+    // Pending filter state (what's shown in the modal)
     const [filterTypes, setFilterTypes] = useState<string[]>([]);
     const [filterDeleted, setFilterDeleted] = useState<boolean>(false);
-
     const [startDate, setStartDate] = useState<Date | null>(null);
     const [endDate, setEndDate] = useState<Date | null>(null);
     const [datePickerType, setDatePickerType] = useState<'start' | 'end' | null>(null);
@@ -42,42 +42,67 @@ export function useTransactions() {
 
     const contentFadeAnim = useRef(new Animated.Value(0)).current;
 
-    const activeFilterTypesStr = useMemo(() => filterTypes.length > 0 ? filterTypes.join(',') : undefined, [filterTypes]);
-    const activeStartDateStr = useMemo(() => startDate ? startDate.toISOString() : undefined, [startDate]);
-    const activeEndDateStr = useMemo(() => endDate ? endDate.toISOString() : undefined, [endDate]);
-    // Tags was handled by useMemo, we'll now use the debounced value for fetching.
+    // Applied filter values (what's actually used in API calls)
+    const appliedFiltersRef = useRef({
+        types: [] as string[],
+        startDate: null as Date | null,
+        endDate: null as Date | null,
+        deleted: false,
+    });
+    const [appliedFilterActive, setAppliedFilterActive] = useState(false);
 
     const handleOpenModal = useCallback(() => setModalVisible(true), []);
     const handleCloseModal = useCallback(() => setModalVisible(false), []);
 
+    const openFilterModal = useCallback(() => {
+        const a = appliedFiltersRef.current;
+        setFilterTypes(a.types);
+        setStartDate(a.startDate);
+        setEndDate(a.endDate);
+        setFilterDeleted(a.deleted);
+        setFilterModalVisible(true);
+    }, []);
+
+    const closeFilterModal = useCallback(() => {
+        setFilterModalVisible(false);
+    }, []);
+
+    const doFetch = useCallback(async (params: {
+        refresh: boolean;
+        types?: string;
+        startDate?: string;
+        endDate?: string;
+        deleted?: boolean;
+        tags?: string;
+    }) => {
+        if (!selectedAccount?.id) return;
+        setIsRefreshingData(true);
+        await getHistoryTransactions(selectedAccount.id, user.id, params);
+        setIsRefreshingData(false);
+    }, [selectedAccount?.id, user.id, getHistoryTransactions]);
+
     const handleRefresh = useCallback(async () => {
-        if (selectedAccount?.id) {
-            setIsRefreshingData(true);
-            await getHistoryTransactions(selectedAccount.id, user.id, {
-                refresh: true,
-                types: activeFilterTypesStr,
-                startDate: activeStartDateStr,
-                endDate: activeEndDateStr,
-                tags: debouncedTags
-            });
-            setIsRefreshingData(false);
-        }
-    }, [selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr, debouncedTags]);
+        const a = appliedFiltersRef.current;
+        await doFetch({
+            refresh: true,
+            types: a.types.length > 0 ? a.types.join(',') : undefined,
+            startDate: a.startDate?.toISOString(),
+            endDate: a.endDate?.toISOString(),
+            tags: debouncedTags,
+        });
+    }, [doFetch, debouncedTags]);
 
     const handleEndReached = useCallback(() => {
-        if (loadingWallet || paginationTransactions.isEnd) {
-            return;
-        }
-        if (selectedAccount?.id) {
-            getHistoryTransactions(selectedAccount.id, user.id, {
-                refresh: false,
-                types: activeFilterTypesStr,
-                startDate: activeStartDateStr,
-                endDate: activeEndDateStr,
-                tags: debouncedTags
-            });
-        }
-    }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions, activeFilterTypesStr, activeStartDateStr, activeEndDateStr, debouncedTags]);
+        if (loadingWallet || paginationTransactions.isEnd) return;
+        const a = appliedFiltersRef.current;
+        getHistoryTransactions(selectedAccount?.id || '', user.id, {
+            refresh: false,
+            types: a.types.length > 0 ? a.types.join(',') : undefined,
+            startDate: a.startDate?.toISOString(),
+            endDate: a.endDate?.toISOString(),
+            tags: debouncedTags,
+        });
+    }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions, debouncedTags]);
 
     useEffect(() => {
         const interactionPromise = InteractionManager.runAfterInteractions(() => {
@@ -85,7 +110,7 @@ export function useTransactions() {
         });
         return () => {
             interactionPromise.cancel();
-            clearStore();
+            useWalletStore.setState({ transactions: [], paginationTransactions: { cursor: null, take: 10, isEnd: false } });
         };
     }, []);
 
@@ -116,6 +141,21 @@ export function useTransactions() {
         };
     }, [selectedTags]);
 
+    // Auto-fetch when tags change (uses applied filters from ref)
+    useEffect(() => {
+        if (!isReady || firstMount) return;
+        const a = appliedFiltersRef.current;
+        doFetch({
+            refresh: true,
+            types: a.types.length > 0 ? a.types.join(',') : undefined,
+            startDate: a.startDate?.toISOString(),
+            endDate: a.endDate?.toISOString(),
+            deleted: a.deleted,
+            tags: debouncedTags,
+        });
+    }, [debouncedTags]);
+
+    // Initial fetch on mount or account change
     useEffect(() => {
         if (!isReady) return;
 
@@ -123,17 +163,16 @@ export function useTransactions() {
             if (selectedAccount?.id) {
                 setFirstMount(true);
                 contentFadeAnim.setValue(0);
-                clearStore();
+                useWalletStore.setState({ transactions: [], paginationTransactions: { cursor: null, take: 10, isEnd: false } });
 
-                setIsRefreshingData(true);
-                await getHistoryTransactions(selectedAccount.id, user.id, {
+                await doFetch({
                     refresh: true,
-                    types: activeFilterTypesStr,
-                    startDate: activeStartDateStr,
-                    endDate: activeEndDateStr,
-                    tags: debouncedTags
+                    types: undefined,
+                    startDate: undefined,
+                    endDate: undefined,
+                    deleted: undefined,
+                    tags: undefined,
                 });
-                setIsRefreshingData(false);
 
                 setFirstMount(false);
                 Animated.timing(contentFadeAnim, {
@@ -154,39 +193,30 @@ export function useTransactions() {
         getData();
     }, [isReady, selectedAccount?.id, user.id]);
 
-    useEffect(() => {
-        if (!isReady || firstMount) return;
+    const applyFilters = async () => {
+        closeFilterModal();
 
-        const updateFilters = async () => {
-            if (selectedAccount?.id) {
-                setIsRefreshingData(true);
-                await getHistoryTransactions(selectedAccount.id, user.id, {
-                    refresh: true,
-                    types: activeFilterTypesStr,
-                    startDate: activeStartDateStr,
-                    endDate: activeEndDateStr,
-                    tags: debouncedTags
-                });
-                setIsRefreshingData(false);
-            }
+        appliedFiltersRef.current = {
+            types: filterTypes,
+            startDate,
+            endDate,
+            deleted: filterDeleted,
         };
+        setAppliedFilterActive(
+            filterTypes.length > 0 ||
+            startDate !== null ||
+            endDate !== null ||
+            filterDeleted
+        );
 
-        updateFilters();
-    }, [activeFilterTypesStr, activeStartDateStr, activeEndDateStr, debouncedTags]);
-
-    const applyFilters = () => {
-        setFilterModalVisible(false);
-        if (selectedAccount?.id && isReady) {
-            setIsRefreshingData(true);
-            getHistoryTransactions(selectedAccount.id, user.id, {
-                refresh: true,
-                types: activeFilterTypesStr,
-                deleted: filterDeleted,
-                startDate: activeStartDateStr,
-                endDate: activeEndDateStr,
-                tags: debouncedTags
-            }).finally(() => setIsRefreshingData(false));
-        }
+        await doFetch({
+            refresh: true,
+            types: filterTypes.length > 0 ? filterTypes.join(',') : undefined,
+            startDate: startDate?.toISOString(),
+            endDate: endDate?.toISOString(),
+            deleted: filterDeleted,
+            tags: debouncedTags,
+        });
     };
 
     const toggleFilterType = (type: string) => {
@@ -221,6 +251,8 @@ export function useTransactions() {
         setFilterTypes([]);
         setStartDate(null);
         setEndDate(null);
+        setFilterDeleted(false);
+        setSelectedTags([]);
     };
 
     const onToggleTag = useCallback((tagName: string) => {
@@ -233,11 +265,10 @@ export function useTransactions() {
         });
     }, []);
 
-    const hasActiveFilters = filterTypes.length > 0 || startDate !== null || endDate !== null;
+    const hasActiveFilters = appliedFilterActive || selectedTags.length > 0;
     const showSkeleton = !isReady || (firstMount && selectedAccount?.id);
 
     return {
-        // State
         isReady,
         loadingWallet,
         isFiltering: isRefreshingData && !firstMount,
@@ -255,10 +286,10 @@ export function useTransactions() {
         contentFadeAnim,
         showSkeleton,
 
-        // Handlers
         toggleBalanceHidden,
         setModalVisible,
-        setFilterModalVisible,
+        openFilterModal,
+        closeFilterModal,
         setDatePickerType,
         handleOpenModal,
         handleCloseModal,
@@ -274,7 +305,6 @@ export function useTransactions() {
         setFilterDeleted,
         filterDeleted,
 
-        // Derived
         hasActiveFilters,
         buttonText: selectedAccount ? `${selectedAccount.name} ${selectedAccount.currency}` : 'Seleccionar cuenta'
     };

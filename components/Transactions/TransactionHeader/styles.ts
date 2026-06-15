@@ -13,7 +13,22 @@ export const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
     },
-    filterButtonNoBg: {
-        padding: 8,
+    filterButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    filterDot: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: '#000',
+        zIndex: 1,
     },
 });

@@ -81,8 +81,9 @@ export const TransactionHeader = ({
                 </View>
             </View>
 
-            <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButtonNoBg}>
-                <SlidersHorizontal size={20} color={hasActiveFilters ? '#10b981' : '#64748b'} />
+            <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterButton}>
+                {hasActiveFilters && <View style={styles.filterDot} />}
+                <SlidersHorizontal size={18} color={hasActiveFilters ? '#000' : 'rgba(0,0,0,0.38)'} />
             </TouchableOpacity>
         </View>
     );

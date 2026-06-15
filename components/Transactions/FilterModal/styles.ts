@@ -1,151 +1,164 @@
 import { Platform, StyleSheet } from 'react-native';
 
+const activeBg = '#f5f5f5';
+const borderLight = '#e8e8ec';
+const textPrimary = 'rgba(0,0,0,0.87)';
+const textSecondary = 'rgba(0,0,0,0.6)';
+const textTertiary = 'rgba(0,0,0,0.38)';
+
 export const styles = StyleSheet.create({
-    filterModalContainer: {
+    container: {
         flex: 1,
-        paddingTop: 10,
-        paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+        paddingTop: 6,
+        paddingBottom: Platform.OS === 'ios' ? 16 : 6,
     },
-    filterModalHeader: {
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 5,
+        marginBottom: 24,
     },
-    filterModalTitle: {
+    title: {
         fontSize: 20,
-        color: '#1a1a1a',
-        letterSpacing: -0.5,
+        fontWeight: '600',
+        color: textPrimary,
+        letterSpacing: -0.3,
     },
-    clearFiltersText: {
-        fontSize: 14,
-        color: '#FF6B6B',
+    clearButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
     },
-    filterModalScroll: {
+    clearText: {
+        fontSize: 13,
+        color: textTertiary,
+        fontWeight: '500',
+    },
+    scroll: {
         flex: 1,
     },
-    filterSection: {
+    section: {
         marginBottom: 28,
     },
-    filterSectionTitle: {
+    sectionTitle: {
         fontSize: 12,
-        color: '#838383ff',
-        marginBottom: 16,
-        textTransform: 'uppercase',
-        letterSpacing: .5,
+        fontWeight: '600',
+        color: textSecondary,
+        marginBottom: 12,
+        letterSpacing: 0.3,
     },
-    filterOptionsGrid: {
+    chipsRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12,
-    },
-    filterOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#f1f5f9',
-        borderRadius: 14,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
         gap: 8,
-        backgroundColor: '#f8fafc',
     },
-    filterOptionActive: {
-        backgroundColor: '#1a1a1a',
-        borderColor: '#1a1a1a',
-    },
-    filterOptionActiveWarning: {
-        backgroundColor: '#F5C842',
-        borderColor: '#F5C842',
-    },
-    filterOptionText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#475569',
-    },
-    dateSelectorsRow: {
+    chip: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: borderLight,
+        borderRadius: 10,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        gap: 7,
+        backgroundColor: '#fff',
     },
-    datePickerButton: {
+    chipActive: {
+        backgroundColor: activeBg,
+        borderColor: '#000',
+    },
+    chipActiveWarning: {
+        backgroundColor: '#fffbeb',
+        borderColor: '#fbbf24',
+    },
+    chipText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: textTertiary,
+    },
+    chipTextActive: {
+        color: textPrimary,
+    },
+    chipTextWarning: {
+        color: '#d97706',
+    },
+    dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 0,
+    },
+    dateButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderWidth: 1.5,
-        borderColor: '#f1f5f9',
-        borderRadius: 14,
-        paddingVertical: 12,
-        paddingHorizontal: 12,
-        gap: 10,
-    },
-    datePickerButtonActive: {
-        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        borderColor: borderLight,
+        borderRadius: 10,
+        paddingVertical: 11,
+        paddingHorizontal: 13,
+        gap: 9,
         backgroundColor: '#fff',
     },
-    datePickerLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#94a3b8',
-        textTransform: 'uppercase',
-        marginBottom: 2,
+    dateButtonActive: {
+        backgroundColor: activeBg,
+        borderColor: '#000',
     },
-    datePickerValue: {
+    dateLabel: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#64748b',
+        color: textTertiary,
     },
-    clearDatesButton: {
+    dateLabelActive: {
+        color: textPrimary,
+    },
+    dateSeparator: {
+        width: 10,
+        height: 1,
+        backgroundColor: borderLight,
+        marginHorizontal: 4,
+    },
+    resetDateButton: {
         alignSelf: 'flex-start',
+        marginTop: 10,
         paddingVertical: 4,
+        paddingHorizontal: 2,
     },
-    clearDatesText: {
+    resetDateText: {
         fontSize: 13,
         fontWeight: '500',
-        color: '#64748b',
-        textDecorationLine: 'underline',
+        color: textTertiary,
     },
-    iosDatePickerContainer: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
+    iosPickerContainer: {
+        backgroundColor: activeBg,
+        borderRadius: 12,
         padding: 16,
         borderWidth: 1,
-        borderColor: '#f1f5f9',
-        marginTop: 10,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.05,
-                shadowRadius: 10,
-            },
-        }),
+        borderColor: borderLight,
+        marginTop: 8,
+        marginBottom: 4,
     },
-    iosDatePickerHeader: {
+    iosPickerHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
+        marginBottom: 16,
     },
-    iosDatePickerTitle: {
-        fontSize: 15,
+    iosPickerTitle: {
+        fontSize: 14,
         fontWeight: '600',
-        color: '#1a1a1a',
+        color: textPrimary,
     },
-    iosDatePickerDone: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#10b981',
+    iosPickerDone: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#000',
     },
-    filterModalFooter: {
+    footer: {
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-        marginTop: 'auto',
+        borderTopColor: borderLight,
+        marginTop: 8,
     },
 });

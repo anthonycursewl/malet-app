@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { MALET_API_URL } from "../config/malet.config";
 import { TransactionItem } from "../entities/TransactionItem";
 import { secureFetch } from "../http/secureFetch";
+import { useToastStore } from "./useToastStore";
 
 interface Tasas {
     fuente: string;
@@ -104,6 +105,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
         get().setError(null);
 
+        useToastStore.getState().add({ type: 'success', message: 'Transacción creada con éxito', duration: 3000 });
+
         get().setPreviewTransactions([response, ...get().previewTransactions]);
         return response;
     },
@@ -180,10 +183,10 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         }
     },
 
-    getPreviewTransactions: async (account_id: string, user_id = '') => {
+    getPreviewTransactions: async (account_id: string, user_id = '', take = 3) => {
         const { setLoading, setError, setPreviewTransactions } = get();
 
-        const endpoint = `/transactions/history?take=${10}&account_id=${account_id}&user_id=${user_id}`;
+        const endpoint = `/transactions/history?take=${take}&account_id=${account_id}&user_id=${user_id}`;
         const { error, response } = await secureFetch<{ data: TransactionItem[]; nextCursor: string | null }>({
             url: `${MALET_API_URL}${endpoint}`,
             method: 'GET',

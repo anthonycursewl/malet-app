@@ -2,7 +2,7 @@ import Button from "@/components/Button/Button";
 import ModalOptions from "@/components/shared/ModalOptions";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, Calendar, Clock, Trash2 } from "lucide-react-native";
+import { ArrowDownRight, ArrowUpRight, Calendar, Clock, RotateCcw, Trash2 } from "lucide-react-native";
 import React from 'react';
 import { Platform, ScrollView, TouchableOpacity, View } from 'react-native';
 import { styles } from './styles';
@@ -30,7 +30,6 @@ export const FilterModal = ({
     visible,
     onClose,
     filterTypes,
-    hasActiveFilters,
     startDate,
     endDate,
     datePickerType,
@@ -50,114 +49,110 @@ export const FilterModal = ({
         return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
+    const pendingHasFilters = filterTypes.length > 0 || startDate !== null || endDate !== null || filterDeleted;
+
+    const isExpenseActive = filterTypes.includes('expense');
+    const isSavingActive = filterTypes.includes('saving');
+    const isPendingActive = filterTypes.includes('pending_payment');
+
     return (
         <ModalOptions
             visible={visible}
             onClose={onClose}
         >
-            <View style={styles.filterModalContainer}>
-                <View style={styles.filterModalHeader}>
-                    <TextMalet style={styles.filterModalTitle}>Filtros Avanzados</TextMalet>
-                    {hasActiveFilters && (
-                        <TouchableOpacity onPress={clearFilters}>
-                            <TextMalet style={styles.clearFiltersText}>Limpiar</TextMalet>
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <TextMalet style={styles.title}>Filtros</TextMalet>
+                    {pendingHasFilters && (
+                        <TouchableOpacity onPress={clearFilters} style={styles.clearButton}>
+                            <RotateCcw size={14} color="rgba(0,0,0,0.38)" />
+                            <TextMalet style={styles.clearText}>Limpiar</TextMalet>
                         </TouchableOpacity>
                     )}
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} style={styles.filterModalScroll}>
-                    <View style={styles.filterSection}>
-                        <TextMalet style={styles.filterSectionTitle}>Tipos de Transacción</TextMalet>
-
-                        <View style={styles.filterOptionsGrid}>
+                <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
+                    <View style={styles.section}>
+                        <TextMalet style={styles.sectionTitle}>Tipo</TextMalet>
+                        <View style={styles.chipsRow}>
                             <TouchableOpacity
-                                style={[styles.filterOption, filterTypes.includes('expense') && styles.filterOptionActive]}
+                                style={[styles.chip, isExpenseActive && styles.chipActive]}
                                 onPress={() => toggleFilterType('expense')}
                             >
-                                <ArrowDownRight size={16} color={filterTypes.includes('expense') ? '#fff' : '#64748b'} />
-                                <TextMalet style={[styles.filterOptionText, filterTypes.includes('expense') && { color: '#fff' }]}>Egresos</TextMalet>
+                                <ArrowDownRight size={15} color={isExpenseActive ? 'rgba(0,0,0,0.87)' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.chipText, isExpenseActive && styles.chipTextActive]}>Gastos</TextMalet>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.filterOption, filterTypes.includes('saving') && styles.filterOptionActive]}
+                                style={[styles.chip, isSavingActive && styles.chipActive]}
                                 onPress={() => toggleFilterType('saving')}
                             >
-                                <ArrowUpRight size={16} color={filterTypes.includes('saving') ? '#fff' : '#64748b'} />
-                                <TextMalet style={[styles.filterOptionText, filterTypes.includes('saving') && { color: '#fff' }]}>Ingresos</TextMalet>
+                                <ArrowUpRight size={15} color={isSavingActive ? 'rgba(0,0,0,0.87)' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.chipText, isSavingActive && styles.chipTextActive]}>Ingresos</TextMalet>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.filterOption, filterTypes.includes('pending_payment') && styles.filterOptionActiveWarning]}
+                                style={[styles.chip, isPendingActive && styles.chipActiveWarning]}
                                 onPress={() => toggleFilterType('pending_payment')}
                             >
-                                <Clock size={16} color={filterTypes.includes('pending_payment') ? '#fff' : '#64748b'} />
-                                <TextMalet style={[styles.filterOptionText, filterTypes.includes('pending_payment') && { color: '#fff' }]}>Pendientes</TextMalet>
+                                <Clock size={15} color={isPendingActive ? '#d97706' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.chipText, isPendingActive && styles.chipTextWarning]}>Pendientes</TextMalet>
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.filterOption, filterDeleted && styles.filterOptionActiveWarning]}
+                                style={[styles.chip, filterDeleted && styles.chipActiveWarning]}
                                 onPress={() => setFilterDeleted(!filterDeleted)}
                             >
-                                <Trash2 size={16} color={filterDeleted ? '#fff' : '#64748b'} />
-                                <TextMalet style={[styles.filterOptionText, filterDeleted && { color: '#fff' }]}>Eliminados</TextMalet>
+                                <Trash2 size={15} color={filterDeleted ? '#d97706' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.chipText, filterDeleted && styles.chipTextWarning]}>Eliminados</TextMalet>
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    <View style={styles.filterSection}>
-                        <TextMalet style={styles.filterSectionTitle}>Rango de Fechas</TextMalet>
-
-                        <View style={styles.dateSelectorsRow}>
+                    <View style={styles.section}>
+                        <TextMalet style={styles.sectionTitle}>Fecha</TextMalet>
+                        <View style={styles.dateRow}>
                             <TouchableOpacity
-                                style={[styles.datePickerButton, startDate && styles.datePickerButtonActive]}
+                                style={[styles.dateButton, startDate && styles.dateButtonActive]}
                                 onPress={() => setDatePickerType('start')}
                             >
-                                <Calendar size={16} color={startDate ? '#10b981' : '#64748b'} />
-                                <View>
-                                    <TextMalet style={styles.datePickerLabel}>Desde</TextMalet>
-                                    <TextMalet style={[styles.datePickerValue, startDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
-                                        {formatDateForDisplay(startDate) || 'Inicio'}
-                                    </TextMalet>
-                                </View>
+                                <Calendar size={15} color={startDate ? 'rgba(0,0,0,0.87)' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.dateLabel, startDate && styles.dateLabelActive]}>
+                                    {formatDateForDisplay(startDate) || 'Desde'}
+                                </TextMalet>
                             </TouchableOpacity>
 
-                            <ArrowRight size={16} color="#cbd5e1" />
+                            <View style={styles.dateSeparator} />
 
                             <TouchableOpacity
-                                style={[styles.datePickerButton, endDate && styles.datePickerButtonActive]}
+                                style={[styles.dateButton, endDate && styles.dateButtonActive]}
                                 onPress={() => setDatePickerType('end')}
                             >
-                                <Calendar size={16} color={endDate ? '#10b981' : '#64748b'} />
-                                <View>
-                                    <TextMalet style={styles.datePickerLabel}>Hasta</TextMalet>
-                                    <TextMalet style={[styles.datePickerValue, endDate && { color: '#1a1a1a', fontWeight: 'bold' }]}>
-                                        {formatDateForDisplay(endDate) || 'Fin'}
-                                    </TextMalet>
-                                </View>
+                                <Calendar size={15} color={endDate ? 'rgba(0,0,0,0.87)' : 'rgba(0,0,0,0.38)'} />
+                                <TextMalet style={[styles.dateLabel, endDate && styles.dateLabelActive]}>
+                                    {formatDateForDisplay(endDate) || 'Hasta'}
+                                </TextMalet>
                             </TouchableOpacity>
                         </View>
 
                         {(startDate || endDate) && (
                             <TouchableOpacity
-                                style={styles.clearDatesButton}
-                                onPress={() => {
-                                    setStartDate(null);
-                                    setEndDate(null);
-                                }}
+                                style={styles.resetDateButton}
+                                onPress={() => { setStartDate(null); setEndDate(null); }}
                             >
-                                <TextMalet style={styles.clearDatesText}>Resetear fechas</TextMalet>
+                                <TextMalet style={styles.resetDateText}>Limpiar fechas</TextMalet>
                             </TouchableOpacity>
                         )}
                     </View>
 
                     {Platform.OS === 'ios' && datePickerType && (
-                        <View style={styles.iosDatePickerContainer}>
-                            <View style={styles.iosDatePickerHeader}>
-                                <TextMalet style={styles.iosDatePickerTitle}>
-                                    Selecciona la fecha {datePickerType === 'start' ? 'inicial' : 'final'}
+                        <View style={styles.iosPickerContainer}>
+                            <View style={styles.iosPickerHeader}>
+                                <TextMalet style={styles.iosPickerTitle}>
+                                    {datePickerType === 'start' ? 'Fecha inicial' : 'Fecha final'}
                                 </TextMalet>
                                 <TouchableOpacity onPress={() => setDatePickerType(null)}>
-                                    <TextMalet style={styles.iosDatePickerDone}>Listo</TextMalet>
+                                    <TextMalet style={styles.iosPickerDone}>Listo</TextMalet>
                                 </TouchableOpacity>
                             </View>
                             <DateTimePicker
@@ -171,9 +166,9 @@ export const FilterModal = ({
                     )}
                 </ScrollView>
 
-                <View style={styles.filterModalFooter}>
+                <View style={styles.footer}>
                     <Button
-                        text={`Aplicar Filtros`}
+                        text="Aplicar Filtros"
                         onPress={applyFilters}
                         style={{ width: '100%' }}
                     />
