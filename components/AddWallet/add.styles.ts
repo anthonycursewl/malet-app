@@ -156,6 +156,7 @@ export const fieldStyles = StyleSheet.create({
     gap: 8,
   },
   fieldWrapper: {
+    width: '100%',
     marginBottom: 0,
   },
   fieldContainer: {

@@ -1,12 +1,12 @@
 import Button from "@/components/Button/Button";
-import Input from "@/components/Input/Input";
+import { InputField } from "@/components/AddWallet/InputField";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { UserPrimitives } from "@/shared/entities/User";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type RegisterPayload = Pick<UserPrimitives, 'name' | 'username' | 'email' | 'password'>;
@@ -20,7 +20,6 @@ export default function Register() {
     password: '',
   });
 
-  // Auth store 
   const { register, loading, error } = useAuthStore();
 
   const handleNext = () => {
@@ -70,172 +69,138 @@ export default function Register() {
     }
   };
 
-  const renderStepIndicator = () => (
-    <View style={{
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 20,
-      gap: 10,
-      width: '100%',
-    }}>
-      {[1, 2, 3].map((stepNumber) => (
-        <View
-          key={stepNumber}
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 15,
-            backgroundColor: step === stepNumber ? '#007AFF' : '#E5E5EA',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <TextMalet
-            style={{ color: step === stepNumber ? 'white' : 'gray' }}
-          >
-            {stepNumber.toString()}
-          </TextMalet>
-        </View>
-      ))}
-    </View>
-  );
-
-  const renderStep = () => {
-    switch (step) {
-      case 1:
-        return (
-          <View style={{ gap: 20, justifyContent: 'center', alignItems: 'center' }}>
-
-            <View style={{ width: '100%', gap: 10 }}>
-              <TextMalet style={{ fontSize: 16 }}>
-                Nombres
-              </TextMalet>
-              <Input
-                placeholder="Tu nombre completo..."
-                value={userData.name}
-                onChangeText={(text) => handleInputChange('name', text)}
-                style={{ width: '100%' }}
-                autoCapitalize="words"
-              />
-            </View>
-
-            <View style={{ width: '100%', gap: 10 }}>
-              <TextMalet style={{ fontSize: 16 }}>
-                Nombre de Usuario
-              </TextMalet>
-              <Input
-                placeholder="Elige un @username..."
-                value={userData.username}
-                onChangeText={(text) => handleInputChange('username', text.toLowerCase().trim())}
-                style={{ width: '100%' }}
-                autoCapitalize="none"
-                keyboardType="default"
-              />
-            </View>
-
+          <View style={styles.header}>
+            <IconAt style={styles.logo} />
+            <TextMalet style={styles.title}>Crear cuenta</TextMalet>
           </View>
 
-        );
-      case 2:
-        return (
-          <View style={{ gap: 20, justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ width: '100%', gap: 10 }}>
-              <TextMalet style={{ fontSize: 16 }}>
-                Correo Electrónico
-              </TextMalet>
-              <Input
+          <View style={styles.steps}>
+            {[1, 2, 3].map((s) => (
+              <View
+                key={s}
+                style={[styles.dot, step === s && styles.dotActive]}
+              />
+            ))}
+          </View>
+
+          <View style={styles.form}>
+            {step === 1 && (
+              <View style={{ gap: 16 }}>
+                <InputField
+                  label="Nombres"
+                  placeholder="Tu nombre completo..."
+                  value={userData.name}
+                  onChangeText={(text) => handleInputChange('name', text)}
+                />
+                <InputField
+                  label="Nombre de Usuario"
+                  placeholder="Elige un @username..."
+                  value={userData.username}
+                  onChangeText={(text) => handleInputChange('username', text.toLowerCase().trim())}
+                />
+              </View>
+            )}
+
+            {step === 2 && (
+              <InputField
+                label="Correo Electrónico"
                 placeholder="tucorreo@ejemplo.com"
                 value={userData.email}
                 onChangeText={(text) => handleInputChange('email', text)}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={{ width: '100%' }}
               />
-            </View>
-          </View>
-        );
-      case 3:
-        return (
-          <View style={{ gap: 20, justifyContent: 'center', alignItems: 'center' }}>
-            <View style={{ width: '100%', gap: 10 }}>
-              <TextMalet style={{ fontSize: 16 }}>
-                Contraseña
-              </TextMalet>
-              <Input
+            )}
+
+            {step === 3 && (
+              <InputField
+                label="Contraseña"
                 placeholder="Crea una contraseña segura"
                 value={userData.password}
                 onChangeText={(text) => handleInputChange('password', text)}
                 secureTextEntry
-                style={{ width: '100%' }}
               />
-            </View>
-
+            )}
           </View>
-        );
-      default:
-        return null;
-    }
-  };
 
-  return (
-    <SafeAreaView style={{
-      flex: 1,
-      backgroundColor: '#fff',
-    }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
-      >
-        <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            justifyContent: 'center',
-            padding: 20,
-          }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={{
-            width: '95%',
-            alignSelf: 'center',
-            backgroundColor: '#fff',
-            borderRadius: 10,
-          }}>
-            <View style={{ alignItems: 'center', marginBottom: 30 }}>
-              <IconAt style={{ width: 80, height: 80 }} />
-            </View>
+          <View style={styles.buttons}>
+            {loading ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Button
+                text={step === 3 ? 'Registrarse' : 'Siguiente'}
+                onPress={step === 3 ? handleSubmit : handleNext}
+              />
+            )}
 
-            <View style={{ gap: 24 }}>
-              {renderStepIndicator()}
-              {renderStep()}
-
-              <View style={{ marginTop: 10, gap: 12 }}>
-                {loading ? (
-                  <View style={{ alignItems: 'center', width: '100%', justifyContent: 'center' }}>
-                    <ActivityIndicator size="small" color="#007AFF" />
-                  </View>
-                ) : (
-                  <Button
-                    text={step === 3 ? 'Registrarse' : 'Siguiente'}
-                    onPress={step === 3 ? handleSubmit : handleNext}
-                  />
-                )}
-
-
-                {step > 1 && !loading && (
-                  <Button
-                    text="Volver atrás"
-                    onPress={handlePrevious}
-                  />
-                )}
-              </View>
-            </View>
-
+            {step > 1 && !loading && (
+              <Button
+                text="Volver atrás"
+                onPress={handlePrevious}
+              />
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logo: {
+    width: 48,
+    height: 48,
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  steps: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 32,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e5e7eb',
+  },
+  dotActive: {
+    backgroundColor: '#1a1a1a',
+    width: 24,
+  },
+  form: {
+    gap: 16,
+    marginBottom: 32,
+  },
+  buttons: {
+    gap: 12,
+  },
+});

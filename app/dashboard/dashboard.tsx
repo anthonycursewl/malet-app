@@ -1,4 +1,3 @@
-import Button from "@/components/Button/Button";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
@@ -10,20 +9,19 @@ import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import IconArrow from "@/svgs/dashboard/IconArrow";
 import IconAt from "@/svgs/dashboard/IconAt";
-import IconCommunities from "@/svgs/dashboard/IconCommunities";
 import IconMinus from "@/svgs/dashboard/IconMinus";
 import IconPlus from "@/svgs/dashboard/IconPlus";
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, FlatList, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, Path, Pattern, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, Path, Pattern, Rect, Stop, LinearGradient as SvgLinearGradient, Text } from 'react-native-svg';
 
 // lucide icon 
 import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
-import { AtSign, Layers, TrendingUp, Wallet } from 'lucide-react-native';
+import { ArrowRight, Layers, Plus, ShoppingCart, TrendingUp, Wallet } from 'lucide-react-native';
 
 const SHOW_S_ACCOUNTS_NEW_TAG = (() => {
     const releaseDate = new Date('2026-02-26');
@@ -97,7 +95,7 @@ const LoadingScreen = memo(({ fadeAnim, logoFadeAnim }: { fadeAnim: Animated.Val
 
 const loadingStyles = StyleSheet.create({
     container: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         backgroundColor: '#fff',
         zIndex: 100,
         justifyContent: 'space-between',
@@ -149,6 +147,173 @@ const loadingStyles = StyleSheet.create({
     }
 });
 
+const DIGIT_H = 26;
+const DIGIT_W = 15;
+
+const DigitColumn = memo(({ digit }: { digit: number }) => {
+    const anim = useRef(new Animated.Value(digit)).current;
+
+    useEffect(() => {
+        Animated.spring(anim, {
+            toValue: digit,
+            tension: 120,
+            friction: 12,
+            useNativeDriver: true,
+        }).start();
+    }, [digit]);
+
+    const translateY = anim.interpolate({
+        inputRange: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        outputRange: [0, -DIGIT_H, -2 * DIGIT_H, -3 * DIGIT_H, -4 * DIGIT_H, -5 * DIGIT_H, -6 * DIGIT_H, -7 * DIGIT_H, -8 * DIGIT_H, -9 * DIGIT_H],
+    });
+
+    return (
+        <View style={{ width: DIGIT_W, height: DIGIT_H, overflow: 'hidden' }}>
+            <Animated.View style={{ transform: [{ translateY }] }}>
+                {'0123456789'.split('').map(d => (
+                    <TextMalet
+                        key={d}
+                        style={{ fontSize: DIGIT_H, lineHeight: DIGIT_H, fontWeight: '700', color: '#0f172a', textAlign: 'center', height: DIGIT_H }}
+                    >
+                        {d}
+                    </TextMalet>
+                ))}
+            </Animated.View>
+        </View>
+    );
+});
+
+const RollingNumber = memo(({ value }: { value: string }) => {
+    if (value.includes('***') || value === 'General') {
+        return <TextMalet style={styles.balanceValue}>{value}</TextMalet>;
+    }
+
+    const parts = value.split(' ');
+    const numberPart = parts[0];
+    const suffix = parts.slice(1).join(' ');
+
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            {numberPart.split('').map((char, i) => {
+                if (char >= '0' && char <= '9') {
+                    return <DigitColumn key={`d-${i}`} digit={parseInt(char, 10)} />;
+                }
+                return (
+                    <TextMalet
+                        key={char === '.' ? `dot-${i}` : `sep-${i}`}
+                        style={{ fontSize: DIGIT_H, lineHeight: DIGIT_H, fontWeight: '700', color: '#0f172a', width: char === '.' ? 10 : 8, textAlign: 'center' }}
+                    >
+                        {char}
+                    </TextMalet>
+                );
+            })}
+            {suffix ? (
+                <TextMalet style={{ fontSize: 14, color: '#64748b', marginLeft: 6, fontWeight: '500' }}>
+                    {suffix}
+                </TextMalet>
+            ) : null}
+        </View>
+    );
+});
+
+const TICKET_W = 162;
+const TICKET_H = 78;
+
+const GoldenTicket = memo(({ onPress }: { onPress: () => void }) => {
+    const scallopSpacing = 12;
+    const scallopR = 5;
+    const numTopBottom = Math.floor(TICKET_W / scallopSpacing) - 1;
+    const numLeftRight = Math.floor(TICKET_H / scallopSpacing) - 1;
+    const tearOffX = TICKET_W - 36;
+
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            style={{
+                width: TICKET_W + 8,
+                height: TICKET_H + 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+                elevation: 6,
+            }}
+        >
+            <View style={{ transform: [{ rotate: '-1.5deg' }], width: TICKET_W, height: TICKET_H }}>
+                <Svg width={TICKET_W} height={TICKET_H}>
+                    <Defs>
+                        <SvgLinearGradient id="brdTicketGold" x1="0" y1="0" x2="1" y2="1">
+                            <Stop offset="0" stopColor="#f3a65e" />
+                            <Stop offset="0.35" stopColor="#f5d76e" />
+                            <Stop offset="0.7" stopColor="#e8b830" />
+                            <Stop offset="1" stopColor="#ac79ce" />
+                        </SvgLinearGradient>
+                    </Defs>
+
+                    {/* Main golden body */}
+                    <Rect x={0} y={0} width={TICKET_W} height={TICKET_H} rx={6} fill="url(#brdTicketGold)" />
+
+                    {/* Scallops - top */}
+                    {Array.from({ length: numTopBottom }).map((_, i) => (
+                        <Circle key={`t${i}`} cx={scallopSpacing * (i + 1)} cy={0} r={scallopR} fill="#fff" />
+                    ))}
+
+                    {/* Scallops - bottom */}
+                    {Array.from({ length: numTopBottom }).map((_, i) => (
+                        <Circle key={`b${i}`} cx={scallopSpacing * (i + 1)} cy={TICKET_H} r={scallopR} fill="#fff" />
+                    ))}
+
+                    {/* Scallops - left */}
+                    {Array.from({ length: numLeftRight }).map((_, i) => (
+                        <Circle key={`l${i}`} cx={0} cy={scallopSpacing * (i + 1)} r={scallopR} fill="#fff" />
+                    ))}
+
+                    {/* Scallops - right */}
+                    {Array.from({ length: numLeftRight }).map((_, i) => (
+                        <Circle key={`r${i}`} cx={TICKET_W} cy={scallopSpacing * (i + 1)} r={scallopR} fill="#fff" />
+                    ))}
+
+                    {/* Inner border */}
+                    <Rect x={10} y={10} width={tearOffX - 14} height={TICKET_H - 20} rx={4} fill="none" stroke="#b8931a" strokeWidth={1.5} />
+
+                    {/* Tear-off dashed line */}
+                    <Line x1={tearOffX} y1={8} x2={tearOffX} y2={TICKET_H - 8} stroke="#eeb281" strokeWidth={1} strokeDasharray="4 3" />
+
+                    {/* Stars in tear-off */}
+                    {[0, 1, 2].map(i => (
+                        <Text
+                            key={`s${i}`}
+                            x={tearOffX + (TICKET_W - tearOffX) / 2}
+                            y={22 + i * 20}
+                            textAnchor="middle"
+                            fill="#b8931a"
+                            fontSize={13}
+                        >
+                            ★
+                        </Text>
+                    ))}
+                </Svg>
+
+                {/* Content overlay */}
+                <View style={{ position: 'absolute', top: 0, left: 0, width: TICKET_W, height: TICKET_H, flexDirection: 'row', alignItems: 'center', paddingLeft: 14 }}>
+                    <Image
+                        source={{ uri: 'https://bucket.breadriuss.com/brd/brd_lg_dark.webp' }}
+                        style={{ width: 22, height: 22 }}
+                    />
+                    <View style={{ marginLeft: 8, flexShrink: 1 }}>
+                        <TextMalet style={{ fontSize: 13, fontWeight: '700', color: '#3d2a00', letterSpacing: 0.3 }}>
+                            Breadriuss
+                        </TextMalet>
+                        <TextMalet style={{ fontSize: 10, fontWeight: '500', color: '#6b4c00', letterSpacing: 0.2 }}>
+                            Communities
+                        </TextMalet>
+                    </View>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
 const BalanceSection = memo((({
     balance,
     onOpenModal,
@@ -172,7 +337,6 @@ const BalanceSection = memo((({
     return (
         <View style={styles.balanceSection}>
             <View style={styles.balanceContainer}>
-                {/* Account info outside the card */}
                 <TouchableOpacity
                     onPress={onOpenModal}
                     style={styles.accountHeader}
@@ -188,21 +352,19 @@ const BalanceSection = memo((({
                     <IconArrow width={12} height={12} />
                 </TouchableOpacity>
 
-                <Pressable onPress={onOpenModal}>
-                    <View style={styles.balanceCard}>
-                        <Image source={{ uri: getCurrencyIcon(accountCurrency) }} style={{ width: 20, height: 20 }} />
-                        <TouchableOpacity onPress={onOpenModal} style={{ flexShrink: 1 }}>
-                            <TextMalet style={styles.balanceValue} numberOfLines={1}>{displayBalance}</TextMalet>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={onToggleHidden} style={styles.eyeButtonInner}>
-                            {isBalanceHidden ? (
-                                <Feather name="eye-off" size={20} color="#666" />
-                            ) : (
-                                <Feather name="eye" size={20} color="#666" />
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </Pressable>
+                <View style={styles.balanceRow}>
+                    <Image source={{ uri: getCurrencyIcon(accountCurrency) }} style={{ width: 22, height: 22 }} />
+                    <TouchableOpacity onPress={onOpenModal} style={{ flexShrink: 1 }}>
+                        <RollingNumber value={displayBalance} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={onToggleHidden} style={styles.eyeButtonInner}>
+                        {isBalanceHidden ? (
+                            <Feather name="eye-off" size={20} color="#94a3b8" />
+                        ) : (
+                            <Feather name="eye" size={20} color="#94a3b8" />
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
             <View style={styles.actionsContainer}>
                 <Link push href='/wallet/add?type=expense'>
@@ -306,7 +468,7 @@ export default function Dashboard() {
     }, [selectedAccount?.balance, selectedAccount?.currency]);
 
     useEffect(() => {
-        verifyUserSession();
+        // verifyUserSession();
 
         return () => {
             fadeAnim.setValue(0);
@@ -399,12 +561,13 @@ export default function Dashboard() {
                             contentContainerStyle={{ gap: 10, paddingRight: 20 }}
                         >
                             {/* BCV Rate Card with premium style */}
-                            <LinearGradient
-                                colors={['#ffffff', '#fcfcfcff']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={[styles.tasaCard, { overflow: 'hidden' }]}
-                            >
+                            <View style={{ width: 170, height: TICKET_H + 8 }}>
+                                <LinearGradient
+                                    colors={['#ffffff', '#fcfcfcff']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={[styles.tasaCard, { overflow: 'hidden', height: TICKET_H }]}
+                                >
                                 {/* Animated background texture */}
                                 <Animated.View style={[StyleSheet.absoluteFill, {
                                     opacity: 0.15,
@@ -440,7 +603,7 @@ export default function Dashboard() {
 
                                             <View>
                                                 <TextMalet style={{ fontSize: 18, fontWeight: 'bold', color: '#1a1a1a', marginBottom: 1 }}>
-                                                    Bs {tasas[currentTasaIndex]?.promedio}
+                                                    Bs {tasas[currentTasaIndex]?.promedio?.toFixed(2)}
                                                 </TextMalet>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                     <TextMalet style={{ color: '#94a3b8', fontSize: 10 }}>
@@ -456,104 +619,107 @@ export default function Dashboard() {
                                     )}
                                 </Animated.View>
                             </LinearGradient>
+                            </View>
 
-                            <TouchableOpacity onPress={() => router.push('/s-accounts/main')} style={{ width: 170 }}>
-                                <LinearGradient
-                                    colors={['#ffffff', '#e1d7ffff']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ padding: 10, borderRadius: 10, width: '100%', gap: 8, borderWidth: 1, borderColor: '#f5f5f5', overflow: 'hidden' }}>
-
-                                    <View style={[StyleSheet.absoluteFill, { opacity: 0.1, zIndex: 0 }]}>
+                            <TouchableOpacity onPress={() => router.push('/s-accounts/main')} style={{ width: 170, height: TICKET_H + 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                                <View style={{ width: '100%', height: TICKET_H, borderRadius: 10, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#d8d8e0', padding: 14, justifyContent: 'center', overflow: 'hidden' }}>
+                                    {/* Hex pattern texture */}
+                                    <View style={[StyleSheet.absoluteFill, { opacity: 0.12 }]}>
                                         <Svg width="100%" height="100%">
                                             <Defs>
-                                                <Pattern id="gridPattern" width="16" height="16" patternUnits="userSpaceOnUse">
-                                                    <Path d="M 16 0 L 0 0 0 16" fill="none" stroke="#252525" strokeWidth="1" />
+                                                <Pattern id="sHexPattern" width="14" height="24" patternUnits="userSpaceOnUse">
+                                                    <Path d="M7 0L14 4.2V12.6L7 16.8L0 12.6V4.2Z" fill="none" stroke="#1a1a2e" strokeWidth="0.8" />
                                                 </Pattern>
                                             </Defs>
-                                            <Rect width="100%" height="100%" fill="url(#gridPattern)" />
+                                            <Rect width="100%" height="100%" fill="url(#sHexPattern)" />
                                         </Svg>
                                     </View>
 
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, zIndex: 1 }}>
-                                        <Wallet size={15} color={'#505050ff'} fill={'#ecececff'} />
-                                        <TextMalet style={{ fontWeight: '500' }}>S-Accounts</TextMalet>
-                                        {SHOW_S_ACCOUNTS_NEW_TAG && (
-                                            <View style={styles.newBadge}>
-                                                <TextMalet style={styles.newBadgeText}>NEW</TextMalet>
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    <View style={{ zIndex: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                            <AtSign size={15} color={'#505050ff'} />
-                                            <TextMalet style={{ fontSize: 11 }}>Get Started with</TextMalet>
-                                        </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                            <TextMalet style={{ fontSize: 11 }}>M-Account</TextMalet>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 1 }}>
+                                        <Wallet size={18} color={'#1a1a2e'} fill={'#f5f4fa'} />
+                                        <View>
+                                            <TextMalet style={{ fontSize: 14, fontWeight: '700', color: '#1a1a2e', letterSpacing: -0.2 }}>
+                                                S-Accounts
+                                            </TextMalet>
+                                            <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
+                                                Shared
+                                            </TextMalet>
                                         </View>
                                     </View>
-
-                                </LinearGradient>
+                                </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => router.push('/communities' as any)} style={{ width: 170 }}>
-                                <LinearGradient
-                                    colors={['#ffffff', '#ffffffff']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={{ padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: '#f5f5f5', paddingBottom: 15 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                        <IconCommunities width={18} height={18} fill={'#1f1f1fff'} />
-                                        <TextMalet>Comunidades</TextMalet>
-                                    </View>
-
-                                    <View>
-                                        <View style={{ flexDirection: 'row', gap: 2 }}>
-                                            <View style={{ width: 18, height: 22, backgroundColor: '#d1d1d1ff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 13, height: 22, backgroundColor: '#d6d7fdff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 25, height: 22, backgroundColor: '#fcdfabff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 20, height: 22, backgroundColor: '#fdb3aeff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 15, height: 22, backgroundColor: '#bcffd8ff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 15, height: 22, backgroundColor: '#f7b9ffff', borderRadius: 5 }}></View>
-                                            <View style={{ width: 18, height: 22, backgroundColor: '#b1dafcff', borderRadius: 5 }}></View>
-                                        </View>
-                                    </View>
-
-                                </LinearGradient>
-                            </TouchableOpacity>
+                            <GoldenTicket onPress={() => router.push('/communities' as any)} />
 
                         </ScrollView>
                     </View>
                 </View>
 
                 {/* Transacciones recientes. */}
-                {/* Turn into a separated component brd-task-1526845236958456 */}
 
-                <FlatList
-                    data={previewTransactions}
-                    keyExtractor={(item) => item.id.toString()}
-                    showsVerticalScrollIndicator={false}
-                    style={styles.transactionsList}
-                    ListHeaderComponent={null}
-                    renderItem={({ item }) => <LastTransactions item={item} />}
-                    ListEmptyComponent={
-                        <TextMalet style={styles.emptyListText}>
-                            No hay movimientos aún.
-                        </TextMalet>
-                    }
-                    onRefresh={handleRefresh}
-                    refreshing={loading && previewTransactions.length === 0}
-                />
+                <View style={styles.transactionsContainer}>
+                    <View style={styles.transactionsList}>
+                        {previewTransactions.length > 0 ? (
+                            previewTransactions.slice(0, 3).map((item) => (
+                                <LastTransactions key={item.id.toString()} item={item} />
+                            ))
+                        ) : (
+                            !loading && (
+                                <View style={styles.emptyContainer}>
+                                    <TextMalet style={styles.emptyListText}>
+                                        No hay movimientos aún.
+                                    </TextMalet>
+                                    <TouchableOpacity
+                                        style={styles.emptyCta}
+                                        onPress={() => router.push('/wallet/add?type=expense')}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Plus size={14} color="#fff" />
+                                        <TextMalet style={styles.emptyCtaText}>Crear movimiento</TextMalet>
+                                    </TouchableOpacity>
+                                </View>
+                            )
+                        )}
+                    </View>
+
+                    {previewTransactions.length > 0 && (
+                        <View style={styles.viewAllWrapper}>
+                            <LinearGradient
+                                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,1)']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.viewAllGradient}
+                            />
+                            <TouchableOpacity onPress={handleViewAllTransactions} style={styles.viewAllChip}>
+                                <TextMalet style={styles.viewAllChipText}>Ver todas</TextMalet>
+                                <ArrowRight size={14} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    style={styles.shoppingEntry}
+                    onPress={() => router.push('/shopping-list' as any)}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.shoppingEntryLeft}>
+                        <View style={styles.shoppingEntryIcon}>
+                            <ShoppingCart size={18} color="#000" />
+                        </View>
+                        <View>
+                            <TextMalet style={styles.shoppingEntryTitle}>Lista de Compras</TextMalet>
+                            <TextMalet style={styles.shoppingEntrySubtitle}>Organiza tus compras</TextMalet>
+                        </View>
+                    </View>
+                    <ArrowRight size={16} color="rgba(0,0,0,0.38)" />
+                </TouchableOpacity>
 
             </View>
 
-            <View style={styles.viewAllTransactions}>
-                <Button text="Ver todas las transacciones" onPress={handleViewAllTransactions}
-                    style={{ width: '100%' }}
-                />
-            </View>
+            <TouchableOpacity onPress={() => router.push('/wallet/add?type=expense')} style={styles.fab}>
+                <Plus size={24} color="#fff" />
+            </TouchableOpacity>
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
             <UpdatesModal />
@@ -562,14 +728,6 @@ export default function Dashboard() {
 };
 
 const styles = StyleSheet.create({
-    viewAllButton: {
-        backgroundColor: '#007AFF',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     // ---- Tasas styles ----
     tasasContainer: {
         marginTop: 8,
@@ -619,11 +777,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#888',
         marginTop: 4,
-    },
-    viewAllButtonText: {
-        color: 'white',
-        fontWeight: '600',
-        fontSize: 16,
     },
     loadingContainer: {
         flex: 1,
@@ -690,29 +843,20 @@ const styles = StyleSheet.create({
         flexShrink: 1,
     },
     accountNumber: {
-        fontSize: 11,
+        fontSize: 5,
         fontWeight: '500',
         color: 'rgba(120, 120, 120, 0.8)',
         letterSpacing: 0.5,
     },
-    balanceCard: {
-        backgroundColor: 'rgb(250, 250, 250)',
-        borderRadius: 10,
-        padding: 8,
-        width: '100%',
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.08)',
+    balanceRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        alignSelf: 'flex-start',
+        gap: 8,
     },
     balanceValue: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1a1a1a', // Rich dark color
+        fontSize: DIGIT_H,
+        fontWeight: '700',
+        color: '#0f172a',
         letterSpacing: -0.5,
     },
     eyeButtonInner: {
@@ -733,28 +877,129 @@ const styles = StyleSheet.create({
     summaryText: {
         fontSize: 15,
     },
-    transactionsList: {
-        flex: 1,
+    transactionsContainer: {
         marginTop: 9,
-        flexGrow: 1,
+        position: 'relative',
+        minHeight: 210,
+    },
+    transactionsList: {
+        gap: 2,
+    },
+    viewAllWrapper: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 100,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingBottom: 12,
+    },
+    viewAllGradient: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    viewAllChip: {
+        backgroundColor: '#1a1a2e',
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    viewAllChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#fff',
     },
     listHeader: {
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 8,
     },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+        minHeight: 170,
+    },
     emptyListText: {
         textAlign: 'center',
-        marginTop: 20,
-        color: '#888',
+        fontSize: 14,
+        color: 'rgba(0,0,0,0.38)',
+        marginBottom: 16,
     },
-    viewAllTransactions: {
+    emptyCta: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 10,
-        paddingVertical: 15,
-        paddingHorizontal: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#ccc',
-        width: '100%',
-    }
+        gap: 6,
+        backgroundColor: '#1a1a2e',
+        paddingHorizontal: 16,
+        paddingVertical: 9,
+        borderRadius: 20,
+    },
+    emptyCtaText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 24,
+        right: 20,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#1a1a2e',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    shoppingEntry: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginHorizontal: 0,
+        marginTop: 4,
+        marginBottom: 8,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e8e8ec',
+        backgroundColor: '#fff',
+    },
+    shoppingEntryLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    shoppingEntryIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#d0d0d8',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    shoppingEntryTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.87)',
+    },
+    shoppingEntrySubtitle: {
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.38)',
+        marginTop: 1,
+    },
 });

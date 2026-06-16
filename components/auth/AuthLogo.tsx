@@ -4,20 +4,13 @@ import IconAt from "@/svgs/dashboard/IconAt";
 
 interface AuthLogoProps {
   logoScale: any;
-  pulseAnim: any;
-  logoRotation: any;
 }
 
-const AuthLogo = ({ logoScale, pulseAnim, logoRotation }: AuthLogoProps) => {
+const AuthLogo = ({ logoScale }: AuthLogoProps) => {
   return (
     <Animated.View style={[
       styles.logoContainer,
-      {
-        transform: [
-          { scale: Animated.multiply(logoScale, pulseAnim) },
-          { rotate: logoRotation },
-        ],
-      },
+      { transform: [{ scale: logoScale }] },
     ]}>
       <IconAt style={styles.logo} />
     </Animated.View>
@@ -26,11 +19,11 @@ const AuthLogo = ({ logoScale, pulseAnim, logoRotation }: AuthLogoProps) => {
 
 const styles = StyleSheet.create({
   logoContainer: {
-    marginBottom: 20,
+    alignSelf: 'flex-end',
   },
   logo: {
-    width: 70,
-    height: 70,
+    width: 44,
+    height: 44,
   },
 });
 

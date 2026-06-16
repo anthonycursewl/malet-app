@@ -1,6 +1,6 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import React, { memo } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardTypeOptions, TextInput, TouchableOpacity, View } from 'react-native';
 import { fieldStyles as styles } from './add.styles';
 import { THEME } from './theme';
 
@@ -13,6 +13,10 @@ interface InputFieldProps {
   error?: string;
   editable?: boolean;
   icon?: React.ReactNode;
+  secureTextEntry?: boolean;
+  rightIcon?: React.ReactNode;
+  onRightIconPress?: () => void;
+  keyboardType?: KeyboardTypeOptions;
 }
 
 export const InputField = memo(({
@@ -23,8 +27,26 @@ export const InputField = memo(({
   onPress,
   error,
   editable = true,
-  icon
+  icon,
+  secureTextEntry,
+  rightIcon,
+  onRightIconPress,
+  keyboardType,
 }: InputFieldProps) => {
+  const inputContent = (
+    <TextInput
+      style={styles.fieldInput}
+      placeholder={placeholder}
+      placeholderTextColor={THEME.textTertiary}
+      value={value}
+      onChangeText={onChangeText}
+      editable={editable}
+      selectionColor={THEME.accent}
+      secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType || 'default'}
+    />
+  );
+
   const content = (
     <View style={[
       styles.fieldContainer,
@@ -34,22 +56,23 @@ export const InputField = memo(({
       <TextMalet style={styles.fieldLabel}>{label}</TextMalet>
       <View style={styles.fieldRow}>
         {onPress ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}
+            onPress={onPress}
+            activeOpacity={0.7}
+          >
             {icon && icon}
             <TextMalet style={[styles.fieldValue, !value && styles.fieldPlaceholder]}>
               {value || placeholder}
             </TextMalet>
-          </View>
+          </TouchableOpacity>
         ) : (
-          <TextInput
-            style={styles.fieldInput}
-            placeholder={placeholder}
-            placeholderTextColor={THEME.textTertiary}
-            value={value}
-            onChangeText={onChangeText}
-            editable={editable}
-            selectionColor={THEME.accent}
-          />
+          inputContent
+        )}
+        {rightIcon && (
+          <TouchableOpacity onPress={onRightIconPress} activeOpacity={0.6} style={{ marginLeft: 8 }}>
+            {rightIcon}
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -57,11 +80,7 @@ export const InputField = memo(({
 
   return (
     <View style={styles.fieldWrapper}>
-      {onPress ? (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-          {content}
-        </TouchableOpacity>
-      ) : content}
+      {content}
       {error && <TextMalet style={styles.errorText}>{error}</TextMalet>}
     </View>
   );

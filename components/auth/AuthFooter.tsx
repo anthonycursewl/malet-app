@@ -1,10 +1,7 @@
-import React from 'react';
-import { Animated, StyleSheet, View, TouchableOpacity, Image, Alert } from 'react-native';
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import IconGoogle from "@/svgs/auth/IconGoogle";
-import IconWallet from "@/svgs/auth/IconWallet";
+import { router } from "expo-router";
+import { Alert, Animated, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface AuthFooterProps {
   footerOpacity: any;
@@ -32,8 +29,8 @@ const AuthFooter = ({ footerOpacity, request, onGoogleLogin }: AuthFooterProps) 
         >
           <View style={styles.brdIconContainer}>
             <Image
-              source={{ uri: 'https://bucket.breadriuss.com/brd/BRD_LOGO.webp' }}
-              style={{ width: 24, height: 24 }}
+              source={{ uri: 'https://bucket.breadriuss.com/brd/brd_lg_dark.webp' }}
+              style={{ width: 22, height: 22 }}
               resizeMode="contain"
             />
           </View>
@@ -55,25 +52,12 @@ const AuthFooter = ({ footerOpacity, request, onGoogleLogin }: AuthFooterProps) 
 
       <TouchableOpacity
         onPress={() => router.push('/auth/register')}
-        style={styles.registerButton}
-        activeOpacity={0.7}
+        activeOpacity={0.6}
       >
-        <LinearGradient
-          colors={['#f8fafc', '#f1f5f9']}
-          style={styles.registerButtonGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <IconWallet style={styles.registerIcon} />
-          <View>
-            <TextMalet style={styles.registerText}>
-              ¿No tienes cuenta?
-            </TextMalet>
-            <TextMalet style={styles.registerTextBold}>
-              Crea tu cuenta de Malet
-            </TextMalet>
-          </View>
-        </LinearGradient>
+        <TextMalet style={styles.registerText}>
+          ¿No tienes cuenta?{' '}
+          <TextMalet style={styles.registerTextBold}>Crear cuenta</TextMalet>
+        </TextMalet>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -147,33 +131,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
   },
-  registerButton: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  registerButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 14,
-  },
-  registerIcon: {
-    width: 28,
-    height: 28,
-  },
   registerText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#64748b',
+    textAlign: 'center',
   },
   registerTextBold: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1a1a1a',
-    marginTop: 2,
+    textDecorationLine: 'underline',
   },
 });
 

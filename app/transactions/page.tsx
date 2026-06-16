@@ -12,7 +12,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BadgeDollarSign, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useToastStore } from '@/shared/stores/useToastStore';
 
 export default function TransactionDetail() {
   const { transaction_id } = useLocalSearchParams();
@@ -87,80 +88,61 @@ export default function TransactionDetail() {
         message: `Comprobante de transacción Malet\n\nMonto: $${transaction.amount}\nFecha: ${formatDate(transaction.issued_at)}\nRef: ${transaction.id}`,
       });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo compartir la transacción');
+      useToastStore.getState().add({ type: 'error', message: 'No se pudo compartir la transacción' });
     }
   };
 
   const handleCopyId = async () => {
     await Clipboard.setStringAsync(transaction.index_id.toString());
-    Alert.alert('Copiado', `ID de transacción copiado al portapapeles`);
+    useToastStore.getState().add({ type: 'success', message: 'ID de transacción copiado al portapapeles' });
   };
 
 
-  const handleDelete = async () => {
-    Alert.alert('Eliminar', '¿Estás seguro de que deseas eliminar esta transacción?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          const success = await deleteTransaction(transaction.index_id.toString());
-          if (!success) {
-            Alert.alert('Error | Malet', 'No se ha podido eliminar la transacción.');
-            return;
-          }
-          Alert.alert('Eliminado | Malet', 'Transacción eliminada correctamente.');
-          getAllAccountsByUserId({ refresh: true });
-          router.back();
+  const handleDelete = () => {
+    const toastId = useToastStore.getState().add({
+      type: 'info',
+      message: '¿Eliminar esta transacción?',
+      duration: 0,
+      actionLabel: 'Eliminar',
+      onAction: async () => {
+        useToastStore.getState().update(toastId, { type: 'loading', message: 'Eliminando transacción...', actionLabel: undefined, onAction: undefined, duration: 0 });
+        const success = await deleteTransaction(transaction.index_id.toString());
+        if (!success) {
+          useToastStore.getState().update(toastId, { type: 'error', message: 'No se ha podido eliminar la transacción.', duration: 3000 });
+          return;
         }
-      }
-    ]);
+        useToastStore.getState().update(toastId, { type: 'success', message: 'Transacción eliminada correctamente.', duration: 2000 });
+        getAllAccountsByUserId({ refresh: true });
+        setTimeout(() => router.back(), 500);
+      },
+    });
   };
 
   const handleRestore = async () => {
-    Alert.alert('Restaurar', '¿Estás seguro de que deseas restaurar esta transacción?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Restaurar', style: 'default', onPress: () => { restoreTx() } }
-    ]);
-
-    const restoreTx = async () => {
-      const sucess = await restoreTransaction(transaction.index_id.toString());
-      if (!sucess) {
-        Alert.alert('Error | Malet', 'No se ha podido restaurar la transacción.');
-        return;
-      }
-      Alert.alert('Restaurado | Malet', 'Transacción restaurada correctamente.');
-      router.back();
+    const success = await restoreTransaction(transaction.index_id.toString());
+    if (!success) {
+      useToastStore.getState().add({ type: 'error', message: 'No se ha podido restaurar la transacción.' });
+      return;
     }
+    useToastStore.getState().add({ type: 'success', message: 'Transacción restaurada correctamente.' });
+    router.back();
   };
 
-  const handleComplete = (type: 'expense' | 'saving') => {
-    const title = type === 'expense' ? 'Marcar como Egreso' : 'Marcar como Ingreso';
-    const message = `¿Confirmas que deseas finalizar esta transacción y registrarla como un ${type === 'expense' ? 'egreso' : 'ingreso'}?`;
-
-    Alert.alert(title, message, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Confirmar',
-        style: 'default',
-        onPress: async () => {
-          setIsCompleting(true);
-          const success = await completePendingTransaction(transaction.id.toString(), type);
-          if (success) {
-            updateBalanceInMemory(
-              transaction.account_id,
-              parseFloat(transaction.amount),
-              type
-            );
-            getAllAccountsByUserId();
-            Alert.alert('Éxito', `Transacción marcada como ${type === 'expense' ? 'Egreso' : 'Ingreso'}`);
-          } else {
-            Alert.alert('Error', 'No se ha podido procesar el cambio en el servidor.');
-          }
-          setIsCompleting(false);
-        }
-      }
-    ]);
+  const handleComplete = async (type: 'expense' | 'saving') => {
+    setIsCompleting(true);
+    const success = await completePendingTransaction(transaction.id.toString(), type);
+    if (success) {
+      updateBalanceInMemory(
+        transaction.account_id,
+        parseFloat(transaction.amount),
+        type
+      );
+      getAllAccountsByUserId();
+      useToastStore.getState().add({ type: 'success', message: `Transacción marcada como ${type === 'expense' ? 'Egreso' : 'Ingreso'}` });
+    } else {
+      useToastStore.getState().add({ type: 'error', message: 'No se ha podido procesar el cambio en el servidor.' });
+    }
+    setIsCompleting(false);
   };
 
   return (

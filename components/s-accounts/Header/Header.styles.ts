@@ -5,18 +5,13 @@ export const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 24,
-        backgroundColor: '#fafbfc',
+        paddingTop: 16,
+        paddingBottom: 28,
     },
     backButton: {
         padding: 8,
         marginRight: 12,
         marginLeft: -8,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
     },
     headerTextContainer: {
         flex: 1,
@@ -24,12 +19,12 @@ export const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#111827',
+        color: '#2d1f5e',
         letterSpacing: -0.5,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#6b7280',
+        color: '#7a65a0',
         marginTop: 4,
     },
 });

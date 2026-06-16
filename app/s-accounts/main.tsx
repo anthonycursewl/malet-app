@@ -1,12 +1,47 @@
-import React from "react";
-import { FlatList, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Button from "@/components/Button/Button";
-import { useSAccounts } from "@/components/s-accounts/useSAccounts";
-import { Header } from "@/components/s-accounts/Header/Header";
-import { AccountCard } from "@/components/s-accounts/AccountCard/AccountCard";
-import { EmptyState } from "@/components/s-accounts/EmptyState/EmptyState";
-import { DetailsModal } from "@/components/s-accounts/DetailsModal/DetailsModal";
+import React, { memo, useEffect, useRef } from 'react';
+import { Animated, FlatList, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus } from 'lucide-react-native';
+import { ShimmerEffect } from '@/components/malet-ai/ShimmerEffect';
+import { useSAccounts } from '@/components/s-accounts/useSAccounts';
+import { Header } from '@/components/s-accounts/Header/Header';
+import { AccountCard } from '@/components/s-accounts/AccountCard/AccountCard';
+import { AccountCardSkeleton } from '@/components/s-accounts/AccountCard/AccountCardSkeleton';
+import { EmptyState } from '@/components/s-accounts/EmptyState/EmptyState';
+import { DetailsModal } from '@/components/s-accounts/DetailsModal/DetailsModal';
+
+const HeaderSkeleton = memo(() => {
+    const insets = useSafeAreaInsets();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+        }).start();
+    }, [fadeAnim]);
+
+    return (
+        <Animated.View style={[{ opacity: fadeAnim, paddingHorizontal: 20, paddingTop: insets.top + 16, paddingBottom: 28, backgroundColor: '#ede4ff' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <ShimmerEffect style={{ width: 38, height: 38, borderRadius: 12 }} />
+                <View style={{ flex: 1, gap: 6 }}>
+                    <ShimmerEffect style={{ width: 130, height: 20, borderRadius: 5 }} />
+                    <ShimmerEffect style={{ width: 160, height: 13, borderRadius: 3 }} />
+                </View>
+            </View>
+        </Animated.View>
+    );
+});
+
+const ListSkeleton = memo(() => (
+    <View style={{ padding: 20, paddingBottom: 40 }}>
+        {[0, 1, 2, 3, 4].map(i => (
+            <AccountCardSkeleton key={i} delay={i * 80} />
+        ))}
+    </View>
+));
 
 export default function SAccounts() {
     const {
@@ -25,8 +60,21 @@ export default function SAccounts() {
         handleEdit
     } = useSAccounts();
 
+    const isLoading = loading && sharedAccounts.length === 0;
+
+    if (isLoading) {
+        return (
+            <SafeAreaView edges={['bottom']} style={styles.container}>
+                <HeaderSkeleton />
+                <View style={styles.content}>
+                    <ListSkeleton />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView edges={['bottom']} style={styles.container}>
             <Header />
 
             <View style={styles.content}>
@@ -38,19 +86,15 @@ export default function SAccounts() {
                     )}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    refreshing={loading && sharedAccounts.length === 0}
+                    refreshing={loading}
                     onRefresh={loadAccounts}
-                    ListEmptyComponent={!loading ? <EmptyState /> : null}
+                    ListEmptyComponent={<EmptyState />}
                 />
             </View>
 
-            <View style={styles.footer}>
-                <Button
-                    text="Nueva S-Account"
-                    onPress={openCreateModal}
-                    style={styles.createButton}
-                />
-            </View>
+            <TouchableOpacity onPress={openCreateModal} style={styles.fab}>
+                <Plus size={24} color="#fff" />
+            </TouchableOpacity>
 
             <DetailsModal
                 visible={modalVisible}
@@ -78,17 +122,20 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingBottom: 40,
     },
-    footer: {
-        padding: 20,
-        backgroundColor: '#ffffff',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
-        paddingBottom: 30,
+    fab: {
+        position: 'absolute',
+        bottom: 24,
+        right: 20,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#1a1a2e',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 6,
     },
-    createButton: {
-        width: '100%',
-        minHeight: 52,
-        borderRadius: 12,
-    }
 });
-

@@ -3,6 +3,7 @@ import { useWalletStore } from '../shared/stores/useWalletStore';
 import { useAccountStore } from '../shared/stores/useAccountStore';
 import { useAuthStore } from '../shared/stores/useAuthStore';
 import { useAppStore } from '../shared/stores/useAppStore';
+import { ToastProvider } from './Toast/ToastProvider';
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { logoutWallet } = useWalletStore();
@@ -20,5 +21,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [setState, logoutWallet, logoutAccount, logoutAuth]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ToastProvider />
+    </>
+  );
 }

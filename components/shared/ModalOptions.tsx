@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -33,6 +34,8 @@ export default function ModalOptions({
   isOnTop = false,
   heightRatio = DEFAULT_HEIGHT_RATIO,
 }: ModalOptionsProps) {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   // Compute the resolved height once based on the prop.
   // If the value is <= 1 we treat it as a ratio, otherwise as fixed pixels.
   const modalHeight = useMemo(
@@ -41,7 +44,8 @@ export default function ModalOptions({
   );
 
   const [isModalRendered, setIsModalRendered] = useState(visible);
-  const translateY = useRef(new Animated.Value(modalHeight)).current;
+  const slideAnim = useRef(new Animated.Value(modalHeight)).current;
+  const kbAnim = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   // Keep a ref so the PanResponder always reads the latest height without re-creating.
@@ -49,12 +53,42 @@ export default function ModalOptions({
   modalHeightRef.current = modalHeight;
 
   useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      Animated.timing(kbAnim, {
+        toValue: -e.endCoordinates.height,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => {
+      setKeyboardHeight(0);
+      Animated.timing(kbAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Reset keyboard height when modal visibility changes
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+      kbAnim.setValue(0);
+    }
+  }, [visible]);
+
+  useEffect(() => {
     if (visible) {
-      // Reset translateY to the current height before animating in
-      translateY.setValue(modalHeightRef.current);
+      slideAnim.setValue(modalHeightRef.current);
       setIsModalRendered(true);
       Animated.parallel([
-        Animated.spring(translateY, {
+        Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
           bounciness: 5,
@@ -67,7 +101,7 @@ export default function ModalOptions({
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(translateY, {
+        Animated.timing(slideAnim, {
           toValue: modalHeightRef.current,
           duration: 250,
           useNativeDriver: true,
@@ -91,14 +125,14 @@ export default function ModalOptions({
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
+          slideAnim.setValue(gestureState.dy);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 110) {
           onClose();
         } else {
-          Animated.spring(translateY, {
+          Animated.spring(slideAnim, {
             toValue: 0,
             useNativeDriver: true,
             bounciness: 5,
@@ -123,8 +157,8 @@ export default function ModalOptions({
 
   const animatedStyles = {
     modal: {
-      transform: [{ translateY }],
-    } as Animated.WithAnimatedObject<ViewStyle>,
+      transform: [{ translateY: Animated.add(slideAnim, kbAnim) }],
+    } as unknown as Animated.WithAnimatedObject<ViewStyle>,
     backdrop: {
       opacity,
     } as Animated.WithAnimatedObject<ViewStyle>,
@@ -141,15 +175,11 @@ export default function ModalOptions({
       animationType="none"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View style={[styles.backdrop, animatedStyles.backdrop, !isOnTop && { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]} />
-      </TouchableWithoutFeedback>
+      <View style={styles.root}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <Animated.View style={[StyleSheet.absoluteFill, animatedStyles.backdrop, styles.backdrop, !isOnTop && { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]} />
+        </TouchableWithoutFeedback>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardAvoidingView}
-        pointerEvents="box-none"
-      >
         <Animated.View
           style={[modalStyle, animatedStyles.modal]}
         >
@@ -158,20 +188,27 @@ export default function ModalOptions({
           </View>
 
           <View style={styles.content}>
-            {children}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={{ flex: 1 }}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : undefined}
+            >
+              {children}
+            </KeyboardAvoidingView>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    ...StyleSheet.absoluteFillObject,
+  root: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modal: {
     position: 'absolute',

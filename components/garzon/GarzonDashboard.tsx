@@ -1,7 +1,7 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { DashboardData } from '@/shared/interfaces/garzon.interfaces';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, InteractionManager, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import GarzonLoadingSkeleton from './GarzonLoadingSkeleton';
 import TopPagosCard from './TopPagosCard';
 import TopProductosCard from './TopProductosCard';
@@ -127,8 +127,7 @@ const GarzonDashboard = memo(({ data, fetchedAt, onRefresh, isLoading }: GarzonD
 
     // Wait for navigation animation to complete before doing heavy work
     useEffect(() => {
-        const interactionPromise = InteractionManager.runAfterInteractions(() => {
-            console.log('[DEBUG] InteractionManager - Navigation complete, setting isReady');
+        requestAnimationFrame(() => {
             setIsReady(true);
             // Animate tabs entry
             Animated.timing(tabEntryAnim, {

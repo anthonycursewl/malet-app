@@ -32,7 +32,8 @@ export default function GetAllTransaction() {
         showSkeleton,
         toggleBalanceHidden,
         setModalVisible,
-        setFilterModalVisible,
+        openFilterModal,
+        closeFilterModal,
         setDatePickerType,
         handleOpenModal,
         handleCloseModal,
@@ -63,7 +64,7 @@ export default function GetAllTransaction() {
                             isBalanceHidden={isBalanceHidden}
                             hasActiveFilters={hasActiveFilters}
                             toggleBalanceHidden={toggleBalanceHidden}
-                            setFilterModalVisible={setFilterModalVisible}
+                            setFilterModalVisible={openFilterModal}
                         />
 
                         <TagList
@@ -134,7 +135,7 @@ export default function GetAllTransaction() {
 
             <FilterModal
                 visible={filterModalVisible}
-                onClose={() => setFilterModalVisible(false)}
+                onClose={closeFilterModal}
                 filterTypes={filterTypes}
                 hasActiveFilters={hasActiveFilters}
                 startDate={startDate}

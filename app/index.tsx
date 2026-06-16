@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -16,13 +15,12 @@ import AuthActions from "@/components/auth/AuthActions";
 import AuthBackground from "@/components/auth/AuthBackground";
 import AuthFooter from "@/components/auth/AuthFooter";
 import AuthForm from "@/components/auth/AuthForm";
-import AuthHeader from "@/components/auth/AuthHeader";
 import AuthLogo from "@/components/auth/AuthLogo";
+import NeuralMatrix from "@/components/auth/NeuralMatrix";
 
 export default function Index() {
   const {
     logoScale,
-    logoRotation,
     titleOpacity,
     titleTranslateY,
     subtitleOpacity,
@@ -32,7 +30,6 @@ export default function Index() {
     buttonOpacity,
     buttonScale,
     footerOpacity,
-    pulseAnim,
   } = useLoginAnimations();
 
   const {
@@ -59,18 +56,10 @@ export default function Index() {
             style={styles.keyboardView}
           >
             <View style={styles.content}>
-              <AuthLogo
-                logoScale={logoScale}
-                pulseAnim={pulseAnim}
-                logoRotation={logoRotation}
-              />
-
-              <AuthHeader
-                titleOpacity={titleOpacity}
-                titleTranslateY={titleTranslateY}
-                subtitleOpacity={subtitleOpacity}
-                subtitleTranslateY={subtitleTranslateY}
-              />
+              <View style={styles.topRow}>
+                <NeuralMatrix />
+                <AuthLogo logoScale={logoScale} />
+              </View>
 
               <AuthForm
                 formOpacity={formOpacity}
@@ -119,7 +108,13 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 24,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 20,
+    marginBottom: 32,
   },
 });

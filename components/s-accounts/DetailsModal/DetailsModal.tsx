@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
-import { Plus, Share2, Phone, Mail } from 'lucide-react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Plus, Share2, Phone, Mail, CreditCard, User } from 'lucide-react-native';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import Button from '@/components/Button/Button';
 import Input from '@/components/Input/Input';
@@ -20,52 +20,51 @@ interface DetailsModalProps {
 }
 
 export const DetailsModal = ({
-    visible,
-    onClose,
-    account,
-    shareAmount,
-    onShareAmountChange,
-    onShare,
-    onDelete,
-    onEdit,
+    visible, onClose, account, shareAmount,
+    onShareAmountChange, onShare, onDelete, onEdit,
 }: DetailsModalProps) => {
     if (!account) return null;
 
     return (
-        <ModalOptions
-            visible={visible}
-            onClose={onClose}
-            heightRatio={0.75}
-        >
+        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.85}>
             <View style={styles.container}>
                 <View style={styles.modalHeader}>
-                    <TextMalet style={styles.modalTitle}>Detalles de S-Account</TextMalet>
+                    <TextMalet style={styles.modalTitle}>Detalles</TextMalet>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Plus size={20} color="#111827" style={{ transform: [{ rotate: '45deg' }] }} />
+                        <Plus size={20} color="#6b7280" style={{ transform: [{ rotate: '45deg' }] }} />
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.contentGroup}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                     {/* Name block */}
                     <View style={styles.nameSection}>
+                        <View style={styles.nameIcon}>
+                            <User size={24} color="#e0e0ec" />
+                        </View>
                         <View style={styles.nameInfo}>
-                            <TextMalet style={styles.label}>Titular / Nombre</TextMalet>
+                            <TextMalet style={styles.label}>Titular</TextMalet>
                             <TextMalet style={styles.nameValue}>{account.name}</TextMalet>
                         </View>
                         <TouchableOpacity onPress={onShare} style={styles.shareButton}>
-                            <Share2 size={20} color="#111827" />
+                            <Share2 size={18} color="#4a4a6a" />
                         </TouchableOpacity>
                     </View>
 
                     {/* Identifiers block */}
                     <View style={styles.rowFlex}>
                         <View style={styles.flex1}>
+                            <View style={styles.detailRowIcon}>
+                                <CreditCard size={16} color="#6b7280" />
+                            </View>
                             <TextMalet style={styles.label}>ID de Cuenta</TextMalet>
                             <TextMalet style={account.account_id ? styles.value : styles.valueMuted}>
                                 {account.account_id || 'No proporcionado'}
                             </TextMalet>
                         </View>
                         <View style={styles.flex1}>
+                            <View style={styles.detailRowIcon}>
+                                <User size={16} color="#6b7280" />
+                            </View>
                             <TextMalet style={styles.label}>Doc. Identidad</TextMalet>
                             <TextMalet style={styles.value}>{account.identification_number}</TextMalet>
                         </View>
@@ -74,7 +73,6 @@ export const DetailsModal = ({
                     {/* Contact block */}
                     {(account.phone_associated || account.email_associated) && (
                         <View style={styles.contactSection}>
-                            <TextMalet style={styles.label}>Vías de Contacto</TextMalet>
                             <View style={styles.contactPillsWrapper}>
                                 {account.phone_associated && (
                                     <View style={styles.contactPill}>
@@ -102,28 +100,17 @@ export const DetailsModal = ({
                             keyboardType="numeric"
                             style={styles.input}
                         />
-                        <Button
-                            text="Compartir Datos"
-                            onPress={onShare}
-                            style={styles.shareButtonFull}
-                        />
+                        <Button text="Compartir Datos" onPress={onShare} style={styles.shareButtonFull} />
                     </View>
-                </View>
 
-                {/* Footer Actions */}
-                <View style={styles.footerActions}>
-                    <TouchableOpacity
-                        onPress={() => onDelete(account.id)}
-                        style={styles.deleteButton}
-                    >
-                        <TextMalet style={styles.deleteText}>Eliminar</TextMalet>
-                    </TouchableOpacity>
-                    <Button
-                        text="Editar"
-                        onPress={onEdit}
-                        style={styles.editButton}
-                    />
-                </View>
+                    {/* Footer Actions */}
+                    <View style={styles.footerActions}>
+                        <TouchableOpacity onPress={() => onDelete(account.id)} style={styles.deleteButton}>
+                            <TextMalet style={styles.deleteText}>Eliminar</TextMalet>
+                        </TouchableOpacity>
+                        <Button text="Editar" onPress={onEdit} style={styles.editButton} />
+                    </View>
+                </ScrollView>
             </View>
         </ModalOptions>
     );

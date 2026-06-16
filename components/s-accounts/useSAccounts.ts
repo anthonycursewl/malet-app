@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Alert, Share } from 'react-native';
+import { Share } from 'react-native';
 import { router } from 'expo-router';
 import { useSharedAccountStore } from '@/shared/stores/useSharedAccountStore';
+import { useToastStore } from '@/shared/stores/useToastStore';
 import { SharedAccount } from '@/shared/entities/SharedAccount';
 
 export const useSAccounts = () => {
@@ -34,21 +35,21 @@ export const useSAccounts = () => {
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert(
-            "Eliminar Cuenta Compartida",
-            "¿Estás seguro de que deseas eliminar esta cuenta? Se enviará a la papelera.",
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Eliminar",
-                    style: "destructive",
-                    onPress: async () => {
-                        await deleteSharedAccount(id);
-                        setModalVisible(false);
-                    }
+        const toastId = useToastStore.getState().add({
+            type: 'info',
+            message: '¿Eliminar cuenta compartida?',
+            actionLabel: 'Eliminar',
+            onAction: async () => {
+                useToastStore.getState().update(toastId, { type: 'loading', message: 'Eliminando...', actionLabel: undefined });
+                const success = await deleteSharedAccount(id);
+                if (success) {
+                    useToastStore.getState().update(toastId, { type: 'success', message: 'Cuenta eliminada', duration: 2000, actionLabel: undefined });
+                } else {
+                    useToastStore.getState().update(toastId, { type: 'error', message: 'Error al eliminar', duration: 3000, actionLabel: undefined });
                 }
-            ]
-        );
+                setModalVisible(false);
+            },
+        });
     };
 
     const handleShare = async () => {

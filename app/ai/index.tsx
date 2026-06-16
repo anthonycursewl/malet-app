@@ -24,7 +24,6 @@ import {
     Animated,
     FlatList,
     Image,
-    InteractionManager,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
@@ -109,7 +108,7 @@ Sé conciso pero útil en tus respuestas.`,
     }, []);
 
     useEffect(() => {
-        const interactionPromise = InteractionManager.runAfterInteractions(() => {
+        requestAnimationFrame(() => {
             setIsReady(true);
             Animated.timing(contentFadeAnim, {
                 toValue: 1,

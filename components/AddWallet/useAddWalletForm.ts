@@ -10,6 +10,7 @@ import { SuccessData } from './SuccessScreen';
 import { FormDataType, FormErrors } from './types';
 import SoundManager from '@/utils/soundManager';
 import { usePreferencesStore } from '@/shared/stores/usePreferencesStore';
+import { useToastStore } from '@/shared/stores/useToastStore';
 
 export function useAddWalletForm() {
   const { type } = useGlobalSearchParams();
@@ -188,6 +189,11 @@ export function useAddWalletForm() {
   const handleNextStep1 = useCallback(() => {
     if (!formData.amount || parseFloat(formData.amount.replace(',', '.')) <= 0) {
       setErrors(prev => ({ ...prev, amount: 'Ingresa un monto válido' }));
+      useToastStore.getState().add({
+        type: 'error',
+        message: 'Ingresa un **monto válido** para continuar',
+        duration: 2500,
+      });
       return;
     }
     setStep(2);
