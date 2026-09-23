@@ -1,4 +1,5 @@
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
+import UpdatesModal from "@/components/Modals/UpdatesModal/UpdatesModal";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
@@ -77,11 +78,13 @@ const OptionBlock = ({
 };
 
 export default function ProfileView() {
-    const { user, logout } = useAuthStore();
-    const { logoutAccount } = useAccountStore();
-    const { logoutWallet } = useWalletStore();
+    const user = useAuthStore(s => s.user);
+    const logout = useAuthStore(s => s.logout);
+    const logoutAccount = useAccountStore(s => s.logoutAccount);
+    const logoutWallet = useWalletStore(s => s.logoutWallet);
 
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [updatesVisible, setUpdatesVisible] = useState(false);
 
     const handleLogoutApp = useCallback(async () => {
         setIsLoggingOut(true);
@@ -130,6 +133,41 @@ export default function ProfileView() {
                 title: "Integraciones",
                 subtitle: "Apps conectadas",
                 onPress: () => router.push("/profile/integrations"),
+            },
+            {
+                id: "ai",
+                icon: "message-circle" as const,
+                title: "Malet AI",
+                subtitle: "Asistente financiero",
+                onPress: () => router.push("/ai" as any),
+            },
+            {
+                id: "calculator",
+                icon: "hash" as const,
+                title: "Calculadora",
+                subtitle: "Conversor USD / BS",
+                onPress: () => router.push("/calculator" as any),
+            },
+            {
+                id: "garzon",
+                icon: "grid" as const,
+                title: "Garzón",
+                subtitle: "Dashboard de ventas",
+                onPress: () => router.push("/garzon" as any),
+            },
+            {
+                id: "garzon-wallet",
+                icon: "credit-card" as const,
+                title: "Wallet Garzón",
+                subtitle: "Tus wallets y tokens",
+                onPress: () => router.push("/garzon/wallet" as any),
+            },
+            {
+                id: "updates",
+                icon: "bell" as const,
+                title: "Novedades",
+                subtitle: "Últimas actualizaciones",
+                onPress: () => setUpdatesVisible(true),
             },
             {
                 id: "settings",
@@ -259,6 +297,8 @@ export default function ProfileView() {
                     <ActivityIndicator size="small" color="#0f172a" />
                 </View>
             )}
+
+            <UpdatesModal visible={updatesVisible} onClose={() => setUpdatesVisible(false)} />
         </LayoutAuthenticated>
     );
 }

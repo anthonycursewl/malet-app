@@ -4,7 +4,7 @@ import IconArrow from '@/svgs/dashboard/IconArrow';
 import IconAt from '@/svgs/dashboard/IconAt';
 import IconReload from '@/svgs/dashboard/IconReload';
 import { router } from 'expo-router';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FEF2F2',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 8,
+        borderRadius: 22,
     },
     logoutText: {
         fontSize: 12,

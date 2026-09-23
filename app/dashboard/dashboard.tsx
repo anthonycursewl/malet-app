@@ -6,14 +6,19 @@ import TextMalet from "@/components/TextMalet/TextMalet";
 import { parseDate } from "@/shared/services/date/parseDate";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
+import { useTagStore } from "@/shared/stores/useTagStore";
+import { useToastStore } from "@/shared/stores/useToastStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
+import { useAnalyticsStore } from "@/shared/stores/useAnalyticsStore";
+import { useSharedAccountStore } from "@/shared/stores/useSharedAccountStore";
 import IconArrow from "@/svgs/dashboard/IconArrow";
 import IconAt from "@/svgs/dashboard/IconAt";
-import IconMinus from "@/svgs/dashboard/IconMinus";
-import IconPlus from "@/svgs/dashboard/IconPlus";
+import IconVerified from "@/svgs/common/IconVerified";
+import { VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
-import { Link, router } from "expo-router";
+import { BlurView } from "expo-blur";
+import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,7 +26,7 @@ import Svg, { Circle, Defs, Line, Path, Pattern, Rect, Stop, LinearGradient as S
 
 // lucide icon 
 import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
-import { ArrowRight, Layers, Plus, ShoppingCart, TrendingUp, Wallet } from 'lucide-react-native';
+import { ArrowRight, Layers, Plus, ShoppingCart, TrendingDown, TrendingUp, Wallet } from 'lucide-react-native';
 
 const SHOW_S_ACCOUNTS_NEW_TAG = (() => {
     const releaseDate = new Date('2026-02-26');
@@ -147,8 +152,8 @@ const loadingStyles = StyleSheet.create({
     }
 });
 
-const DIGIT_H = 26;
-const DIGIT_W = 15;
+const DIGIT_H = 34;
+const DIGIT_W = 17;
 
 const DigitColumn = memo(({ digit }: { digit: number }) => {
     const anim = useRef(new Animated.Value(digit)).current;
@@ -321,7 +326,8 @@ const BalanceSection = memo((({
     accountNumber,
     accountCurrency,
     isBalanceHidden,
-    onToggleHidden
+    onToggleHidden,
+    onAddTransaction
 }: {
     balance: string,
     onOpenModal: () => void,
@@ -329,33 +335,81 @@ const BalanceSection = memo((({
     accountNumber: string,
     accountCurrency: string,
     isBalanceHidden: boolean,
-    onToggleHidden: () => void
+    onToggleHidden: () => void,
+    onAddTransaction: () => void
 }) => {
     const maskedAccountNumber = accountNumber.slice(0, 4) + ' ***';
     const displayBalance = isBalanceHidden ? '***.*****' : balance;
 
+    // Animación: shimmer tipo "Pensando..." de la IA (gradiente que barre el texto de izquierda a derecha cada 1.5s)
+    const shimmerAnim = useRef(new Animated.Value(0)).current;
+    const enterAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.timing(shimmerAnim, {
+                toValue: 1,
+                duration: 1500,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            })
+        ).start();
+
+        Animated.timing(enterAnim, { toValue: 1, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }, [shimmerAnim, enterAnim]);
+
+    const shimmerTranslate = shimmerAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-320, 320],
+    });
+
     return (
         <View style={styles.balanceSection}>
-            <View style={styles.balanceContainer}>
-                <TouchableOpacity
-                    onPress={onOpenModal}
-                    style={styles.accountHeader}
-                >
-                    <View style={styles.accountInfo}>
-                        <TextMalet style={styles.accountName} numberOfLines={1} ellipsizeMode="tail">
-                            {accountName}
-                        </TextMalet>
-                        <TextMalet style={styles.accountNumber}>
-                            {maskedAccountNumber}
-                        </TextMalet>
-                    </View>
-                    <IconArrow width={12} height={12} />
-                </TouchableOpacity>
+            <TouchableOpacity
+                onPress={onOpenModal}
+                style={styles.accountHeader}
+                activeOpacity={0.7}
+            >
+                <TextMalet style={styles.accountName} numberOfLines={1} ellipsizeMode="tail">
+                    {accountName}
+                </TextMalet>
+                <View style={styles.accountNumberRow}>
+                    <TextMalet style={styles.accountNumber}>
+                        {maskedAccountNumber}
+                    </TextMalet>
+                    <IconArrow width={10} height={10} />
+                </View>
+            </TouchableOpacity>
 
-                <View style={styles.balanceRow}>
-                    <Image source={{ uri: getCurrencyIcon(accountCurrency) }} style={{ width: 22, height: 22 }} />
-                    <TouchableOpacity onPress={onOpenModal} style={{ flexShrink: 1 }}>
-                        <RollingNumber value={displayBalance} />
+            <View style={styles.balanceRow}>
+                <Animated.View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        opacity: enterAnim,
+                        transform: [{ translateY: enterAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+                    }}
+                >
+                    <TouchableOpacity onPress={onAddTransaction} style={styles.balanceMain} activeOpacity={0.7}>
+                        <View style={styles.balanceShimmerWrap}>
+                            <View style={styles.balanceShimmerContent}>
+                                <Image source={{ uri: getCurrencyIcon(accountCurrency) }} style={{ width: 24, height: 24 }} />
+                                <RollingNumber value={displayBalance} />
+                            </View>
+                            {/* Shimmer: brillo blanco que barre el bloque (icono + números + USD) */}
+                            <Animated.View
+                                pointerEvents="none"
+                                style={[styles.balanceShimmerOverlay, { transform: [{ translateX: shimmerTranslate }] }]}
+                            >
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={StyleSheet.absoluteFill}
+                                />
+                            </Animated.View>
+                        </View>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onToggleHidden} style={styles.eyeButtonInner}>
                         {isBalanceHidden ? (
@@ -364,37 +418,50 @@ const BalanceSection = memo((({
                             <Feather name="eye" size={20} color="#94a3b8" />
                         )}
                     </TouchableOpacity>
-                </View>
-            </View>
-            <View style={styles.actionsContainer}>
-                <Link push href='/wallet/add?type=expense'>
-                    <IconMinus width={40} height={40} fill={'rgb(255, 114, 114)'} />
-                </Link>
-                <Link push href='/wallet/add?type=saving'>
-                    <IconPlus width={45} height={45} fill={'rgb(38, 219, 93)'} />
-                </Link>
+                </Animated.View>
             </View>
         </View>
     );
 }));
 
 export default function Dashboard() {
-    const { user, verifySession } = useAuthStore();
-    const { previewTransactions, getPreviewTransactions, error, loading, tasas, getTasas } = useWalletStore();
-    const { selectedAccount, isBalanceHidden, toggleBalanceHidden } = useAccountStore();
+    const user = useAuthStore(s => s.user);
+    const verifySession = useAuthStore(s => s.verifySession);
+    const previewTransactions = useWalletStore(s => s.previewTransactions);
+    const getPreviewTransactions = useWalletStore(s => s.getPreviewTransactions);
+    const error = useWalletStore(s => s.error);
+    const loading = useWalletStore(s => s.loading);
+    const tasas = useWalletStore(s => s.tasas);
+    const getTasas = useWalletStore(s => s.getTasas);
+    const selectedAccount = useAccountStore(s => s.selectedAccount);
+    const isBalanceHidden = useAccountStore(s => s.isBalanceHidden);
+    const toggleBalanceHidden = useAccountStore(s => s.toggleBalanceHidden);
+    const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
+    const loadTags = useTagStore(s => s.loadTags);
+    const analyticsSummary = useAnalyticsStore(s => s.summary);
+    const analyticsLoading = useAnalyticsStore(s => s.loadingSummary);
+    const fetchAnalyticsSummary = useAnalyticsStore(s => s.fetchSummary);
+    const sharedAccounts = useSharedAccountStore(s => s.sharedAccounts);
+    const getSharedAccounts = useSharedAccountStore(s => s.getSharedAccounts);
 
     const [loadingSession, setLoadingSession] = useState(false);
     const [modalAccountsVisible, setModalAccountsVisible] = useState(false);
     // Index for carousel of tasas
     const [currentTasaIndex, setCurrentTasaIndex] = useState(0);
+    // Track if analytics has been fetched at least once
+    const [analyticsFetched, setAnalyticsFetched] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const logoFadeAnim = useRef(new Animated.Value(0)).current;
     const modalAccountsRef = useRef<ModalAccountsRef>(null);
     // Animated value for fading tasa text on change
     const fadeTasaAnim = useRef(new Animated.Value(1)).current;
+    // Slide animation for tasa card
+    const slideTasaAnim = useRef(new Animated.Value(0)).current;
     // Low-speed background animation for the rates card
     const tasaBgAnim = useRef(new Animated.Value(0)).current;
+    // Sticky header opacity
+    const stickyHeaderOpacity = useRef(new Animated.Value(0)).current;
 
     const startAnimation = useCallback(() => {
         Animated.timing(fadeAnim, {
@@ -479,7 +546,42 @@ export default function Dashboard() {
     useEffect(() => {
         loadTransactions();
         loadTasas();
-    }, [loadTransactions, loadTasas]);
+        getSharedAccounts();
+    }, [loadTransactions, loadTasas, getSharedAccounts]);
+
+    useEffect(() => {
+        if (!selectedAccount?.id) return;
+        setAnalyticsFetched(false);
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        useAnalyticsStore.setState({ summary: null, loadingSummary: true });
+        fetchAnalyticsSummary({
+            account_id: selectedAccount.id,
+            from: monthStart,
+            to: monthEnd,
+        }).then(() => {
+            setAnalyticsFetched(true);
+        });
+    }, [selectedAccount?.id, fetchAnalyticsSummary]);
+
+    useEffect(() => {
+        const sync = async () => {
+            useToastStore.getState().add({
+                type: 'info',
+                message: 'Sincronizando datos...',
+                duration: 2000,
+            });
+            await Promise.allSettled([
+                getAllAccountsByUserId({ refresh: true }),
+                loadTags(),
+            ]);
+        };
+        sync();
+    }, [getAllAccountsByUserId, loadTags]);
 
     // Carousel effect: change displayed tasa every 10 seconds
     useEffect(() => {
@@ -490,20 +592,15 @@ export default function Dashboard() {
         return () => clearInterval(interval);
     }, [tasas]);
 
-    // Fade animation when the displayed tasa changes
+    // Slide animation when the displayed tasa changes
     useEffect(() => {
-        Animated.sequence([
-            Animated.timing(fadeTasaAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(fadeTasaAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        slideTasaAnim.setValue(0);
+        Animated.spring(slideTasaAnim, {
+            toValue: 1,
+            friction: 8,
+            tension: 40,
+            useNativeDriver: true,
+        }).start();
     }, [currentTasaIndex]);
 
     useEffect(() => {
@@ -528,13 +625,68 @@ export default function Dashboard() {
         }
     }, [error]);
 
+    const HEADER_SHOW_THRESHOLD = 80;
+    const [showStickyHeader, setShowStickyHeader] = useState(false);
+
+    const handleScroll = useCallback((e: any) => {
+        const y = e.nativeEvent.contentOffset.y;
+        const shouldShow = y > HEADER_SHOW_THRESHOLD;
+        setShowStickyHeader(shouldShow);
+        stickyHeaderOpacity.setValue(y);
+    }, []);
+
     if (loadingSession) {
         return <LoadingScreen fadeAnim={fadeAnim} logoFadeAnim={logoFadeAnim} />;
     }
 
+    const stickyOpacity = stickyHeaderOpacity.interpolate({
+        inputRange: [HEADER_SHOW_THRESHOLD - 10, HEADER_SHOW_THRESHOLD + 10],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+    });
+
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <View style={styles.container}>
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            {/* Sticky header with blur - appears on scroll */}
+            <Animated.View style={[styles.stickyHeaderOverlay, { opacity: stickyOpacity }]} pointerEvents={showStickyHeader ? 'auto' : 'none'}>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.85)' }]} />
+                <BlurView intensity={80} tint="systemChromeMaterialLight" style={StyleSheet.absoluteFill} />
+                <SafeAreaView style={{ flex: 0, backgroundColor: 'transparent' }}>
+                    <View style={styles.stickyHeaderContent}>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+                                <TextMalet style={{ fontSize: 15, fontWeight: '600', color: 'rgba(0,0,0,0.85)' }} numberOfLines={1} ellipsizeMode="tail">
+                                    {user?.name || ''}
+                                </TextMalet>
+                                {user?.verified && user.verification_type && (
+                                    <IconVerified width={18} height={18} fill={VERIFICATION_TYPES[user.verification_type.type]?.color || '#6366f1'} />
+                                )}
+                            </View>
+                            <TextMalet style={{ color: 'rgba(116, 116, 116, 1)', fontSize: 13, marginTop: 1 }}>
+                                @{user?.username || ''}
+                            </TextMalet>
+                        </View>
+                        <TouchableOpacity onPress={() => router.push('/profile')}>
+                            <Image
+                                source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/placeholders/placeholder_avatar.png')}
+                                style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#f0f0f0' }}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </Animated.View>
+
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+            >
+                {/* Spacer for status bar */}
+                <View style={{ height: 16 }} />
+
+                {/* Original header - visible at top, hidden when scrolling */}
                 <DashboardHeader name={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url} username={user.username} />
 
                 <BalanceSection
@@ -545,6 +697,7 @@ export default function Dashboard() {
                     accountCurrency={selectedAccount?.currency || 'USD'}
                     isBalanceHidden={isBalanceHidden}
                     onToggleHidden={toggleBalanceHidden}
+                    onAddTransaction={() => router.push('/wallet/add')}
                 />
 
                 {/* Tasas de Cambio Section */}
@@ -621,6 +774,22 @@ export default function Dashboard() {
                             </LinearGradient>
                             </View>
 
+                            <TouchableOpacity onPress={() => router.push('/calculator' as any)} style={{ width: 170, height: TICKET_H + 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                                <View style={{ width: '100%', height: TICKET_H, borderRadius: 10, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#d8d8e0', padding: 14, justifyContent: 'center', overflow: 'hidden' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 1 }}>
+                                        <IconAt width={18} height={18} fill="#64748b" />
+                                        <View>
+                                            <TextMalet style={{ fontSize: 14, fontWeight: '700', color: '#1a1a2e', letterSpacing: -0.2 }}>
+                                                Calculadora
+                                            </TextMalet>
+                                            <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
+                                                Conversor
+                                            </TextMalet>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+
                             <TouchableOpacity onPress={() => router.push('/s-accounts/main')} style={{ width: 170, height: TICKET_H + 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
                                 <View style={{ width: '100%', height: TICKET_H, borderRadius: 10, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#d8d8e0', padding: 14, justifyContent: 'center', overflow: 'hidden' }}>
                                     {/* Hex pattern texture */}
@@ -643,6 +812,22 @@ export default function Dashboard() {
                                             </TextMalet>
                                             <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
                                                 Shared
+                                            </TextMalet>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push('/analytics')} style={{ width: 170, height: TICKET_H + 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                                <View style={{ width: '100%', height: TICKET_H, borderRadius: 10, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#d8d8e0', padding: 14, justifyContent: 'center', overflow: 'hidden' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 1 }}>
+                                        <TrendingUp size={18} color="#1e88e5" />
+                                        <View>
+                                            <TextMalet style={{ fontSize: 14, fontWeight: '700', color: '#1a1a2e', letterSpacing: -0.2 }}>
+                                                Analíticas
+                                            </TextMalet>
+                                            <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
+                                                Stats
                                             </TextMalet>
                                         </View>
                                     </View>
@@ -698,6 +883,96 @@ export default function Dashboard() {
                     )}
                 </View>
 
+                {/* Analytics Widget */}
+                <TouchableOpacity
+                    onPress={() => router.push('/analytics')}
+                    activeOpacity={0.7}
+                    style={styles.analyticsWidget}
+                >
+                    <View style={styles.analyticsWidgetHeader}>
+                        <View style={styles.analyticsWidgetTitleRow}>
+                            <TrendingUp size={14} color="rgba(0,0,0,0.55)" />
+                            <TextMalet style={styles.analyticsWidgetTitle}>Resumen mensual</TextMalet>
+                        </View>
+                        <ArrowRight size={14} color="rgba(0,0,0,0.3)" />
+                    </View>
+
+                    {!analyticsFetched ? (
+                        <View style={styles.analyticsWidgetMetrics}>
+                            <View style={styles.analyticsMetric}>
+                                <View style={styles.skeletonMiniLabel} />
+                                <View style={styles.skeletonMiniValue} />
+                            </View>
+                            <View style={styles.analyticsDivider} />
+                            <View style={styles.analyticsMetric}>
+                                <View style={styles.skeletonMiniLabel} />
+                                <View style={styles.skeletonMiniValue} />
+                            </View>
+                        </View>
+                    ) : analyticsSummary ? (
+                        <>
+                            <View style={styles.analyticsWidgetMetrics}>
+                                <View style={styles.analyticsMetric}>
+                                    <TextMalet style={[styles.analyticsMetricLabel, { color: '#ef4444' }]}>Egreso</TextMalet>
+                                    <TextMalet style={[styles.analyticsMetricValue, { color: '#ef4444' }]}>
+                                        ${analyticsSummary.total_spent.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </TextMalet>
+                                </View>
+                                <View style={styles.analyticsDivider} />
+                                <View style={styles.analyticsMetric}>
+                                    <TextMalet style={[styles.analyticsMetricLabel, { color: '#22c55e' }]}>Ingreso</TextMalet>
+                                    <TextMalet style={[styles.analyticsMetricValue, { color: '#22c55e' }]}>
+                                        ${analyticsSummary.total_saved.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </TextMalet>
+                                </View>
+                            </View>
+
+                            {analyticsSummary.by_type.length > 0 && (
+                                <View style={styles.analyticsTypeBar}>
+                                    {analyticsSummary.by_type.map((t, i) => {
+                                        const total = analyticsSummary.total_spent + analyticsSummary.total_saved;
+                                        const pct = total > 0 ? (t.total / total) * 100 : 0;
+                                        if (pct <= 0) return null;
+                                        const isFirst = i === 0;
+                                        const isLast = i === analyticsSummary.by_type.length - 1;
+
+                                        let barColors: [string, string];
+                                        if (t.type === 'saving') {
+                                            barColors = ['#86efac', '#22c55e'];
+                                        } else if (t.type === 'pending_payment') {
+                                            barColors = ['#fde68a', '#f59e0b'];
+                                        } else {
+                                            barColors = ['#fca5a5', '#ef4444'];
+                                        }
+
+                                        return (
+                                            <LinearGradient
+                                                key={t.type}
+                                                colors={barColors}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                                style={[
+                                                    styles.analyticsTypeSegment,
+                                                    { flex: pct },
+                                                    isFirst && isLast && { borderRadius: 10 },
+                                                    isFirst && !isLast && { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 },
+                                                    !isFirst && isLast && { borderTopRightRadius: 10, borderBottomRightRadius: 10 },
+                                                ]}
+                                            />
+                                        );
+                                    })}
+                                </View>
+                            )}
+                        </>
+                    ) : (
+                        <View style={styles.analyticsWidgetMetrics}>
+                            <View style={styles.analyticsMetric}>
+                                <TextMalet style={styles.analyticsMetricLabel}>Sin datos este mes</TextMalet>
+                            </View>
+                        </View>
+                    )}
+                </TouchableOpacity>
+
                 <TouchableOpacity
                     style={styles.shoppingEntry}
                     onPress={() => router.push('/shopping-list' as any)}
@@ -715,7 +990,126 @@ export default function Dashboard() {
                     <ArrowRight size={16} color="rgba(0,0,0,0.38)" />
                 </TouchableOpacity>
 
-            </View>
+                {/* S-Accounts Widget */}
+                {sharedAccounts.length > 0 && (
+                    <TouchableOpacity
+                        onPress={() => router.push('/s-accounts/main')}
+                        activeOpacity={0.7}
+                        style={styles.sAccountsWidget}
+                    >
+                        <View style={styles.sAccountsWidgetHeader}>
+                            <View style={styles.sAccountsWidgetTitleRow}>
+                                <Wallet size={14} color="rgba(0,0,0,0.55)" />
+                                <TextMalet style={styles.sAccountsWidgetTitle}>S-Accounts</TextMalet>
+                                <View style={styles.sAccountsBadge}>
+                                    <TextMalet style={styles.sAccountsBadgeText}>{sharedAccounts.length}</TextMalet>
+                                </View>
+                            </View>
+                            <ArrowRight size={14} color="rgba(0,0,0,0.3)" />
+                        </View>
+
+                        <View style={styles.sAccountsList}>
+                            {sharedAccounts.slice(0, 3).map((account) => (
+                                <View key={account.id} style={styles.sAccountRow}>
+                                    <View style={styles.sAccountAvatar}>
+                                        <TextMalet style={styles.sAccountInitial}>
+                                            {account.name.charAt(0).toUpperCase()}
+                                        </TextMalet>
+                                    </View>
+                                    <View style={styles.sAccountInfo}>
+                                        <TextMalet style={styles.sAccountName} numberOfLines={1}>
+                                            {account.name}
+                                        </TextMalet>
+                                        <TextMalet style={styles.sAccountId} numberOfLines={1}>
+                                            {account.identification_number}
+                                        </TextMalet>
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+
+                        {sharedAccounts.length > 3 && (
+                            <TextMalet style={styles.sAccountsMore}>
+                                +{sharedAccounts.length - 3} más
+                            </TextMalet>
+                        )}
+                    </TouchableOpacity>
+                )}
+
+                {/* Tasas Widget */}
+                {tasas && tasas.length > 0 && (
+                    <View style={styles.tasasWidget}>
+                        <View style={styles.tasasWidgetHeader}>
+                            <View style={styles.tasasWidgetTitleRow}>
+                                <Layers size={14} color="rgba(0,0,0,0.55)" />
+                                <TextMalet style={styles.tasasWidgetTitle}>Tasas de Cambio</TextMalet>
+                            </View>
+                            <View style={styles.tasasWidgetDots}>
+                                {tasas.map((_, i) => (
+                                    <Animated.View
+                                        key={i}
+                                        style={[
+                                            styles.tasasDot,
+                                            i === currentTasaIndex && styles.tasasDotActive,
+                                        ]}
+                                    />
+                                ))}
+                            </View>
+                        </View>
+
+                        <Animated.View style={{
+                            opacity: slideTasaAnim,
+                            transform: [{
+                                translateX: slideTasaAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [30, 0],
+                                }),
+                            }],
+                        }}>
+                            <View style={styles.tasasWidgetContent}>
+                                <View style={styles.tasasWidgetItem}>
+                                    <View style={styles.tasasWidgetItemHeader}>
+                                        <TextMalet style={styles.tasasWidgetItemName}>
+                                            {tasas[currentTasaIndex]?.nombre}
+                                        </TextMalet>
+                                        <View style={styles.tasasWidgetActiveBadge}>
+                                            <TextMalet style={styles.tasasWidgetActiveBadgeText}>●</TextMalet>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.tasasWidgetItemPrices}>
+                                        <View style={styles.tasasWidgetItemPrice}>
+                                            <TextMalet style={styles.tasasWidgetItemPriceLabel}>Compra</TextMalet>
+                                            <TextMalet style={styles.tasasWidgetItemPriceValue}>
+                                                {tasas[currentTasaIndex]?.compra != null ? `Bs ${tasas[currentTasaIndex].compra.toFixed(2)}` : '—'}
+                                            </TextMalet>
+                                        </View>
+                                        <View style={styles.tasasWidgetItemDivider} />
+                                        <View style={styles.tasasWidgetItemPrice}>
+                                            <TextMalet style={styles.tasasWidgetItemPriceLabel}>Venta</TextMalet>
+                                            <TextMalet style={styles.tasasWidgetItemPriceValueHighlight}>
+                                                {tasas[currentTasaIndex]?.venta != null ? `Bs ${tasas[currentTasaIndex].venta.toFixed(2)}` : '—'}
+                                            </TextMalet>
+                                        </View>
+                                    </View>
+
+                                    <TextMalet style={styles.tasasWidgetItemUpdated}>
+                                        {parseDate(tasas[currentTasaIndex]?.fechaActualizacion).split(',')[0]}
+                                    </TextMalet>
+                                </View>
+                            </View>
+                        </Animated.View>
+
+                        <View style={styles.tasasWidgetFooter}>
+                            <TextMalet style={styles.tasasWidgetFooterText}>
+                                1 USD = Bs {tasas[currentTasaIndex]?.promedio?.toFixed(2) || '—'}
+                            </TextMalet>
+                        </View>
+                    </View>
+                )}
+
+                <View style={{ height: 80 }} />
+            </ScrollView>
 
             <TouchableOpacity onPress={() => router.push('/wallet/add?type=expense')} style={styles.fab}>
                 <Plus size={24} color="#fff" />
@@ -723,14 +1117,13 @@ export default function Dashboard() {
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
             <UpdatesModal />
-        </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     // ---- Tasas styles ----
     tasasContainer: {
-        marginTop: 8,
     },
     tasasHeader: {
         fontSize: 14,
@@ -796,6 +1189,27 @@ const styles = StyleSheet.create({
         padding: 12,
         paddingBottom: 0
     },
+    stickyHeaderOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        overflow: 'hidden',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.06)',
+    },
+    stickyHeaderContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    scrollContent: {
+        padding: 12,
+        gap: 16,
+    },
     headerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -815,35 +1229,31 @@ const styles = StyleSheet.create({
     },
     balanceSection: {
         marginTop: 10,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        gap: 10,
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 12,
     },
     balanceContainer: {
         flex: 1,
         gap: 6,
     },
     accountHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 6,
-        width: '100%',
-    },
-    accountInfo: {
-        flex: 1,
-        flexDirection: 'row',
         alignItems: 'center',
         gap: 2,
     },
     accountName: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: '600',
         color: 'rgba(60, 60, 60, 1)',
-        flexShrink: 1,
+        textAlign: 'center',
+    },
+    accountNumberRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
     accountNumber: {
-        fontSize: 5,
+        fontSize: 11,
         fontWeight: '500',
         color: 'rgba(120, 120, 120, 0.8)',
         letterSpacing: 0.5,
@@ -851,7 +1261,29 @@ const styles = StyleSheet.create({
     balanceRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        justifyContent: 'center',
+        gap: 10,
+    },
+    balanceShimmerWrap: {
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    balanceShimmerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    balanceShimmerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: 180,
+    },
+    balanceMain: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
     balanceValue: {
         fontSize: DIGIT_H,
@@ -861,11 +1293,6 @@ const styles = StyleSheet.create({
     },
     eyeButtonInner: {
         padding: 4,
-    },
-    actionsContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
     },
     summaryBox: {
         gap: 5,
@@ -878,7 +1305,6 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     transactionsContainer: {
-        marginTop: 9,
         position: 'relative',
         minHeight: 210,
     },
@@ -977,6 +1403,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#e8e8ec',
         backgroundColor: '#fff',
+        minHeight: 72,
     },
     shoppingEntryLeft: {
         flexDirection: 'row',
@@ -1001,5 +1428,277 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(0,0,0,0.38)',
         marginTop: 1,
+    },
+    analyticsWidget: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+        minHeight: 110,
+        justifyContent: 'center',
+    },
+    analyticsWidgetHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    analyticsWidgetTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    analyticsWidgetTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.87)',
+    },
+    analyticsWidgetMetrics: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    analyticsMetric: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    analyticsMetricLabel: {
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.4)',
+        fontWeight: '500',
+    },
+    analyticsMetricValue: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.8)',
+        marginLeft: 'auto',
+    },
+    analyticsDivider: {
+        width: 1,
+        height: 16,
+        backgroundColor: 'rgba(0,0,0,0.08)',
+        marginHorizontal: 10,
+    },
+    analyticsTypeBar: {
+        flexDirection: 'row',
+        height: 8,
+        borderRadius: 10,
+        overflow: 'hidden',
+        marginTop: 14,
+        backgroundColor: 'rgba(0,0,0,0.04)',
+    },
+    analyticsTypeSegment: {
+        height: '100%',
+    },
+    skeletonMiniLabel: {
+        width: 50,
+        height: 10,
+        borderRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+    },
+    skeletonMiniValue: {
+        width: 70,
+        height: 13,
+        borderRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+        marginLeft: 'auto',
+    },
+    sAccountsWidget: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+    },
+    sAccountsWidgetHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    sAccountsWidgetTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    sAccountsWidgetTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.87)',
+    },
+    sAccountsBadge: {
+        backgroundColor: 'rgba(0,0,0,0.07)',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    sAccountsBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.5)',
+    },
+    sAccountsList: {
+        gap: 10,
+    },
+    sAccountRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    sAccountAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    sAccountInitial: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.45)',
+    },
+    sAccountInfo: {
+        flex: 1,
+        gap: 1,
+    },
+    sAccountName: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: 'rgba(0,0,0,0.8)',
+    },
+    sAccountId: {
+        fontSize: 11,
+        color: 'rgba(0,0,0,0.35)',
+    },
+    sAccountsMore: {
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.35)',
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    tasasWidget: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
+    },
+    tasasWidgetHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    tasasWidgetTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    tasasWidgetTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.85)',
+    },
+    tasasWidgetDots: {
+        flexDirection: 'row',
+        gap: 5,
+    },
+    tasasDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(0,0,0,0.1)',
+    },
+    tasasDotActive: {
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        width: 18,
+    },
+    tasasWidgetContent: {
+        marginBottom: 12,
+    },
+    tasasWidgetItem: {
+        backgroundColor: 'rgba(0,0,0,0.025)',
+        borderRadius: 12,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.04)',
+    },
+    tasasWidgetItemActive: {
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        borderColor: 'rgba(0,0,0,0.08)',
+    },
+    tasasWidgetItemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    tasasWidgetItemName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.7)',
+        flex: 1,
+    },
+    tasasWidgetActiveBadge: {
+        marginLeft: 4,
+    },
+    tasasWidgetActiveBadgeText: {
+        fontSize: 8,
+        color: '#1a1a1a',
+    },
+    tasasWidgetItemPrices: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 10,
+    },
+    tasasWidgetItemPrice: {
+        flex: 1,
+    },
+    tasasWidgetItemPriceLabel: {
+        fontSize: 11,
+        color: 'rgba(0,0,0,0.4)',
+        fontWeight: '500',
+        marginBottom: 3,
+    },
+    tasasWidgetItemPriceValue: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.85)',
+        letterSpacing: -0.3,
+    },
+    tasasWidgetItemPriceValueHighlight: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1a1a1a',
+        letterSpacing: -0.3,
+    },
+    tasasWidgetItemDivider: {
+        width: 1,
+        height: 28,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+    },
+    tasasWidgetItemUpdated: {
+        fontSize: 10,
+        color: 'rgba(0,0,0,0.3)',
+    },
+    tasasWidgetFooter: {
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
+        alignItems: 'center',
+    },
+    tasasWidgetFooterText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.5)',
     },
 });

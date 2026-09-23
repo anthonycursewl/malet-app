@@ -10,7 +10,7 @@ import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 const PLACEHOLDER_AVATAR_URL = require('@/assets/images/placeholders/placeholder_avatar.png');
 
 const CommunitiesHeader = memo((): React.ReactElement => {
-    const { user } = useAuthStore();
+    const user = useAuthStore(s => s.user);
 
     return (
         <View style={styles.container}>

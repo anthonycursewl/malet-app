@@ -69,7 +69,7 @@ const COMMUNITIES = [
 ];
 
 export default function CommunitiesScreen() {
-    const { user } = useAuthStore();
+    const user = useAuthStore(s => s.user);
     const [activeTab, setActiveTab] = useState<'home' | 'messages' | 'options'>('home');
 
     // Split data into two columns for masonry effect

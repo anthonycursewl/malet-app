@@ -15,6 +15,8 @@ import {
 } from "@/components/malet-ai";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { useAIChat } from "@/shared/hooks/useAIChat";
+import { sendFeedback } from "@/shared/services/ai/ai.service";
+import { useToastStore } from "@/shared/stores/useToastStore";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -40,6 +42,7 @@ export default function AIAgentScreen() {
     const [showWelcome, setShowWelcome] = useState(true);
     const [lastNewMessageId, setLastNewMessageId] = useState<string | null>(null);
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+    const addToast = useToastStore(s => s.add);
 
     const flatListRef = useRef<FlatList>(null);
     const contentFadeAnim = useRef(new Animated.Value(0)).current;
@@ -108,7 +111,7 @@ Sé conciso pero útil en tus respuestas.`,
     }, []);
 
     useEffect(() => {
-        requestAnimationFrame(() => {
+        const raf = requestAnimationFrame(() => {
             setIsReady(true);
             Animated.timing(contentFadeAnim, {
                 toValue: 1,
@@ -117,7 +120,7 @@ Sé conciso pero útil en tus respuestas.`,
             }).start();
         });
 
-        return () => interactionPromise.cancel();
+        return () => cancelAnimationFrame(raf);
     }, [contentFadeAnim]);
 
     const handleSendMessage = useCallback(async () => {
@@ -157,9 +160,23 @@ Sé conciso pero útil en tus respuestas.`,
         setInputText(text);
     }, []);
 
-    const handleFeedback = useCallback((messageId: string, type: 'like' | 'dislike') => {
-        console.log('Feedback:', messageId, type);
-    }, []);
+    const handleFeedback = useCallback(async (messageId: string, type: 'like' | 'dislike') => {
+        try {
+            await sendFeedback(messageId, type);
+            addToast({
+                type: 'success',
+                message: type === 'like' ? 'Gracias por tu valoración' : 'Gracias por tu reporte',
+                duration: 2500,
+            });
+        } catch (error) {
+            console.error('Error sending feedback:', error);
+            addToast({
+                type: 'error',
+                message: 'No se pudo enviar tu valoración',
+                duration: 2500,
+            });
+        }
+    }, [addToast]);
 
     const renderMessage = useCallback(({ item, index }: { item: Message; index: number }) => (
         <MessageBubble
@@ -192,7 +209,7 @@ Sé conciso pero útil en tus respuestas.`,
 
     return (
         <View style={styles.mainContainer}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <StatusBar backgroundColor="transparent" barStyle="light-content" />
 
             {/* Banner Image with gradient overlay */}
             <View style={styles.bannerContainer}>

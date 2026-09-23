@@ -4,11 +4,10 @@ import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconVerified from "@/svgs/common/IconVerified";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { memo, useCallback, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Button from "../Button/Button";
 import ModalOptions from "../shared/ModalOptions";
-import { DashboardOptions } from "./DashboardOptions/DashboardOptions";
 
 const PLACEHOLDER_AVATAR = require("@/assets/images/placeholders/placeholder_avatar.png");
 const PLACEHOLDER_BANNER = require("@/assets/images/placeholders/placeholder_banner.png");
@@ -91,12 +90,11 @@ interface DashboardHeaderProps {
     userAvatar?: string | null;
     userBanner?: string | null;
     username: string;
-    showOptions?: boolean;
 }
 
-const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOptions = true }: DashboardHeaderProps) => {
+const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: DashboardHeaderProps) => {
     const { width } = Dimensions.get('window');
-    const { user } = useAuthStore();
+    const user = useAuthStore(s => s.user);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [verificationModal, setVerificationModal] = useState(false);
 
@@ -117,9 +115,9 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
     }, [verificationModal]);
 
     return (
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 2 }}>
             {userBanner && (
-                <View style={[StyleSheet.absoluteFill, { height: 160, top: -40, marginHorizontal: -20, zIndex: -1 }]}>
+                <View style={[StyleSheet.absoluteFill, { height: 200, top: -80, marginHorizontal: -20, zIndex: -1 }]}>
                     <Image
                         source={{ uri: userBanner }}
                         style={{ width: '100%', height: '100%', opacity: 0.4 }}
@@ -134,7 +132,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
                 </View>
             )}
 
-            <View style={{ paddingBottom: 7, paddingTop: 5, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ paddingBottom: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                         <TextMalet style={styles.headerText} numberOfLines={1}>
@@ -153,7 +151,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
                         </View>
                     </View>
 
-                    <View style={{ marginTop: 2 }}>
+                    <View style={{ marginTop: 0 }}>
                         <TextMalet style={{ color: 'rgba(116, 116, 116, 1)', fontSize: 13 }}>@{getTruncatedName(username)}</TextMalet>
                     </View>
                 </View>
@@ -165,10 +163,6 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username, showOpti
                     />
                 </TouchableOpacity>
             </View>
-
-            {showOptions && (
-                <DashboardOptions styles={styles} />
-            )}
 
             {verification && (
                 <ModalOptions visible={showVerificationModal} onClose={() => setShowVerificationModal(false)}>

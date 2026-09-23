@@ -17,8 +17,12 @@ import { router, useLocalSearchParams } from "expo-router";
 
 export default function EditAccount() {
     const { accountId } = useLocalSearchParams<{ accountId: string }>();
-    const { user } = useAuthStore();
-    const { updateAccount, deleteAccount, loading, error, accounts } = useAccountStore();
+    const user = useAuthStore(s => s.user);
+    const updateAccount = useAccountStore(s => s.updateAccount);
+    const deleteAccount = useAccountStore(s => s.deleteAccount);
+    const loading = useAccountStore(s => s.loading);
+    const error = useAccountStore(s => s.error);
+    const accounts = useAccountStore(s => s.accounts);
     const [modalCurrencyOpen, setModalCurrencyOpen] = useState(false);
 
     const [balanceInput, setBalanceInput] = useState('');

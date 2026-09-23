@@ -34,7 +34,7 @@ export function useAddWalletForm() {
   const [formData, setFormData] = useState<FormDataType>({
     name: '',
     amount: '',
-    type: type as 'expense' | 'saving' | 'pending_payment',
+    type: (type as 'expense' | 'saving' | 'pending_payment') || 'expense',
     account_id: selectedAccount?.id || '',
     tag_ids: [],
   });

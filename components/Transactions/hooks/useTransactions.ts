@@ -3,27 +3,23 @@ import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Animated, InteractionManager, Platform } from 'react-native';
+import { Alert, Animated, Platform } from 'react-native';
 
 export function useTransactions() {
-    const { user } = useAuthStore();
+    const user = useAuthStore(s => s.user);
     const [firstMount, setFirstMount] = useState(true);
     const [isReady, setIsReady] = useState(false);
-    const {
-        getHistoryTransactions,
-        loading: loadingWallet,
-        transactions,
-        paginationTransactions,
-    } = useWalletStore();
+    const getHistoryTransactions = useWalletStore(s => s.getHistoryTransactions);
+    const loadingWallet = useWalletStore(s => s.loading);
+    const transactions = useWalletStore(s => s.transactions);
+    const paginationTransactions = useWalletStore(s => s.paginationTransactions);
 
-    const {
-        accounts,
-        error,
-        getAllAccountsByUserId,
-        selectedAccount,
-        isBalanceHidden,
-        toggleBalanceHidden
-    } = useAccountStore();
+    const accounts = useAccountStore(s => s.accounts);
+    const error = useAccountStore(s => s.error);
+    const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
+    const selectedAccount = useAccountStore(s => s.selectedAccount);
+    const isBalanceHidden = useAccountStore(s => s.isBalanceHidden);
+    const toggleBalanceHidden = useAccountStore(s => s.toggleBalanceHidden);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -105,11 +101,9 @@ export function useTransactions() {
     }, [loadingWallet, paginationTransactions.isEnd, selectedAccount?.id, user.id, getHistoryTransactions, debouncedTags]);
 
     useEffect(() => {
-        const interactionPromise = InteractionManager.runAfterInteractions(() => {
-            setIsReady(true);
-        });
+        const id = requestIdleCallback ? requestIdleCallback(() => setIsReady(true), { timeout: 500 }) : setTimeout(() => setIsReady(true), 50);
         return () => {
-            interactionPromise.cancel();
+            if (requestIdleCallback) cancelIdleCallback(id); else clearTimeout(id);
             useWalletStore.setState({ transactions: [], paginationTransactions: { cursor: null, take: 10, isEnd: false } });
         };
     }, []);

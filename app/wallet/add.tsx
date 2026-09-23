@@ -5,7 +5,7 @@ import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect } from 'react';
-import { Animated, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, TouchableOpacity, View } from 'react-native';
+import { Animated, FlatList, Image, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -26,6 +26,33 @@ import {
 } from '@/components/AddWallet';
 import { usePreferencesStore } from '@/shared/stores/usePreferencesStore';
 import SoundManager from '@/utils/soundManager';
+
+const accountChipStyles = StyleSheet.create({
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+  },
+  icon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+});
 
 export default function AddWallet() {
   const {
@@ -55,7 +82,7 @@ export default function AddWallet() {
 
   return (
     <View style={layoutStyles.container}>
-      <StatusBar translucent backgroundColor="transparent" />
+      <StatusBar backgroundColor="transparent" />
 
       <LinearGradient
         colors={gradientColors}
@@ -77,6 +104,15 @@ export default function AddWallet() {
               {/* ── Step 1: Monto ─────────────────────────── */}
               <Animated.View style={{ opacity: step1Opacity, transform: [{ translateY: step1TranslateY }], display: step === 1 ? 'flex' : 'none', paddingHorizontal: 20 }}>
                 <AmountInput amount={formData.amount} onChangeAmount={(v) => handleInputChange('amount', v)} error={errors.amount} />
+                {selectedAccount && (
+                  <View style={accountChipStyles.chip}>
+                    <Image
+                      source={{ uri: getCurrencyIcon(selectedAccount.currency) }}
+                      style={accountChipStyles.icon}
+                    />
+                    <TextMalet style={accountChipStyles.text} numberOfLines={1}>{selectedAccount.name}</TextMalet>
+                  </View>
+                )}
                 <View style={{ marginTop: 24 }}>
                   <TypeSelector type={formData.type} onTypeChange={handleTypeChange} />
                 </View>

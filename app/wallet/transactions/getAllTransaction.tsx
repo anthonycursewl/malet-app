@@ -2,8 +2,12 @@ import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import LastTransactions from "@/components/dashboard/LastTransactions";
-import React from "react";
-import { Animated, FlatList, StyleSheet, View } from 'react-native';
+import { FlashList } from "@shopify/flash-list";
+import { router } from "expo-router";
+import { Plus } from 'lucide-react-native';
+import { Animated, StyleSheet, View } from 'react-native';
+
+import Button from "@/components/Button/Button";
 
 import { EmptyAccountState } from "@/components/Transactions/EmptyAccountState";
 import { FilterModal } from "@/components/Transactions/FilterModal";
@@ -72,6 +76,15 @@ export default function GetAllTransaction() {
                             onToggleTag={onToggleTag}
                         />
 
+                        <View style={styles.addButtonContainer}>
+                            <Button
+                                text="Nueva transacción"
+                                onPress={() => router.push('/wallet/add?type=expense')}
+                                icon={<Plus size={18} color="#f4f4f5" />}
+                                style={styles.addButton}
+                            />
+                        </View>
+
                         {isFiltering ? (
                             <View style={{ paddingHorizontal: 16 }}>
                                 {Array.from({ length: 9 }).map((_, i) => (
@@ -81,13 +94,13 @@ export default function GetAllTransaction() {
                         ) : (
                             <Animated.View style={[styles.listWrapper, { opacity: contentFadeAnim }]}>
                                 {selectedAccount ? (
-                                    <FlatList
-                                        key={`transactions-${selectedAccount.id}`}
-                                        data={transactions}
-                                        keyExtractor={(item) => item.id.toString()}
-                                        renderItem={({ item }) => <LastTransactions item={item} />}
+                                    <FlashList
+                                        data={transactions as any}
+                                        keyExtractor={(item: any) => item.id.toString()}
+                                        renderItem={({ item }: any) => <LastTransactions item={item} />}
                                         showsVerticalScrollIndicator={false}
-                                        style={styles.transactionsList}
+                                        contentContainerStyle={styles.transactionsList}
+                                        style={{ flex: 1 }}
                                         ListEmptyComponent={
                                             !loadingWallet ? (
                                                 <TextMalet style={styles.emptyListText}>
@@ -107,10 +120,6 @@ export default function GetAllTransaction() {
                                         refreshing={loadingWallet && transactions.length === 0 && !isFiltering}
                                         onEndReached={handleEndReached}
                                         onEndReachedThreshold={0.4}
-                                        initialNumToRender={8}
-                                        maxToRenderPerBatch={8}
-                                        windowSize={5}
-                                        removeClippedSubviews={true}
                                     />
                                 ) : (
                                     <EmptyAccountState />
@@ -151,6 +160,7 @@ export default function GetAllTransaction() {
                 setEndDate={setEndDate}
                 applyFilters={applyFilters}
             />
+
         </View>
     );
 }
@@ -169,7 +179,6 @@ const styles = StyleSheet.create({
         marginTop: -10,
     },
     transactionsList: {
-        flex: 1,
         paddingHorizontal: 16,
     },
     emptyListText: {
@@ -180,7 +189,13 @@ const styles = StyleSheet.create({
     footerSkeleton: {
         paddingHorizontal: 0,
         paddingBottom: 10,
-        height: 180,
         overflow: 'hidden'
-    }
+    },
+    addButtonContainer: {
+        paddingHorizontal: 16,
+        marginBottom: 20,
+    },
+    addButton: {
+        width: '100%',
+    },
 });

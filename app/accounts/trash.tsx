@@ -9,7 +9,10 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { ActivityIndicator, Alert, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function TrashAccounts() {
-    const { deletedAccounts, getDeletedAccounts, restoreAccount, loading } = useAccountStore();
+    const deletedAccounts = useAccountStore(s => s.deletedAccounts);
+    const getDeletedAccounts = useAccountStore(s => s.getDeletedAccounts);
+    const restoreAccount = useAccountStore(s => s.restoreAccount);
+    const loading = useAccountStore(s => s.loading);
 
     useEffect(() => {
         getDeletedAccounts({ refresh: true });

@@ -6,42 +6,32 @@ import IconAt from '@/svgs/dashboard/IconAt';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Modal, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Animated, Easing, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const UPDATES_VERSION_KEY = '@malet_updates_version';
 
-export default function UpdatesModal() {
+interface UpdatesModalProps {
+    /** Modo controlado: fuerza la visibilidad del modal */
+    visible?: boolean;
+    /** Se llama al cerrar en modo controlado */
+    onClose?: () => void;
+}
+
+export default function UpdatesModal({ visible, onClose }: UpdatesModalProps = {}) {
     const [isVisible, setIsVisible] = useState(false);
     const [currentUpdate, setCurrentUpdate] = useState<AppUpdate | null>(null);
+
+    // Modo controlado: la visibilidad viene de las props
+    const isControlled = visible !== undefined;
+    const shown = isControlled ? !!visible : isVisible;
 
     // Animations
     const [fadeAnim] = useState(new Animated.Value(0));
     const [translateY] = useState(new Animated.Value(50));
 
-    useEffect(() => {
-        checkUpdates();
-    }, []);
-
-    const checkUpdates = async () => {
-        try {
-            const storedVersion = await AsyncStorage.getItem(UPDATES_VERSION_KEY);
-
-            // If no version stored, or stored version is older than latest
-            if (!storedVersion || storedVersion !== LATEST_APP_VERSION) {
-                const updateInfo = APP_UPDATES.find(u => u.version === LATEST_APP_VERSION);
-                if (updateInfo) {
-                    setCurrentUpdate(updateInfo);
-                    setIsVisible(true);
-                    startEntryAnimation();
-                }
-            }
-        } catch (e) {
-            console.error('Error checking update version inside UpdatesModal', e);
-        }
-    };
-
-    const startEntryAnimation = () => {
+    const startEntryAnimation = useCallback(() => {
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
@@ -55,7 +45,42 @@ export default function UpdatesModal() {
                 useNativeDriver: true,
             })
         ]).start();
-    };
+    }, [fadeAnim, translateY]);
+
+    const checkUpdates = useCallback(async () => {
+        try {
+            const storedVersion = await AsyncStorage.getItem(UPDATES_VERSION_KEY);
+
+            // Modo controlado: siempre mostrar el changelog (el usuario lo pidió explícitamente)
+            if (isControlled) {
+                const updateInfo = APP_UPDATES.find(u => u.version === LATEST_APP_VERSION);
+                if (updateInfo) {
+                    setCurrentUpdate(updateInfo);
+                    if (visible) {
+                        setIsVisible(true);
+                        startEntryAnimation();
+                    }
+                }
+                return;
+            }
+
+            // If no version stored, or stored version is older than latest
+            if (!storedVersion || storedVersion !== LATEST_APP_VERSION) {
+                const updateInfo = APP_UPDATES.find(u => u.version === LATEST_APP_VERSION);
+                if (updateInfo) {
+                    setCurrentUpdate(updateInfo);
+                    setIsVisible(true);
+                    startEntryAnimation();
+                }
+            }
+        } catch (e) {
+            console.error('Error checking update version inside UpdatesModal', e);
+        }
+    }, [isControlled, visible, startEntryAnimation]);
+
+    useEffect(() => {
+        checkUpdates();
+    }, [checkUpdates]);
 
     const handleDismiss = async () => {
         Animated.parallel([
@@ -71,6 +96,10 @@ export default function UpdatesModal() {
             })
         ]).start(async () => {
             setIsVisible(false);
+            if (isControlled) {
+                onClose?.();
+                return;
+            }
             try {
                 await AsyncStorage.setItem(UPDATES_VERSION_KEY, LATEST_APP_VERSION);
             } catch (e) {
@@ -83,7 +112,7 @@ export default function UpdatesModal() {
 
     return (
         <Modal
-            visible={isVisible}
+            visible={shown}
             animationType="none"
             transparent={true}
             statusBarTranslucent

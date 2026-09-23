@@ -1,6 +1,6 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { VentasTienda } from '@/shared/interfaces/garzon.interfaces';
-import React, { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // URLs de banderas
@@ -42,7 +42,7 @@ const TiendaItem = memo(({
     const progressWidth = (subtotal / maxSubtotal) * 100;
 
     // Colores según posición
-    const progressColor = index === 0 ? '#10B981' : index === 1 ? '#3B82F6' : index === 2 ? '#8B5CF6' : '#94A3B8';
+    const progressColor = index === 0 ? '#74c9ac' : index === 1 ? '#3B82F6' : index === 2 ? '#8B5CF6' : '#94A3B8';
 
     return (
         <View style={styles.tiendaItem}>
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 6,
+        borderRadius: 22,
     },
     sortButtonText: {
         fontSize: 12,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rankBadgeFirst: {
-        backgroundColor: '#D1FAE5',
+        backgroundColor: '#d6fde9',
     },
     rankText: {
         fontSize: 12,

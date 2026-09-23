@@ -1,28 +1,54 @@
 import { InputField } from "@/components/AddWallet/InputField";
+import Button from "@/components/Button/Button";
 import ModalOptions from "@/components/shared/ModalOptions";
 import TextMalet from "@/components/TextMalet/TextMalet";
 import { currencies } from "@/shared/entities/Currencies";
 import { ShoppingItem } from "@/shared/entities/ShoppingItem";
+import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useShoppingListStore } from "@/shared/stores/useShoppingListStore";
+import { useToastStore } from "@/shared/stores/useToastStore";
+import { FlashList } from "@shopify/flash-list";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Plus, Trash2 } from "lucide-react-native";
+import { Plus, Receipt, Trash2 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, FlatList, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Animated, Dimensions, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const currencyMap = new Map(currencies.map(c => [c.name, c]));
 
 export default function ShoppingListScreen() {
-    const { items, loaded, load, addItem, togglePurchased, removeItem, fabX, fabY, setFabPosition } = useShoppingListStore();
+
+    // Zustand global stores here.
+    const items = useShoppingListStore(s => s.items);
+    const loaded = useShoppingListStore(s => s.loaded);
+    const load = useShoppingListStore(s => s.load);
+    const addItem = useShoppingListStore(s => s.addItem);
+    const togglePurchased = useShoppingListStore(s => s.togglePurchased);
+    const removeItem = useShoppingListStore(s => s.removeItem);
+    const fabX = useShoppingListStore(s => s.fabX);
+    const fabY = useShoppingListStore(s => s.fabY);
+    const setFabPosition = useShoppingListStore(s => s.setFabPosition);
+    const convertToTransaction = useShoppingListStore(s => s.convertToTransaction);
+    const accounts = useAccountStore(s => s.accounts);
+    const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
+    const addToast = useToastStore((s) => s.add);
+
+    // Local states here 
     const [modalVisible, setModalVisible] = useState(false);
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
     const [qty, setQty] = useState('1');
     const [selectedCurrency, setSelectedCurrency] = useState('USD');
+    const [convertModalVisible, setConvertModalVisible] = useState(false);
+    const [selectedConvertAccount, setSelectedConvertAccount] = useState<string | null>(null);
+    const [converting, setConverting] = useState(false);
 
+    // Fab config
     const FAB_SIZE = 52;
     const FAB_MARGIN = 12;
+
+    // Screen dimensions and initial FAB position
     const { width: screenW, height: screenH } = Dimensions.get('window');
     const initialX = fabX !== -999 && fabY !== -999 ? fabX : screenW - FAB_SIZE - FAB_MARGIN;
     const initialY = fabX !== -999 && fabY !== -999 ? fabY : screenH - 180;
@@ -71,7 +97,33 @@ export default function ShoppingListScreen() {
 
     useEffect(() => {
         load();
+        getAllAccountsByUserId();
     }, []);
+
+    const listCurrency = useMemo(() => items.length > 0 ? items[0].currency : null, [items]);
+    const purchasedCount = useMemo(() => items.filter(i => i.purchased).length, [items]);
+
+    const handleConvert = async () => {
+        if (!selectedConvertAccount) return;
+        setConverting(true);
+        const result = await convertToTransaction(selectedConvertAccount);
+        setConverting(false);
+        setConvertModalVisible(false);
+        setSelectedConvertAccount(null);
+        if (result) {
+            addToast({
+                type: 'success',
+                message: `Factura creada: ${result.total.toFixed(2)} ${result.currency} (${result.archivedItemCount} artículos)`,
+                duration: 4000,
+            });
+        } else {
+            addToast({
+                type: 'error',
+                message: 'No hay artículos comprados para convertir',
+                duration: 3000,
+            });
+        }
+    };
 
     const totalsByCurrency = useMemo(() => {
         const map = new Map<string, number>();
@@ -107,7 +159,7 @@ export default function ShoppingListScreen() {
         setName('');
         setPrice('');
         setQty('1');
-        setSelectedCurrency('USD');
+        setSelectedCurrency(listCurrency || 'USD');
         setModalVisible(true);
     };
 
@@ -139,7 +191,12 @@ export default function ShoppingListScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.headerSide}>
                     <TextMalet style={styles.backText}>←</TextMalet>
                 </TouchableOpacity>
-                <TextMalet style={styles.title}>Lista de Compras</TextMalet>
+                <View style={styles.headerCenter}>
+                    <TextMalet style={styles.title}>Lista de Compras</TextMalet>
+                    {listCurrency && (
+                        <TextMalet style={styles.headerCurrency}>Moneda: {listCurrency}</TextMalet>
+                    )}
+                </View>
                 <View style={styles.headerSide} />
             </View>
 
@@ -150,21 +207,37 @@ export default function ShoppingListScreen() {
                 </View>
             ) : (
                 <>
-                    <FlatList
-                        data={items}
-                        keyExtractor={(item) => item.id}
-                        contentContainerStyle={styles.list}
-                        renderItem={({ item }) => (
-                            <SwipeableRow onDelete={() => removeItem(item.id)}>
-                                <ShoppingItemRow
-                                    item={item}
-                                    onToggle={() => togglePurchased(item.id)}
-                                />
-                            </SwipeableRow>
-                        )}
-                    />
+                    <View style={styles.listWrapper}>
+                        <FlashList
+                            data={items}
+                            keyExtractor={(item: ShoppingItem) => item.id}
+                            contentContainerStyle={styles.list}
+                            renderItem={({ item }: { item: ShoppingItem }) => (
+                                <SwipeableRow onDelete={() => removeItem(item.id)}>
+                                    <ShoppingItemRow
+                                        item={item}
+                                        onToggle={() => togglePurchased(item.id)}
+                                    />
+                                </SwipeableRow>
+                            )}
+                        />
+                        <LinearGradient
+                            colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0)']}
+                            style={styles.listFadeTop}
+                            pointerEvents="none"
+                        />
+                        <LinearGradient
+                            colors={['rgba(255,255,255,0)', 'rgba(255,255,255,1)']}
+                            style={styles.listFadeBottom}
+                            pointerEvents="none"
+                        />
+                    </View>
                     <View style={styles.footer}>
-                        <View style={styles.totalsBreakdown}>
+                        <ScrollView
+                            style={styles.totalsScroll}
+                            contentContainerStyle={styles.totalsBreakdown}
+                            showsVerticalScrollIndicator={false}
+                        >
                             {totalsByCurrency.map(([currency, total]) => {
                                 const cur = currencyMap.get(currency);
                                 return (
@@ -181,13 +254,28 @@ export default function ShoppingListScreen() {
                                     </View>
                                 );
                             })}
-                        </View>
+                        </ScrollView>
                         <View style={styles.grandTotalRow}>
                             <TextMalet style={styles.grandTotalLabel}>Total USD</TextMalet>
                             <TextMalet style={styles.grandTotalValue}>
                                 ${grandTotalUSD.toFixed(2)}
                             </TextMalet>
                         </View>
+                        {purchasedCount > 0 && (
+                            <Button
+                                style={styles.convertButton}
+                                onPress={() => {
+                                    setConvertModalVisible(true);
+                                    if (accounts.length > 0 && !selectedConvertAccount) {
+                                        setSelectedConvertAccount(accounts[0].id);
+                                    }
+                                }}
+                                icon={
+                                    <Receipt size={16} color="#fff" />
+                                }
+                                text={`Convertir a factura (${purchasedCount})`}
+                            />
+                        )}
                     </View>
                 </>
             )}
@@ -247,40 +335,47 @@ export default function ShoppingListScreen() {
                         </View>
 
                         <TextMalet style={styles.currencyLabel}>Moneda</TextMalet>
-                        <View style={styles.currencyScrollContainer}>
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.currencyScrollContent}
-                            >
-                                {currencies.map(c => (
-                                    <TouchableOpacity
-                                        key={c.name}
-                                        style={[styles.currencyChip, selectedCurrency === c.name && styles.currencyChipActive]}
-                                        onPress={() => setSelectedCurrency(c.name)}
-                                    >
-                                        <Image source={{ uri: c.img }} style={styles.currencyFlag} />
-                                        <TextMalet style={[styles.currencyChipText, selectedCurrency === c.name && styles.currencyChipTextActive]}>
-                                            {c.name}
-                                        </TextMalet>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                            <LinearGradient
-                                colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0)']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.currencyFadeLeft}
-                                pointerEvents="none"
-                            />
-                            <LinearGradient
-                                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,1)']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.currencyFadeRight}
-                                pointerEvents="none"
-                            />
-                        </View>
+                        {listCurrency ? (
+                            <View style={styles.currencyLocked}>
+                                <TextMalet style={styles.currencyLockedText}>{listCurrency}</TextMalet>
+                                <TextMalet style={styles.currencyLockedHint}>La lista ya tiene artículos en esta moneda</TextMalet>
+                            </View>
+                        ) : (
+                            <View style={styles.currencyScrollContainer}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.currencyScrollContent}
+                                >
+                                    {currencies.map(c => (
+                                        <TouchableOpacity
+                                            key={c.name}
+                                            style={[styles.currencyChip, selectedCurrency === c.name && styles.currencyChipActive]}
+                                            onPress={() => setSelectedCurrency(c.name)}
+                                        >
+                                            <Image source={{ uri: c.img }} style={styles.currencyFlag} />
+                                            <TextMalet style={[styles.currencyChipText, selectedCurrency === c.name && styles.currencyChipTextActive]}>
+                                                {c.name}
+                                            </TextMalet>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.currencyFadeLeft}
+                                    pointerEvents="none"
+                                />
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,1)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.currencyFadeRight}
+                                    pointerEvents="none"
+                                />
+                            </View>
+                        )}
                     </View>
 
                     <View style={styles.modalActions}>
@@ -297,11 +392,80 @@ export default function ShoppingListScreen() {
                     </View>
                 </View>
             </ModalOptions>
+
+            <ModalOptions
+                visible={convertModalVisible}
+                onClose={() => { if (!converting) setConvertModalVisible(false); }}
+                heightRatio={0.50}
+            >
+                <View style={styles.modalBody}>
+                    <TextMalet style={styles.modalTitle}>Convertir a factura</TextMalet>
+                    <TextMalet style={styles.convertDesc}>
+                        Se crear&aacute; una transacci&oacute;n con los {purchasedCount} art&iacute;culo{purchasedCount !== 1 ? 's' : ''} comprado{purchasedCount !== 1 ? 's' : ''}.
+                    </TextMalet>
+
+                    <TextMalet style={styles.currencyLabel}>Cuenta destino ({listCurrency})</TextMalet>
+                    {listCurrency && accounts.filter(a => a.currency === listCurrency).length === 0 ? (
+                        <View style={styles.noAccountCurrency}>
+                            <TextMalet style={styles.noAccountCurrencyText}>
+                                No tienes una cuenta en {listCurrency}. Crea una para poder convertir.
+                            </TextMalet>
+                        </View>
+                    ) : (
+                        <ScrollView style={styles.convertAccountList} showsVerticalScrollIndicator={false}>
+                    {accounts.filter(a => !listCurrency || a.currency === listCurrency).map((acc) => (
+                            <TouchableOpacity
+                                key={acc.id}
+                                style={[styles.convertAccountRow, selectedConvertAccount === acc.id && styles.convertAccountRowActive]}
+                                onPress={() => setSelectedConvertAccount(acc.id)}
+                            >
+                                <View style={styles.convertAccountInfo}>
+                                    <TextMalet style={[styles.convertAccountName, selectedConvertAccount === acc.id && styles.convertAccountNameActive]}>
+                                        {acc.name}
+                                    </TextMalet>
+                                    <TextMalet style={styles.convertAccountBalance}>
+                                        {acc.balance.toFixed(2)} {acc.currency}
+                                    </TextMalet>
+                                </View>
+                                {selectedConvertAccount === acc.id && (
+                                    <View style={styles.convertCheck}>
+                                        <TextMalet style={styles.convertCheckText}>✓</TextMalet>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                    )}
+
+                    <View style={styles.modalActions}>
+                        <TouchableOpacity
+                            style={styles.cancelButton}
+                            onPress={() => { if (!converting) setConvertModalVisible(false); }}
+                            disabled={converting}
+                        >
+                            <TextMalet style={styles.cancelText}>Cancelar</TextMalet>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.submitButton, (!selectedConvertAccount || converting) && styles.submitButtonDisabled]}
+                            onPress={handleConvert}
+                            disabled={!selectedConvertAccount || converting}
+                        >
+                            {converting ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <TextMalet style={styles.submitText}>Convertir</TextMalet>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </ModalOptions>
         </SafeAreaView>
     );
 }
 
 const SWIPE_THRESHOLD = -80;
+
+const MAX_TOTALS_HEIGHT = 140;
 
 const SwipeableRow = React.memo(({
     children,
@@ -434,6 +598,43 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: 'rgba(0,0,0,0.87)',
     },
+    headerCenter: {
+        alignItems: 'center',
+    },
+    headerCurrency: {
+        fontSize: 11,
+        color: 'rgba(0,0,0,0.38)',
+        marginTop: 1,
+    },
+    currencyLocked: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: '#f5f5f7',
+        borderRadius: 8,
+    },
+    currencyLockedText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: 'rgba(0,0,0,0.6)',
+    },
+    currencyLockedHint: {
+        fontSize: 11,
+        color: 'rgba(0,0,0,0.3)',
+        flex: 1,
+    },
+    noAccountCurrency: {
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    noAccountCurrencyText: {
+        fontSize: 13,
+        color: 'rgba(0,0,0,0.4)',
+        textAlign: 'center',
+        lineHeight: 18,
+    },
     emptyTitle: {
         fontSize: 16,
         fontWeight: '600',
@@ -444,10 +645,34 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: 'rgba(0,0,0,0.38)',
     },
+    listWrapper: {
+        flex: 1,
+        position: 'relative',
+        maxHeight: '70%',
+    },
     list: {
         paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 160,
+        paddingTop: 16,
+        paddingBottom: 16,
+    },
+    listScroll: {
+        flex: 1,
+    },
+    listFadeTop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 24,
+        zIndex: 1,
+    },
+    listFadeBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 24,
+        zIndex: 1,
     },
     swipeWrapper: {
         marginBottom: 8,
@@ -554,19 +779,19 @@ const styles = StyleSheet.create({
         color: 'rgba(0,0,0,0.38)',
     },
     footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
         paddingHorizontal: 20,
         paddingVertical: 14,
         borderTopWidth: 1,
         borderTopColor: '#e8e8ec',
         backgroundColor: '#fff',
+        maxHeight: '40%',
+    },
+    totalsScroll: {
+        maxHeight: MAX_TOTALS_HEIGHT,
     },
     totalsBreakdown: {
-        gap: 4,
-        marginBottom: 10,
+        gap: 6,
+        paddingBottom: 10,
     },
     totalRow: {
         flexDirection: 'row',
@@ -579,8 +804,8 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     totalFlag: {
-        width: 14,
-        height: 14,
+        width: 20,
+        height: 20,
     },
     totalRowCurrency: {
         fontSize: 13,
@@ -633,7 +858,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: 'rgba(0,0,0,0.87)',
-        marginBottom: 20,
+        marginBottom: 5,
     },
     fieldsGroup: {
         gap: 14,
@@ -739,5 +964,69 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: '#fff',
+    },
+    convertButton: {
+        marginTop: 12,
+        paddingVertical: 11,
+    },
+    convertButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    convertDesc: {
+        fontSize: 13,
+        color: 'rgba(0,0,0,0.5)',
+        marginBottom: 16,
+        lineHeight: 18,
+    },
+    convertAccountList: {
+        maxHeight: 160,
+        marginTop: 6,
+        marginBottom: 8,
+    },
+    convertAccountRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: '#e8e8ec',
+    },
+    convertAccountRowActive: {
+        borderColor: '#1a1a2e',
+        backgroundColor: '#f4f0ff',
+    },
+    convertAccountInfo: {
+        flex: 1,
+    },
+    convertAccountName: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: 'rgba(0,0,0,0.87)',
+    },
+    convertAccountNameActive: {
+        fontWeight: '600',
+    },
+    convertAccountBalance: {
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.38)',
+        marginTop: 2,
+    },
+    convertCheck: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#1a1a2e',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    convertCheckText: {
+        fontSize: 12,
+        color: '#fff',
+        fontWeight: '700',
     },
 });

@@ -1,6 +1,6 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { TopPago } from '@/shared/interfaces/garzon.interfaces';
-import React, { memo, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 interface TopPagosCardProps {
@@ -9,12 +9,12 @@ interface TopPagosCardProps {
 
 // Colores para los diferentes métodos de pago
 const PAYMENT_COLORS = [
-    '#10B981', // Verde esmeralda
-    '#3B82F6', // Azul
-    '#8B5CF6', // Púrpura
-    '#F59E0B', // Ámbar
-    '#EF4444', // Rojo
-    '#EC4899', // Rosa
+    '#155a3d', // Verde esmeralda
+    '#2b538f', // Azul
+    '#6a3cb3', // Púrpura
+    '#bd8d3c', // Ámbar
+    '#752020', // Rojo
+    '#6b2e4d', // Rosa
 ];
 
 // Componente para mostrar montos con decimales en gris
@@ -55,7 +55,6 @@ const PaymentItem = memo(({
         <View style={styles.paymentItem}>
             <View style={styles.paymentHeader}>
                 <View style={styles.paymentLeft}>
-                    <View style={[styles.colorDot, { backgroundColor: color }]} />
                     <TextMalet
                         style={styles.paymentName}
                         numberOfLines={1}
@@ -232,7 +231,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F4F6',
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 4,
+        borderRadius: 22,
     },
     percentageText: {
         fontSize: 11,
@@ -246,10 +245,13 @@ const styles = StyleSheet.create({
     },
     barBackground: {
         flex: 1,
-        height: 6,
+        height: 10,
         backgroundColor: '#F3F4F6',
-        borderRadius: 3,
+        borderRadius: 5,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#cfcfcf',
+        borderStyle: 'dashed',
     },
     barFill: {
         height: '100%',

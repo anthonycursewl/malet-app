@@ -1,6 +1,7 @@
 import Button from "@/components/Button/Button";
 import Input from "@/components/Input/Input";
 import TextMalet from "@/components/TextMalet/TextMalet";
+import { dataCache, CACHE_KEYS } from "@/shared/offline/dataCache";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useProfileStore } from "@/shared/stores/useProfileStore";
 import IconCross from "@/svgs/common/IconCross";
@@ -26,8 +27,12 @@ const PLACEHOLDER_AVATAR = require("@/assets/images/placeholders/placeholder_ava
 const PLACEHOLDER_BANNER = require("@/assets/images/placeholders/placeholder_banner.png");
 
 export default function EditProfile() {
-    const { user, setUser } = useAuthStore();
-    const { loading: loadingUsername, error, checkUsernameAvailability, updateProfile } = useProfileStore()
+    const user = useAuthStore(s => s.user);
+    const setUser = useAuthStore(s => s.setUser);
+    const loadingUsername = useProfileStore(s => s.loading);
+    const error = useProfileStore(s => s.error);
+    const checkUsernameAvailability = useProfileStore(s => s.checkUsernameAvailability);
+    const updateProfile = useProfileStore(s => s.updateProfile);
 
     const [form, setForm] = useState({
         name: user?.name || "",
@@ -116,6 +121,8 @@ export default function EditProfile() {
             }
 
             setUser(response);
+            setPickedImages({ banner: null, avatar: null });
+            dataCache.set(CACHE_KEYS.USER, response);
             Alert.alert("Éxito", "Perfil actualizado correctamente.");
             setIsLoading(false);
         } catch (error) {

@@ -19,8 +19,13 @@ export default function TransactionDetail() {
   const { transaction_id } = useLocalSearchParams();
   const router = useRouter();
   const [isCompleting, setIsCompleting] = useState(false);
-  const { transactions, completePendingTransaction, deleteTransaction, restoreTransaction } = useWalletStore();
-  const { accounts, getAllAccountsByUserId, updateBalanceInMemory } = useAccountStore();
+  const transactions = useWalletStore(s => s.transactions);
+  const completePendingTransaction = useWalletStore(s => s.completePendingTransaction);
+  const deleteTransaction = useWalletStore(s => s.deleteTransaction);
+  const restoreTransaction = useWalletStore(s => s.restoreTransaction);
+  const accounts = useAccountStore(s => s.accounts);
+  const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
+  const updateBalanceInMemory = useAccountStore(s => s.updateBalanceInMemory);
   const transaction = transactions.find(t => t.id.toString() === transaction_id);
   const account = accounts.find(a => a.id === transaction?.account_id);
 
@@ -125,6 +130,7 @@ export default function TransactionDetail() {
       return;
     }
     useToastStore.getState().add({ type: 'success', message: 'Transacción restaurada correctamente.' });
+    getAllAccountsByUserId({ refresh: true });
     router.back();
   };
 
@@ -137,7 +143,7 @@ export default function TransactionDetail() {
         parseFloat(transaction.amount),
         type
       );
-      getAllAccountsByUserId();
+      getAllAccountsByUserId({ refresh: true });
       useToastStore.getState().add({ type: 'success', message: `Transacción marcada como ${type === 'expense' ? 'Egreso' : 'Ingreso'}` });
     } else {
       useToastStore.getState().add({ type: 'error', message: 'No se ha podido procesar el cambio en el servidor.' });

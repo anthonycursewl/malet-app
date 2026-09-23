@@ -7,16 +7,16 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StatusBar,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ScrollView,
+   ActivityIndicator,
+   Alert,
+   StatusBar,
+   StyleSheet,
+   TextInput,
+   TouchableOpacity,
+   View,
+   ScrollView,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const COLOR_PALETTE = [
@@ -29,7 +29,12 @@ const MAX_PALETTE_SIZE = 4;
 
 export default function TagsPage() {
   const router = useRouter();
-  const { tags, loading, loadTags, addTag, updateTag, deleteTag } = useTagStore();
+  const tags = useTagStore(s => s.tags);
+  const loading = useTagStore(s => s.loading);
+  const loadTags = useTagStore(s => s.loadTags);
+  const addTag = useTagStore(s => s.addTag);
+  const updateTag = useTagStore(s => s.updateTag);
+  const deleteTag = useTagStore(s => s.deleteTag);
 
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -275,7 +280,7 @@ export default function TagsPage() {
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" />
+      <StatusBar backgroundColor="transparent" />
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
 
         {/* Header */}
@@ -319,14 +324,15 @@ export default function TagsPage() {
             </TouchableOpacity>
           </View>
         ) : (
-          <FlatList
-            data={tags}
-            renderItem={renderTag}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
+           <FlashList
+             data={tags}
+             renderItem={renderTag}
+             keyExtractor={(item) => item.id}
+             contentContainerStyle={styles.listContent}
+             estimatedItemSize={72}
+             showsVerticalScrollIndicator={false}
+             ItemSeparatorComponent={() => <View style={styles.separator} />}
+           />
         )}
 
         {/* Create Modal */}

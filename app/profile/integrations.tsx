@@ -2,18 +2,19 @@ import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import { ShimmerEffect } from "@/components/malet-ai/ShimmerEffect";
 import { SkeletonLoader } from "@/components/malet-ai/SkeletonLoader";
 import TextMalet from "@/components/TextMalet/TextMalet";
-import { MALET_API_URL } from "@/shared/config/malet.config";
+import { useToastStore } from "@/shared/stores/useToastStore";
+import { integrationsService, IntegrationStatus } from "@/shared/services/integrations/integrations.service";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { spacing } from "@/shared/theme";
 import IconLink from "@/svgs/common/IconLink";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Animated,
     Easing,
-    Linking,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -22,127 +23,11 @@ import {
 } from "react-native";
 
 // ============================================================================
-// TYPES - Definiciones de tipos para el sistema de integraciones agnóstico
+// INTEGRATION SERVICE - Cliente del sistema de integraciones
+// (ver shared/services/integrations/integrations.service.ts)
 // ============================================================================
 
-interface ProviderConfig {
-    id: string;
-    displayName: string;
-    description: string;
-    icon: string;
-    brandColor: string;
-    enabled: boolean;
-    comingSoon: boolean;
-}
-
-interface IntegrationStatus {
-    connected: boolean;
-    provider: ProviderConfig;
-    metadata?: Record<string, any>;
-    connectedAt?: string;
-}
-
-// ============================================================================
-// FALLBACK DATA - Datos locales mientras el backend no esté implementado
-// ============================================================================
-
-const FALLBACK_INTEGRATIONS: IntegrationStatus[] = [
-    {
-        connected: false,
-        provider: {
-            id: 'wheek',
-            displayName: 'Wheek',
-            description: 'Sistema de inventario, facturación y gestión empresarial. Conecta tu cuenta para sincronizar datos.',
-            icon: 'WK',
-            brandColor: '#FF6B35',
-            enabled: true,
-            comingSoon: false,
-        },
-    },
-    {
-        connected: false,
-        provider: {
-            id: 'google',
-            displayName: 'Google',
-            description: 'Sincroniza con tu cuenta de Google para acceder a más funcionalidades.',
-            icon: 'GO',
-            brandColor: '#4285F4',
-            enabled: false,
-            comingSoon: true,
-        },
-    },
-    {
-        connected: false,
-        provider: {
-            id: 'apple',
-            displayName: 'Apple',
-            description: 'Conecta tu Apple ID para una experiencia más integrada.',
-            icon: 'AP',
-            brandColor: '#000000',
-            enabled: false,
-            comingSoon: true,
-        },
-    },
-];
-
-// ============================================================================
-// INTEGRATION SERVICE - Servicio para comunicarse con el backend
-// ============================================================================
-
-const integrationsService = {
-    async getIntegrations(token: string): Promise<IntegrationStatus[]> {
-        try {
-            const response = await fetch(`${MALET_API_URL}/integrations`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch integrations');
-            }
-
-            return response.json();
-        } catch (error) {
-            console.warn('Using fallback integrations data:', error);
-            return FALLBACK_INTEGRATIONS;
-        }
-    },
-
-    async authorize(token: string, providerId: string): Promise<string> {
-        const response = await fetch(
-            `${MALET_API_URL}/integrations/${providerId}/authorize`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error('Failed to get authorization URL');
-        }
-
-        const data = await response.json();
-        return data.authorization_url;
-    },
-
-    async disconnect(token: string, providerId: string): Promise<void> {
-        const response = await fetch(
-            `${MALET_API_URL}/integrations/${providerId}`,
-            {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error('Failed to disconnect');
-        }
-    },
-};
+const CALLBACK_SCHEME = 'maletapp://integrations';
 
 // ============================================================================
 // INTEGRATION CARD COMPONENT
@@ -322,22 +207,24 @@ const IntegrationCard = ({
 // ============================================================================
 
 export default function IntegrationsView() {
-    const { token } = useAuthStore();
+    const token = useAuthStore(s => s.token);
+    const addToast = useToastStore(s => s.add);
     const [integrations, setIntegrations] = useState<IntegrationStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const toastShownRef = useRef<string | null>(null);
 
     // Cargar integraciones
     const loadIntegrations = useCallback(async () => {
         if (!token) return;
 
         try {
-            const data = await integrationsService.getIntegrations(token);
-            setIntegrations(Array.isArray(data) ? data : FALLBACK_INTEGRATIONS);
+            const data = await integrationsService.getIntegrations();
+            setIntegrations(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error loading integrations:', error);
-            setIntegrations(FALLBACK_INTEGRATIONS);
+            setIntegrations([]);
         } finally {
             setIsLoading(false);
             setRefreshing(false);
@@ -347,6 +234,64 @@ export default function IntegrationsView() {
     useEffect(() => {
         loadIntegrations();
     }, [loadIntegrations]);
+
+    // Procesar el retorno del navegador OAuth (deep link maletapp://integrations)
+    // El backend redirige aquí tras el callback: maletapp://integrations?success=true&provider=wheek
+    const handleCallbackUrl = useCallback((url: string | null) => {
+        if (!url) return;
+
+        const parsed = Linking.parse(url);
+        const params = parsed.queryParams as Record<string, string> | undefined;
+        if (!params) return;
+
+        const success = params.success === 'true';
+        const provider = params.provider || '';
+        const error = params.error || '';
+
+        // Evitar toasts duplicados si el deep link se recibe más de una vez
+        const toastKey = `${success ? 'success' : 'error'}:${provider}:${error}`;
+        if (toastShownRef.current === toastKey) return;
+        toastShownRef.current = toastKey;
+
+        // Recargar el estado real desde el backend (la conexión la registró el servidor)
+        loadIntegrations();
+
+        if (success) {
+            addToast({
+                type: 'success',
+                message: provider
+                    ? `Integración con ${provider} conectada con éxito`
+                    : 'Integración conectada con éxito',
+                duration: 3500,
+            });
+        } else {
+            addToast({
+                type: 'error',
+                message: error
+                    ? `No se pudo conectar: ${error}`
+                    : 'No se pudo conectar la integración',
+                duration: 3500,
+            });
+        }
+    }, [loadIntegrations, addToast]);
+
+    useEffect(() => {
+        // Deep link cuando la app está abierta y vuelve del navegador
+        const sub = Linking.addEventListener('url', (event) => {
+            if (event.url.startsWith(CALLBACK_SCHEME)) {
+                handleCallbackUrl(event.url);
+            }
+        });
+
+        // Deep link que abrió la app directamente
+        Linking.getInitialURL().then((url) => {
+            if (url && url.startsWith(CALLBACK_SCHEME)) {
+                handleCallbackUrl(url);
+            }
+        });
+
+        return () => sub.remove();
+    }, [handleCallbackUrl]);
 
     // Pull to refresh
     const onRefresh = useCallback(() => {
@@ -361,39 +306,20 @@ export default function IntegrationsView() {
         setLoadingProvider(providerId);
 
         try {
-            const authUrl = await integrationsService.authorize(token, providerId);
+            const authUrl = await integrationsService.authorize(providerId);
 
             // Abrir URL de autorización en el navegador
             const canOpen = await Linking.canOpenURL(authUrl);
             if (canOpen) {
                 await Linking.openURL(authUrl);
             } else {
-                throw new Error('Cannot open authorization URL');
+                throw new Error('No se pudo abrir la URL de autorización');
             }
         } catch (error) {
             console.error('Error initiating connection:', error);
-
-            // Fallback: Simular conexión exitosa para demo
-            setIntegrations(prev =>
-                prev.map(integration =>
-                    integration.provider.id === providerId
-                        ? {
-                            ...integration,
-                            connected: true,
-                            metadata: {
-                                name: 'Usuario Demo',
-                                email: 'demo@example.com'
-                            },
-                            connectedAt: new Date().toISOString(),
-                        }
-                        : integration
-                )
-            );
-
             Alert.alert(
-                '¡Conexión exitosa!',
-                `Tu cuenta de Malet ha sido conectada con ${integrations?.find?.(i => i?.provider?.id === providerId)?.provider?.displayName ?? providerId}. (Modo demo)`,
-                [{ text: 'Entendido', style: 'default' }]
+                'Error',
+                'No se pudo iniciar la conexión. Verifica tu conexión e intenta de nuevo.'
             );
         } finally {
             setLoadingProvider(null);
@@ -419,21 +345,23 @@ export default function IntegrationsView() {
                         setLoadingProvider(providerId);
 
                         try {
-                            await integrationsService.disconnect(token, providerId);
+                            await integrationsService.disconnect(providerId);
+                            await loadIntegrations();
+                            addToast({
+                                type: 'success',
+                                message: `Integración con ${integration.provider.displayName} desconectada`,
+                                duration: 3000,
+                            });
                         } catch (error) {
-                            console.warn('Using local disconnect:', error);
+                            console.error('Error disconnecting integration:', error);
+                            addToast({
+                                type: 'error',
+                                message: 'No se pudo desconectar. Intenta de nuevo.',
+                                duration: 3000,
+                            });
+                        } finally {
+                            setLoadingProvider(null);
                         }
-
-                        // Actualizar estado local
-                        setIntegrations(prev =>
-                            prev.map(int =>
-                                int.provider.id === providerId
-                                    ? { ...int, connected: false, metadata: undefined }
-                                    : int
-                            )
-                        );
-
-                        setLoadingProvider(null);
                     }
                 }
             ]

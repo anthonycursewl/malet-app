@@ -107,6 +107,28 @@ export async function getAvailableModels(): Promise<ModelsResponse> {
 }
 
 /**
+ * Envía feedback (like/dislike) sobre una respuesta del AI
+ */
+export async function sendFeedback(
+    messageId: string,
+    type: 'like' | 'dislike'
+): Promise<void> {
+    const { response, error, httpError } = await secureFetch<{ success: boolean }>({
+        url: `${MALET_API_URL}/ai/feedback`,
+        method: 'POST',
+        body: { message_id: messageId, type },
+    });
+
+    if (error || !response) {
+        throw new AIServiceError(
+            error || 'No se pudo enviar el feedback',
+            'SERVICE_ERROR',
+            httpError?.status
+        );
+    }
+}
+
+/**
  * Envía un mensaje al AI y recibe la respuesta
  */
 export async function sendChatMessage(

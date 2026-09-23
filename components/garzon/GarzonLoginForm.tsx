@@ -1,7 +1,7 @@
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { GarzonCredentials } from '@/shared/interfaces/garzon.interfaces';
 import IconAt from '@/svgs/dashboard/IconAt';
-import React, { memo, useState } from 'react';
+import { memo, useState } from 'react';
 import {
     Image,
     KeyboardAvoidingView,
@@ -9,8 +9,8 @@ import {
     StyleSheet,
     View
 } from 'react-native';
+import { InputField } from '../AddWallet';
 import Button from '../Button/Button';
-import Input from '../Input/Input';
 
 interface GarzonLoginFormProps {
     onLogin: (credentials: GarzonCredentials) => Promise<boolean>;
@@ -42,37 +42,27 @@ const GarzonLoginForm = memo(({ onLogin, isLoading, error }: GarzonLoginFormProp
                     </View>
                 </View>
 
-                {/* Info Card */}
-                <View style={styles.infoCard}>
-                    <TextMalet style={styles.infoTitle}>Conecta tu cuenta</TextMalet>
-                    <TextMalet style={styles.infoDescription}>
-                        Ingresa tus credenciales del sistema Garzón para acceder al dashboard de ventas,
-                        métodos de pago y productos más vendidos.
-                    </TextMalet>
-                </View>
-
                 {/* Form */}
                 <View style={styles.form}>
                     <View style={styles.inputContainer}>
                         <TextMalet style={styles.label}>Nombre de usuario</TextMalet>
-                        <Input
+                        <InputField
+                            label="Nombre de usuario"
                             placeholder="tu nombre de usuario..."
                             value={username}
                             onChangeText={setUsername}
-                            autoCapitalize="none"
-                            autoComplete="username"
                             editable={!isLoading}
                         />
                     </View>
 
                     <View style={styles.inputContainer}>
                         <TextMalet style={styles.label}>Contraseña</TextMalet>
-                        <Input
+                        <InputField
+                            label="Contraseña"
                             placeholder="••••••••"
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry
-                            autoComplete="password"
                             editable={!isLoading}
                         />
                     </View>

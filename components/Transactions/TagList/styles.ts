@@ -2,8 +2,7 @@ import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
     container: {
-        paddingVertical: 10,
-        marginBottom: 8,
+        marginBottom: 9,
     },
     scrollContent: {
         paddingHorizontal: 18,
@@ -38,7 +37,7 @@ export const styles = StyleSheet.create({
     },
     loadingContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 16,
+        paddingHorizontal: 18,
         gap: 8,
     },
     skeletonTag: {
@@ -46,5 +45,10 @@ export const styles = StyleSheet.create({
         height: 30,
         borderRadius: 20,
         backgroundColor: '#f1f5f9',
+    },
+    loadingMore: {
+        paddingHorizontal: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

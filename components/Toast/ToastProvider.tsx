@@ -1,4 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import TextMalet from '@/components/TextMalet/TextMalet';
+import { Toast, useToastStore } from '@/shared/stores/useToastStore';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -6,8 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import TextMalet from '@/components/TextMalet/TextMalet';
-import { Toast, useToastStore } from '@/shared/stores/useToastStore';
 
 const COLORS = {
   bg: '#2a2a2a',
@@ -38,24 +38,16 @@ const parseRichText = (text: string) => {
 
 const ToastItem = ({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) => {
   const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.92)).current;
-  const isExiting = useRef(false);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 180,
-        friction: 12,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [opacity, scale]);
+    setHidden(false);
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity, toast.id]);
 
   useEffect(() => {
     if (toast.duration > 0 && !toast.actionLabel) {
@@ -65,28 +57,25 @@ const ToastItem = ({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
   }, [toast.duration, toast.actionLabel]);
 
   const handleDismiss = () => {
-    if (isExiting.current) return;
-    isExiting.current = true;
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 0.92,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start(() => onDismiss(toast.id));
+    if (hidden) return;
+    Animated.timing(opacity, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setHidden(true);
+      onDismiss(toast.id);
+    });
   };
 
   const handleAction = () => {
     toast.onAction?.();
   };
 
+  if (hidden) return null;
+
   return (
-    <Animated.View style={{ opacity, transform: [{ scale }] }}>
+    <Animated.View style={{ opacity }}>
       <View style={styles.toast}>
         {toast.type === 'loading' ? (
           <ActivityIndicator size={14} color={COLORS.icon} />
@@ -133,23 +122,21 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     alignItems: 'center',
-    gap: 8,
     zIndex: 9999,
+    paddingTop: 8,
   },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: COLORS.bg,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 22,
     gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+  },
+  toastWrap: {
+    marginBottom: 8,
   },
   iconWrap: {
     width: 24,

@@ -4,6 +4,11 @@ import React, { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import ModalOptions from '../shared/ModalOptions';
 
+const toUSD = (bs: number, tasa: string) => {
+    const t = parseFloat(tasa);
+    return t > 0 ? bs / t : 0;
+};
+
 const FLAG_VE = 'https://flagcdn.com/w40/ve.png';
 const INITIAL_ITEMS_COUNT = 4;
 
@@ -12,9 +17,9 @@ interface TopProductosCardProps {
 }
 
 const RANK_STYLES = [
-    { bg: '#FEF3C7', text: '#D97706', bar: '#F59E0B' },
-    { bg: '#E0E7FF', text: '#4338CA', bar: '#6366F1' },
-    { bg: '#FCE7F3', text: '#BE185D', bar: '#EC4899' },
+    { bg: '#ffead1e5', text: '#ffbe75', bar: '#f3b954' },
+    { bg: '#ebebeb', text: '#797979', bar: '#22236b' },
+    { bg: '#ebebeb', text: '#797979', bar: '#682044' },
 ];
 const DEFAULT_RANK_STYLE = { bg: '#F3F4F6', text: '#6B7280', bar: '#9CA3AF' };
 
@@ -42,11 +47,12 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
     maxTotal: number;
     onPress: (producto: TopProducto, index: number) => void;
 }) => {
-    const { total, costo, cantidad, ganancia, margenPct, progressWidth } = useMemo(() => {
+    const { total, costo, cantidad, ganancia, margenPct, progressWidth, totalUSD, costoUSD, gananciaUSD } = useMemo(() => {
         const t = parseFloat(producto.total);
         const c = parseFloat(producto.costo);
         const cant = parseInt(producto.cantidad);
         const gan = t - c;
+        const tasa = producto.articulos.tasacambio;
         return {
             total: t,
             costo: c,
@@ -54,13 +60,17 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
             ganancia: gan,
             margenPct: (gan / t) * 100,
             progressWidth: (t / maxTotal) * 100,
+            totalUSD: toUSD(t, tasa),
+            costoUSD: toUSD(c, tasa),
+            gananciaUSD: toUSD(gan, tasa),
         };
-    }, [producto.total, producto.costo, producto.cantidad, maxTotal]);
+    }, [producto.total, producto.costo, producto.cantidad, producto.articulos.tasacambio, maxTotal]);
 
     const rankStyle = getRankStyle(index);
     const articulo = producto.articulos;
 
     const handlePress = useCallback(() => {
+        console.log(producto, index);
         onPress(producto, index);
     }, [onPress, producto, index]);
 
@@ -94,7 +104,7 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
                 </View>
                 <View style={styles.quantityBadge}>
                     <TextMalet style={styles.quantityText}>{cantidad}</TextMalet>
-                    <TextMalet style={styles.quantityLabel}>uds</TextMalet>
+                    <TextMalet style={styles.quantityLabel}>UNDS</TextMalet>
                 </View>
             </View>
 
@@ -107,7 +117,10 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
                         ]}
                     />
                 </View>
-                <FormattedAmount value={total} color="#10B981" />
+                <View style={{ alignItems: 'flex-end' }}>
+                    <FormattedAmount value={total} color="#525252" />
+                    <FormattedAmount value={totalUSD} prefix="$" color="#9CA3AF" />
+                </View>
             </View>
 
             <View style={styles.statsRow}>
@@ -115,6 +128,9 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
                     <TextMalet style={styles.statLabel}>Costo</TextMalet>
                     <TextMalet style={styles.statValue}>
                         Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </TextMalet>
+                    <TextMalet style={styles.statValueUSD}>
+                        ${costoUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TextMalet>
                 </View>
                 <View style={styles.statDivider} />
@@ -129,6 +145,9 @@ const ProductItem = memo(({ producto, index, maxTotal, onPress }: {
                     <TextMalet style={styles.statLabel}>Ganancia</TextMalet>
                     <TextMalet style={[styles.statValue, styles.statValueGood]}>
                         Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </TextMalet>
+                    <TextMalet style={styles.statValueUSD}>
+                        ${gananciaUSD.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TextMalet>
                 </View>
             </View>
@@ -163,6 +182,11 @@ const ProductDetailModal = memo(({
     const ganancia = total - costo;
     const margenPct = (ganancia / total) * 100;
     const gananciaPorUnidad = ganancia / cantidad;
+    const tasa = displayData.articulos.tasacambio;
+    const totalUSD = toUSD(total, tasa);
+    const costoUSD = toUSD(costo, tasa);
+    const gananciaUSD = toUSD(ganancia, tasa);
+    const gananciaPorUnidadUSD = toUSD(gananciaPorUnidad, tasa);
     const rankStyle = getRankStyle(displayIndex);
     const articulo = displayData.articulos;
 
@@ -196,17 +220,20 @@ const ProductDetailModal = memo(({
                 <View style={styles.modalQuickStats}>
                     <View style={styles.modalQuickStatItem}>
                         <TextMalet style={styles.modalQuickStatValue}>{cantidad}</TextMalet>
-                        <TextMalet style={styles.modalQuickStatLabel}>uds. vendidas</TextMalet>
+                        <TextMalet style={styles.modalQuickStatLabel}>Unds. vendidas</TextMalet>
                     </View>
                     <View style={styles.modalQuickStatDivider} />
                     <View style={styles.modalQuickStatItem}>
                         <View style={styles.modalAmountRow}>
                             <Image source={{ uri: FLAG_VE }} style={styles.modalFlagIcon} />
-                            <TextMalet style={[styles.modalQuickStatValue, { color: '#10B981' }]}>
+                            <TextMalet style={[styles.modalQuickStatValue, { color: '#505050' }]}>
                                 {total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                             </TextMalet>
                         </View>
-                        <TextMalet style={styles.modalQuickStatLabel}>total vendido</TextMalet>
+                        <TextMalet style={[styles.modalQuickStatValue, { fontSize: 11, color: '#9CA3AF' }]}>
+                            ${totalUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </TextMalet>
+                        <TextMalet style={styles.modalQuickStatLabel}>Total vendido</TextMalet>
                     </View>
                 </View>
 
@@ -214,15 +241,25 @@ const ProductDetailModal = memo(({
                     <TextMalet style={styles.modalSectionTitle}>Desglose Financiero</TextMalet>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Costo total</TextMalet>
-                        <TextMalet style={styles.modalInfoValue}>
-                            Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                        </TextMalet>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <TextMalet style={styles.modalInfoValue}>
+                                Bs {costo.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                            <TextMalet style={styles.modalInfoValueUSD}>
+                                ${costoUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                        </View>
                     </View>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Ganancia bruta</TextMalet>
-                        <TextMalet style={[styles.modalInfoValue, { color: '#059669' }]}>
-                            Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                        </TextMalet>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <TextMalet style={[styles.modalInfoValue, { color: '#059669' }]}>
+                                Bs {ganancia.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                            <TextMalet style={styles.modalInfoValueUSD}>
+                                ${gananciaUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                        </View>
                     </View>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Margen de ganancia</TextMalet>
@@ -232,9 +269,14 @@ const ProductDetailModal = memo(({
                     </View>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Ganancia por unidad</TextMalet>
-                        <TextMalet style={styles.modalInfoValue}>
-                            Bs {gananciaPorUnidad.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
-                        </TextMalet>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <TextMalet style={styles.modalInfoValue}>
+                                Bs {gananciaPorUnidad.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                            <TextMalet style={styles.modalInfoValueUSD}>
+                                ${gananciaPorUnidadUSD.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                            </TextMalet>
+                        </View>
                     </View>
                 </View>
 
@@ -248,7 +290,7 @@ const ProductDetailModal = memo(({
                     </View>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Peso</TextMalet>
-                        <TextMalet style={styles.modalInfoValue}>{articulo.peso} kg</TextMalet>
+                        <TextMalet style={styles.modalInfoValue}>{articulo.peso}</TextMalet>
                     </View>
                     <View style={styles.modalInfoRow}>
                         <TextMalet style={styles.modalInfoLabel}>Estado</TextMalet>
@@ -274,20 +316,25 @@ const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
     const hasMoreItems = data.length > INITIAL_ITEMS_COUNT;
     const remainingCount = data.length - INITIAL_ITEMS_COUNT;
 
-    const { totalVendido, totalGanancia, maxTotal } = useMemo(() => {
+    const { totalVendido, totalGanancia, maxTotal, totalVendidoUSD, totalGananciaUSD } = useMemo(() => {
         let vendido = 0;
         let ganancia = 0;
         let max = 0;
+        let vendidoUSD = 0;
+        let gananciaUSD = 0;
 
         for (const item of data) {
             const total = parseFloat(item.total);
             const costo = parseFloat(item.costo);
+            const tasa = item.articulos.tasacambio;
             vendido += total;
             ganancia += (total - costo);
             if (total > max) max = total;
+            vendidoUSD += toUSD(total, tasa);
+            gananciaUSD += toUSD(total - costo, tasa);
         }
 
-        return { totalVendido: vendido, totalGanancia: ganancia, maxTotal: max };
+        return { totalVendido: vendido, totalGanancia: ganancia, maxTotal: max, totalVendidoUSD: vendidoUSD, totalGananciaUSD: gananciaUSD };
     }, [data]);
 
     const handleProductPress = useCallback((producto: TopProducto, index: number) => {
@@ -352,12 +399,18 @@ const TopProductosCard = memo(({ data }: TopProductosCardProps) => {
             <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
                     <TextMalet style={styles.summaryLabel}>Total vendido</TextMalet>
-                    <FormattedAmount value={totalVendido} color="#10B981" />
+                    <View style={{ alignItems: 'center' }}>
+                        <FormattedAmount value={totalVendido} color="#10B981" />
+                        <FormattedAmount value={totalVendidoUSD} prefix="$" color="#9CA3AF" />
+                    </View>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
                     <TextMalet style={styles.summaryLabel}>Ganancia neta</TextMalet>
-                    <FormattedAmount value={totalGanancia} color="#059669" />
+                    <View style={{ alignItems: 'center' }}>
+                        <FormattedAmount value={totalGanancia} color="#059669" />
+                        <FormattedAmount value={totalGananciaUSD} prefix="$" color="#9CA3AF" />
+                    </View>
                 </View>
             </View>
 
@@ -550,6 +603,12 @@ const styles = StyleSheet.create({
     statValueWarn: {
         color: '#D97706',
     },
+    statValueUSD: {
+        fontSize: 9,
+        fontWeight: '500',
+        color: '#9CA3AF',
+        marginTop: 0,
+    },
     summaryRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -611,15 +670,15 @@ const styles = StyleSheet.create({
     },
     modalTag: {
         alignSelf: 'flex-start',
-        backgroundColor: '#E0E7FF',
+        backgroundColor: '#e6e6e6',
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 4,
+        borderRadius: 22,
     },
     modalTagText: {
         fontSize: 10,
         fontWeight: '600',
-        color: '#4338CA',
+        color: '#424247',
     },
     modalDescriptionContainer: {
         gap: 4,
@@ -699,6 +758,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#1F2937',
+    },
+    modalInfoValueUSD: {
+        fontSize: 10,
+        fontWeight: '500',
+        color: '#9CA3AF',
+        marginTop: -2,
     },
 });
 

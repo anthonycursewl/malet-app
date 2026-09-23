@@ -17,7 +17,7 @@ interface AccountItemProps {
 
 export const AccountItem = memo(({ account, onPress, isLast, onLongPress }: AccountItemProps) => {
   const { name, balance } = account;
-  const { isBalanceHidden } = useAccountStore();
+  const isBalanceHidden = useAccountStore(s => s.isBalanceHidden);
 
   const displayBalance = isBalanceHidden ? '••••••' : `$${balance.toFixed(2)}`;
 

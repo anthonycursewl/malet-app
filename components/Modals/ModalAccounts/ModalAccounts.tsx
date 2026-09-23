@@ -31,14 +31,12 @@ const ModalAccounts = ({ visible, onClose }: ModalAccountsProps) => {
     const spinValue = useRef(new Animated.Value(0)).current;
     const isMounted = useRef(true);
     const isLoadingRef = useRef(false);
-    const {
-        loading,
-        error,
-        getAllAccountsByUserId,
-        accounts,
-        setSelectedAccount
-    } = useAccountStore();
-    const { user } = useAuthStore();
+    const loading = useAccountStore(s => s.loading);
+    const error = useAccountStore(s => s.error);
+    const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
+    const accounts = useAccountStore(s => s.accounts);
+    const setSelectedAccount = useAccountStore(s => s.setSelectedAccount);
+    const user = useAuthStore(s => s.user);
 
     const spin = spinValue.interpolate({
         inputRange: [0, 1],

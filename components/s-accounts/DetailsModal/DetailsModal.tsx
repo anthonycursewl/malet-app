@@ -1,11 +1,10 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { Plus, Share2, Phone, Mail, CreditCard, User } from 'lucide-react-native';
-import TextMalet from '@/components/TextMalet/TextMalet';
 import Button from '@/components/Button/Button';
 import Input from '@/components/Input/Input';
 import ModalOptions from '@/components/shared/ModalOptions';
+import TextMalet from '@/components/TextMalet/TextMalet';
 import { SharedAccount } from '@/shared/entities/SharedAccount';
+import { CreditCard, Mail, Phone, Plus, Share2, User } from 'lucide-react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { styles } from './DetailsModal.styles';
 
 interface DetailsModalProps {
@@ -26,12 +25,12 @@ export const DetailsModal = ({
     if (!account) return null;
 
     return (
-        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.85}>
+        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.73}>
             <View style={styles.container}>
                 <View style={styles.modalHeader}>
                     <TextMalet style={styles.modalTitle}>Detalles</TextMalet>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Plus size={20} color="#6b7280" style={{ transform: [{ rotate: '45deg' }] }} />
+                        <Plus size={20} color="#6b7280" />
                     </TouchableOpacity>
                 </View>
 

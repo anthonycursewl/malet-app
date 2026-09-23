@@ -11,7 +11,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function ManageSAccount() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const isEditing = !!id;
-    const { sharedAccounts, loading, createSharedAccount, updateSharedAccount } = useSharedAccountStore();
+    const sharedAccounts = useSharedAccountStore(s => s.sharedAccounts);
+    const loading = useSharedAccountStore(s => s.loading);
+    const createSharedAccount = useSharedAccountStore(s => s.createSharedAccount);
+    const updateSharedAccount = useSharedAccountStore(s => s.updateSharedAccount);
 
     // Form state
     const [name, setName] = useState('');

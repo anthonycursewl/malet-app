@@ -34,13 +34,13 @@ const MOCK_CHATS = [
 ];
 
 export default function ChatListScreen() {
-    const { user } = useAuthStore();
+    const user = useAuthStore(s => s.user);
 
     return (
         <LayoutAuthenticated>
             <View style={styles.container}>
                 <DashboardHeader name={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url}
-                    username={user?.username || ''} showOptions={false}
+                    username={user?.username || ''}
                 />
 
                 <FlatList

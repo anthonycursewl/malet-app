@@ -20,7 +20,9 @@ export default function Register() {
     password: '',
   });
 
-  const { register, loading, error } = useAuthStore();
+  const register = useAuthStore(s => s.register);
+  const loading = useAuthStore(s => s.loading);
+  const error = useAuthStore(s => s.error);
 
   const handleNext = () => {
     if (step < 3) {

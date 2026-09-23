@@ -16,8 +16,10 @@ import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { router } from "expo-router";
 
 export default function Create() {
-    const { user } = useAuthStore();
-    const { createAccount, loading, error } = useAccountStore()
+    const user = useAuthStore(s => s.user);
+    const createAccount = useAccountStore(s => s.createAccount);
+    const loading = useAccountStore(s => s.loading);
+    const error = useAccountStore(s => s.error);
 
     const [balanceInput, setBalanceInput] = useState('');
     const [accountDetails, setAccountDetails] = useState<Omit<Account, 'created_at' | 'updated_at' | 'id'>>({
