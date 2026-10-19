@@ -36,7 +36,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them with your friends."
+          "photosPermission": "Malet usa tu galería para elegir la foto de perfil y el banner de tus tiendas."
         }
       ],
       "expo-font",
@@ -51,7 +51,15 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Malet usa la cámara para escanear los códigos QR de invitación a tiendas."
+        }
+      ],
+      "expo-sharing",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
