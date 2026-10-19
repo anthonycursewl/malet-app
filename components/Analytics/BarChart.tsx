@@ -32,6 +32,13 @@ export default function BarChart({
   const paddingHorizontal = 20;
   const chartWidth = Math.max(data.length * (barWidth + barGap) + barGap + paddingHorizontal * 2, 300);
   const innerHeight = height - 36;
+  /**
+   * Espacio reservado arriba para el punto y el número del valor máximo.
+   * Antes la barra más alta llegaba al 85% de innerHeight y la etiqueta
+   * (a y - 18) se recortaba contra el borde superior del SVG.
+   */
+  const topSpace = 30;
+  const maxBarHeight = Math.max(innerHeight - topSpace, 6);
 
   const format = formatValue ?? ((v: number) => `$${v.toFixed(0)}`);
 
@@ -74,7 +81,7 @@ export default function BarChart({
 
         {/* Bars */}
         {data.map((d, i) => {
-          const barHeight = Math.max((d.value / maxVal) * innerHeight * 0.85, 4);
+          const barHeight = Math.max((d.value / maxVal) * maxBarHeight, 4);
           const x = paddingHorizontal + barGap + i * (barWidth + barGap);
           const y = innerHeight - barHeight;
           const isMax = i === maxIndex && d.value > 0;

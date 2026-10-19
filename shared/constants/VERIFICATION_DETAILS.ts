@@ -157,3 +157,61 @@ export const VERIFICATION_TYPES: Record<string, { color: string; name: string; d
         description: 'Esta cuenta pertenece a una organización verificada.',
     },
 };
+
+export const DEFAULT_VERIFICATION_COLOR = '#6366f1';
+
+export interface UserVerification {
+    color: string;
+    name: string;
+    description: string;
+    type: string | null;
+}
+
+type VerificationInfo = (typeof VERIFICATION_TYPES)[string];
+
+// Índice normalizado (minúsculas) para tolerar diferencias de casing enviadas por el backend
+const VERIFICATION_TYPES_NORMALIZED: Record<string, VerificationInfo> = Object.fromEntries(
+    Object.entries(VERIFICATION_TYPES).map(([key, value]) => [key.toLowerCase(), value])
+);
+
+/**
+ * Resuelve la información de un tipo de verificación por su clave.
+ * Busca primero un match exacto y luego case-insensitive (con trim).
+ * Si la clave no existe o viene vacía, devuelve valores genéricos para que
+ * el badge SIEMPRE pueda renderizarse con un color y nombre válidos.
+ */
+export function getVerificationInfo(typeKey?: string | null): UserVerification {
+    const key = typeKey?.trim() || null;
+    const info: VerificationInfo | undefined = key
+        ? VERIFICATION_TYPES[key] ?? VERIFICATION_TYPES_NORMALIZED[key.toLowerCase()]
+        : undefined;
+
+    return {
+        color: info?.color ?? DEFAULT_VERIFICATION_COLOR,
+        name: info?.name ?? 'Cuenta verificada',
+        description: info?.description ?? 'Esta cuenta está verificada en Malet.',
+        type: key,
+    };
+}
+
+/**
+ * Resuelve la verificación del usuario logueado de forma tolerante a fallos.
+ *
+ * Devuelve `null` SOLO si el usuario no está verificado. Si `verified` es true
+ * siempre devuelve un resultado (con fallbacks si `verification_type` no viene
+ * cargado del backend o el `type` no existe en `VERIFICATION_TYPES`), de modo
+ * que el badge se renderice siempre que la persona esté verificada.
+ */
+export function getUserVerification(
+    user?: {
+        verified?: boolean | number | null;
+        verification_type?: { type?: string | null } | string | null;
+    } | null
+): UserVerification | null {
+    if (!user?.verified) return null;
+
+    const rawType = user.verification_type;
+    const typeKey = typeof rawType === 'string' ? rawType : (rawType?.type ?? null);
+
+    return getVerificationInfo(typeKey);
+}

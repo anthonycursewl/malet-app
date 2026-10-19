@@ -17,9 +17,10 @@ interface InputFieldProps {
   rightIcon?: React.ReactNode;
   onRightIconPress?: () => void;
   keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
 }
 
-export const InputField = memo(({
+export const InputField = memo(function InputField({
   label,
   placeholder,
   value,
@@ -32,7 +33,8 @@ export const InputField = memo(({
   rightIcon,
   onRightIconPress,
   keyboardType,
-}: InputFieldProps) => {
+  autoCapitalize,
+}: InputFieldProps) {
   const inputContent = (
     <TextInput
       style={styles.fieldInput}
@@ -44,6 +46,7 @@ export const InputField = memo(({
       selectionColor={THEME.accent}
       secureTextEntry={secureTextEntry}
       keyboardType={keyboardType || 'default'}
+      autoCapitalize={autoCapitalize}
     />
   );
 
@@ -53,28 +56,54 @@ export const InputField = memo(({
       error ? styles.fieldError : null,
       value ? styles.fieldActive : null,
     ]}>
-      <TextMalet style={styles.fieldLabel}>{label}</TextMalet>
-      <View style={styles.fieldRow}>
-        {onPress ? (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}
-            onPress={onPress}
-            activeOpacity={0.7}
-          >
-            {icon && icon}
-            <TextMalet style={[styles.fieldValue, !value && styles.fieldPlaceholder]}>
-              {value || placeholder}
-            </TextMalet>
-          </TouchableOpacity>
-        ) : (
-          inputContent
-        )}
-        {rightIcon && (
-          <TouchableOpacity onPress={onRightIconPress} activeOpacity={0.6} style={{ marginLeft: 8 }}>
-            {rightIcon}
-          </TouchableOpacity>
-        )}
-      </View>
+      {onPress ? (
+        /* Toda la caja es tocable: etiqueta, icono, texto y espacio libre. */
+        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+          <TextMalet style={styles.fieldLabel}>{label}</TextMalet>
+          <View style={styles.fieldRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              {icon && icon}
+              <TextMalet
+                style={[styles.fieldValue, !value && styles.fieldPlaceholder]}
+                numberOfLines={1}
+              >
+                {value || placeholder}
+              </TextMalet>
+            </View>
+            {rightIcon &&
+              (onRightIconPress ? (
+                <TouchableOpacity
+                  onPress={onRightIconPress}
+                  activeOpacity={0.6}
+                  style={{ marginLeft: 8 }}
+                >
+                  {rightIcon}
+                </TouchableOpacity>
+              ) : (
+                <View style={{ marginLeft: 8 }}>{rightIcon}</View>
+              ))}
+          </View>
+        </TouchableOpacity>
+      ) : (
+        <>
+          <TextMalet style={styles.fieldLabel}>{label}</TextMalet>
+          <View style={styles.fieldRow}>
+            {inputContent}
+            {rightIcon &&
+              (onRightIconPress ? (
+                <TouchableOpacity
+                  onPress={onRightIconPress}
+                  activeOpacity={0.6}
+                  style={{ marginLeft: 8 }}
+                >
+                  {rightIcon}
+                </TouchableOpacity>
+              ) : (
+                <View style={{ marginLeft: 8 }}>{rightIcon}</View>
+              ))}
+          </View>
+        </>
+      )}
     </View>
   );
 

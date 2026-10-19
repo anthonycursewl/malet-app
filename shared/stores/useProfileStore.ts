@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from "zustand";
 import { MALET_API_URL } from "../config/malet.config";
 import { secureFetch } from "../http/secureFetch";
+import { uploadWithXhr } from "../http/uploadWithXhr";
 
 interface ProfileStore {
     loading: boolean,
@@ -10,41 +10,6 @@ interface ProfileStore {
     setError: (error: string | null) => void,
     checkUsernameAvailability: (username: string) => Promise<{ error: string | null, response: any }>;
     updateProfile: (data: { name: string, username: string, newAvatar?: string, newBanner?: string }) => Promise<{ error: string | null, response: any }>;
-}
-
-function uploadWithXhr(url: string, formData: FormData): Promise<{ error: string | null, response: any }> {
-    return new Promise(async (resolve) => {
-        const token = await AsyncStorage.getItem('token');
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', `Bearer ${token || ''}`);
-
-        xhr.onload = () => {
-            try {
-                const data = JSON.parse(xhr.responseText);
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    resolve({ error: null, response: data });
-                } else {
-                    const message = data?.message || data?.error || `Error ${xhr.status}`;
-                    resolve({ error: message, response: null });
-                }
-            } catch {
-                resolve({ error: 'Error al procesar la respuesta del servidor', response: null });
-            }
-        };
-
-        xhr.onerror = () => {
-            resolve({ error: 'Error de conexión al subir la imagen', response: null });
-        };
-
-        xhr.ontimeout = () => {
-            resolve({ error: 'La solicitud tardó demasiado tiempo', response: null });
-        };
-
-        xhr.timeout = 30000;
-        xhr.send(formData);
-    });
 }
 
 export const useProfileStore = create<ProfileStore>((set) => ({

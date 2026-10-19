@@ -13,20 +13,20 @@ import { useAnalyticsStore } from "@/shared/stores/useAnalyticsStore";
 import { useSharedAccountStore } from "@/shared/stores/useSharedAccountStore";
 import IconArrow from "@/svgs/dashboard/IconArrow";
 import IconAt from "@/svgs/dashboard/IconAt";
-import IconVerified from "@/svgs/common/IconVerified";
-import { VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
+import VerificationBadge from "@/components/shared/VerificationBadge";
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleProp, StyleSheet, TextStyle, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Line, Path, Pattern, Rect, Stop, LinearGradient as SvgLinearGradient, Text } from 'react-native-svg';
 
 // lucide icon 
 import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
-import { ArrowRight, Layers, Plus, ShoppingCart, TrendingDown, TrendingUp, Wallet } from 'lucide-react-native';
+import { ArrowRight, Layers, PackagePlus, Plus, ShoppingCart, TrendingDown, TrendingUp, Wallet } from 'lucide-react-native';
+import MaskedView from '@react-native-masked-view/masked-view';
 
 const SHOW_S_ACCOUNTS_NEW_TAG = (() => {
     const releaseDate = new Date('2026-02-26');
@@ -220,6 +220,85 @@ const RollingNumber = memo(({ value }: { value: string }) => {
         </View>
     );
 });
+
+// ---- Tasas: transición minimalista + shimmer premium ----
+const SHIMMER_W = 140;
+
+interface PremiumPriceTextProps {
+    text: string;
+    style?: StyleProp<TextStyle>;
+}
+
+/**
+ * Muestra `text` con una transición minimalista y premium: fundido con
+ * micro-escala al rotar la tasa, mientras un shimmer en degradado gris barre
+ * los glifos vía MaskedView. Sin cursores ni tipeo carácter a carácter.
+ */
+const PremiumPriceText = memo(({ text, style }: PremiumPriceTextProps) => {
+    const [displayedText, setDisplayedText] = useState(text);
+    const [containerWidth, setContainerWidth] = useState(0);
+    const [shimmerX] = useState(() => new Animated.Value(0));
+    const [fade] = useState(() => new Animated.Value(1));
+    const [scale] = useState(() => new Animated.Value(1));
+
+    // Transición al cambiar la tasa: salida en fundido + entrada con micro-escala
+    useEffect(() => {
+        if (text === displayedText) return;
+
+        Animated.parallel([
+            Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }),
+            Animated.timing(scale, { toValue: 0.96, duration: 200, useNativeDriver: true }),
+        ]).start(() => {
+            setDisplayedText(text);
+            fade.setValue(0);
+            scale.setValue(1.04);
+            Animated.parallel([
+                Animated.timing(fade, { toValue: 1, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.timing(scale, { toValue: 1, duration: 340, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]).start();
+        });
+    }, [text, displayedText, fade, scale]);
+
+    // Shimmer gris continuo sobre los glifos
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(shimmerX, { toValue: 1, duration: 1900, useNativeDriver: true }),
+                Animated.delay(600),
+                Animated.timing(shimmerX, { toValue: 0, duration: 0, useNativeDriver: true }),
+                Animated.delay(250),
+            ])
+        ).start();
+    }, [shimmerX]);
+
+    const shimmerTranslate = shimmerX.interpolate({
+        inputRange: [0, 1],
+        outputRange: [-SHIMMER_W - 10, containerWidth + 10],
+    });
+
+    return (
+        <View onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}>
+            <Animated.View style={{ opacity: fade, transform: [{ scale }] }}>
+                <MaskedView maskElement={<TextMalet style={style}>{displayedText}</TextMalet>}>
+                    <TextMalet style={[style, { color: '#101010' }]}>{displayedText}</TextMalet>
+
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[StyleSheet.absoluteFill, { transform: [{ translateX: shimmerTranslate }] }]}
+                    >
+                        <LinearGradient
+                            colors={['rgba(160,160,160,0)', 'rgba(215,215,215,0.9)', 'rgba(150,150,150,0.9)', 'rgba(160,160,160,0)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ width: SHIMMER_W, height: '100%' }}
+                        />
+                    </Animated.View>
+                </MaskedView>
+            </Animated.View>
+        </View>
+    );
+});
+PremiumPriceText.displayName = 'PremiumPriceText';
 
 const TICKET_W = 162;
 const TICKET_H = 78;
@@ -456,8 +535,6 @@ export default function Dashboard() {
     const modalAccountsRef = useRef<ModalAccountsRef>(null);
     // Animated value for fading tasa text on change
     const fadeTasaAnim = useRef(new Animated.Value(1)).current;
-    // Slide animation for tasa card
-    const slideTasaAnim = useRef(new Animated.Value(0)).current;
     // Low-speed background animation for the rates card
     const tasaBgAnim = useRef(new Animated.Value(0)).current;
     // Sticky header opacity
@@ -583,25 +660,14 @@ export default function Dashboard() {
         sync();
     }, [getAllAccountsByUserId, loadTags]);
 
-    // Carousel effect: change displayed tasa every 10 seconds
+    // Carousel effect: change displayed tasa every 3 seconds
     useEffect(() => {
         if (!tasas || tasas.length === 0) return;
         const interval = setInterval(() => {
             setCurrentTasaIndex(prev => (prev + 1) % tasas.length);
-        }, 10000);
+        }, 3000);
         return () => clearInterval(interval);
     }, [tasas]);
-
-    // Slide animation when the displayed tasa changes
-    useEffect(() => {
-        slideTasaAnim.setValue(0);
-        Animated.spring(slideTasaAnim, {
-            toValue: 1,
-            friction: 8,
-            tension: 40,
-            useNativeDriver: true,
-        }).start();
-    }, [currentTasaIndex]);
 
     useEffect(() => {
         Animated.loop(
@@ -658,9 +724,7 @@ export default function Dashboard() {
                                 <TextMalet style={{ fontSize: 15, fontWeight: '600', color: 'rgba(0,0,0,0.85)' }} numberOfLines={1} ellipsizeMode="tail">
                                     {user?.name || ''}
                                 </TextMalet>
-                                {user?.verified && user.verification_type && (
-                                    <IconVerified width={18} height={18} fill={VERIFICATION_TYPES[user.verification_type.type]?.color || '#6366f1'} />
-                                )}
+                                <VerificationBadge user={user} size={18} />
                             </View>
                             <TextMalet style={{ color: 'rgba(116, 116, 116, 1)', fontSize: 13, marginTop: 1 }}>
                                 @{user?.username || ''}
@@ -828,6 +892,22 @@ export default function Dashboard() {
                                             </TextMalet>
                                             <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
                                                 Stats
+                                            </TextMalet>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => router.push('/cuaderno' as any)} style={{ width: 170, height: TICKET_H + 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                                <View style={{ width: '100%', height: TICKET_H, borderRadius: 10, backgroundColor: '#fff', borderWidth: 0.5, borderColor: '#d8d8e0', padding: 14, justifyContent: 'center', overflow: 'hidden' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 1 }}>
+                                        <PackagePlus size={18} color="#6b7280" />
+                                        <View>
+                                            <TextMalet style={{ fontSize: 14, fontWeight: '700', color: '#1a1a2e', letterSpacing: -0.2 }}>
+                                                Malet Sales
+                                            </TextMalet>
+                                            <TextMalet style={{ fontSize: 9, color: '#8888a0', fontWeight: '400', marginTop: 1 }}>
+                                                Ventas
                                             </TextMalet>
                                         </View>
                                     </View>
@@ -1057,54 +1137,32 @@ export default function Dashboard() {
                             </View>
                         </View>
 
-                        <Animated.View style={{
-                            opacity: slideTasaAnim,
-                            transform: [{
-                                translateX: slideTasaAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [30, 0],
-                                }),
-                            }],
-                        }}>
-                            <View style={styles.tasasWidgetContent}>
-                                <View style={styles.tasasWidgetItem}>
-                                    <View style={styles.tasasWidgetItemHeader}>
-                                        <TextMalet style={styles.tasasWidgetItemName}>
-                                            {tasas[currentTasaIndex]?.nombre}
-                                        </TextMalet>
-                                        <View style={styles.tasasWidgetActiveBadge}>
-                                            <TextMalet style={styles.tasasWidgetActiveBadgeText}>●</TextMalet>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.tasasWidgetItemPrices}>
-                                        <View style={styles.tasasWidgetItemPrice}>
-                                            <TextMalet style={styles.tasasWidgetItemPriceLabel}>Compra</TextMalet>
-                                            <TextMalet style={styles.tasasWidgetItemPriceValue}>
-                                                {tasas[currentTasaIndex]?.compra != null ? `Bs ${tasas[currentTasaIndex].compra.toFixed(2)}` : '—'}
-                                            </TextMalet>
-                                        </View>
-                                        <View style={styles.tasasWidgetItemDivider} />
-                                        <View style={styles.tasasWidgetItemPrice}>
-                                            <TextMalet style={styles.tasasWidgetItemPriceLabel}>Venta</TextMalet>
-                                            <TextMalet style={styles.tasasWidgetItemPriceValueHighlight}>
-                                                {tasas[currentTasaIndex]?.venta != null ? `Bs ${tasas[currentTasaIndex].venta.toFixed(2)}` : '—'}
-                                            </TextMalet>
-                                        </View>
-                                    </View>
-
-                                    <TextMalet style={styles.tasasWidgetItemUpdated}>
-                                        {parseDate(tasas[currentTasaIndex]?.fechaActualizacion).split(',')[0]}
+                        <View style={styles.tasasWidgetContent}>
+                            <View style={styles.tasasWidgetItem}>
+                                <View style={styles.tasasWidgetItemHeader}>
+                                    <TextMalet style={styles.tasasWidgetItemName}>
+                                        {tasas[currentTasaIndex]?.nombre}
                                     </TextMalet>
+                                    <View style={styles.tasasWidgetActiveBadge}>
+                                        <TextMalet style={styles.tasasWidgetActiveBadgeText}>●</TextMalet>
+                                    </View>
                                 </View>
-                            </View>
-                        </Animated.View>
 
-                        <View style={styles.tasasWidgetFooter}>
-                            <TextMalet style={styles.tasasWidgetFooterText}>
-                                1 USD = Bs {tasas[currentTasaIndex]?.promedio?.toFixed(2) || '—'}
-                            </TextMalet>
+                                {/* Precio principal de la tasa: transición fade + shimmer premium */}
+                                <View style={styles.tasasWidgetItemPriceHero}>
+                                    <TextMalet style={styles.tasasWidgetItemPriceHeroLabel}>1 USD</TextMalet>
+                                    <PremiumPriceText
+                                        text={tasas[currentTasaIndex]?.promedio != null ? `Bs ${tasas[currentTasaIndex].promedio.toFixed(2)}` : '—'}
+                                        style={styles.tasasWidgetItemPriceHeroValue}
+                                    />
+                                </View>
+
+                                <TextMalet style={styles.tasasWidgetItemUpdated}>
+                                    {parseDate(tasas[currentTasaIndex]?.fechaActualizacion).split(',')[0]}
+                                </TextMalet>
+                            </View>
                         </View>
+
                     </View>
                 )}
 
@@ -1625,7 +1683,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     tasasWidgetItem: {
-        backgroundColor: 'rgba(0,0,0,0.025)',
+        backgroundColor: 'transparent',
         borderRadius: 12,
         padding: 14,
         borderWidth: 1,
@@ -1654,51 +1712,26 @@ const styles = StyleSheet.create({
         fontSize: 8,
         color: '#1a1a1a',
     },
-    tasasWidgetItemPrices: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 10,
-    },
-    tasasWidgetItemPrice: {
-        flex: 1,
-    },
-    tasasWidgetItemPriceLabel: {
-        fontSize: 11,
-        color: 'rgba(0,0,0,0.4)',
-        fontWeight: '500',
-        marginBottom: 3,
-    },
-    tasasWidgetItemPriceValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: 'rgba(0,0,0,0.85)',
-        letterSpacing: -0.3,
-    },
-    tasasWidgetItemPriceValueHighlight: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1a1a1a',
-        letterSpacing: -0.3,
-    },
-    tasasWidgetItemDivider: {
-        width: 1,
-        height: 28,
-        backgroundColor: 'rgba(0,0,0,0.06)',
-    },
     tasasWidgetItemUpdated: {
         fontSize: 10,
         color: 'rgba(0,0,0,0.3)',
     },
-    tasasWidgetFooter: {
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
+    tasasWidgetItemPriceHero: {
         alignItems: 'center',
+        marginBottom: 12,
     },
-    tasasWidgetFooterText: {
-        fontSize: 12,
+    tasasWidgetItemPriceHeroLabel: {
+        fontSize: 10,
         fontWeight: '600',
-        color: 'rgba(0,0,0,0.5)',
+        color: 'rgba(0,0,0,0.4)',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    tasasWidgetItemPriceHeroValue: {
+        fontSize: 34,
+        fontWeight: '800',
+        color: '#101010',
+        letterSpacing: -0.8,
     },
 });

@@ -1,12 +1,11 @@
 import LayoutAuthenticated from "@/components/Layout/LayoutAuthenticated";
 import UpdatesModal from "@/components/Modals/UpdatesModal/UpdatesModal";
 import TextMalet from "@/components/TextMalet/TextMalet";
-import { VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
+import VerificationBadge from "@/components/shared/VerificationBadge";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
 import { spacing } from "@/shared/theme";
-import IconVerified from "@/svgs/common/IconVerified";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -112,9 +111,6 @@ export default function ProfileView() {
         ]);
     }, [handleLogoutApp]);
 
-    const verificationType = user?.verification_type?.type;
-    const verificationTypeColor = verificationType ? VERIFICATION_TYPES[verificationType]?.color : undefined;
-
     const profileName = user?.name?.trim() || "Usuario";
     const username = user?.username?.trim() || "usuario";
 
@@ -161,6 +157,13 @@ export default function ProfileView() {
                 title: "Wallet Garzón",
                 subtitle: "Tus wallets y tokens",
                 onPress: () => router.push("/garzon/wallet" as any),
+            },
+            {
+                id: "cuaderno",
+                icon: "shopping-cart" as const,
+                title: "Malet Sales",
+                subtitle: "Tiendas, productos y ventas",
+                onPress: () => router.push("/cuaderno" as any),
             },
             {
                 id: "updates",
@@ -262,7 +265,7 @@ export default function ProfileView() {
                         <View style={styles.identityTextWrap}>
                             <View style={styles.nameRow}>
                                 <TextMalet style={styles.profileName}>{profileName}</TextMalet>
-                                {verificationTypeColor && <IconVerified width={18} height={18} fill={verificationTypeColor} />}
+                                <VerificationBadge user={user} size={18} />
                             </View>
                             <TextMalet style={styles.usernameText}>@{username}</TextMalet>
                         </View>

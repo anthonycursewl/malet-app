@@ -1,5 +1,5 @@
 import TextMalet from "@/components/TextMalet/TextMalet";
-import { VERIFICATION_DETAILS, VERIFICATION_TYPES } from "@/shared/constants/VERIFICATION_DETAILS";
+import { getVerificationInfo, getUserVerification, VERIFICATION_DETAILS } from "@/shared/constants/VERIFICATION_DETAILS";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import IconVerified from "@/svgs/common/IconVerified";
 import { LinearGradient } from "expo-linear-gradient";
@@ -8,12 +8,12 @@ import { memo, useCallback, useState } from "react";
 import { Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Button from "../Button/Button";
 import ModalOptions from "../shared/ModalOptions";
+import VerificationBadge from "../shared/VerificationBadge";
 
 const PLACEHOLDER_AVATAR = require("@/assets/images/placeholders/placeholder_avatar.png");
-const PLACEHOLDER_BANNER = require("@/assets/images/placeholders/placeholder_banner.png");
 
 const VerificationItem = memo(({ item }: { item: typeof VERIFICATION_DETAILS[0] }) => {
-    const verificationType = VERIFICATION_TYPES[item.type];
+    const verificationInfo = getVerificationInfo(item.type);
 
     return (
         <View style={{ marginBottom: 30 }}>
@@ -66,7 +66,7 @@ const VerificationItem = memo(({ item }: { item: typeof VERIFICATION_DETAILS[0] 
                                 <TextMalet>{item.example.name}</TextMalet>
                                 <TextMalet>{item.example.handle}</TextMalet>
                             </View>
-                            <IconVerified width={20} height={20} fill={verificationType.color} />
+                            <IconVerified width={20} height={20} fill={verificationInfo.color} />
                         </View>
 
                     </View>
@@ -84,6 +84,7 @@ const VerificationItem = memo(({ item }: { item: typeof VERIFICATION_DETAILS[0] 
         </View>
     );
 });
+VerificationItem.displayName = 'VerificationItem';
 
 interface DashboardHeaderProps {
     name: string;
@@ -98,7 +99,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
     const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [verificationModal, setVerificationModal] = useState(false);
 
-    const verification = user?.verified && user.verification_type ? VERIFICATION_TYPES[user.verification_type.type] : null;
+    const verification = getUserVerification(user);
 
     const getTruncatedName = useCallback((name: string) => {
         const maxLength = Math.floor(width / 15);
@@ -112,7 +113,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
 
     const handleOpenVerificationModal = useCallback(() => {
         setVerificationModal(true);
-    }, [verificationModal]);
+    }, []);
 
     return (
         <View style={{ gap: 2 }}>
@@ -143,11 +144,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
                             <TextMalet style={{ color: 'rgba(109, 109, 109, 1)' }} numberOfLines={1} ellipsizeMode="tail">
                                 {getTruncatedName(name)}
                             </TextMalet>
-                            {verification && (
-                                <TouchableOpacity onPress={() => setShowVerificationModal(true)}>
-                                    <IconVerified width={20} height={20} fill={verification.color} />
-                                </TouchableOpacity>
-                            )}
+                            <VerificationBadge user={user} size={20} onPress={() => setShowVerificationModal(true)} />
                         </View>
                     </View>
 
@@ -193,14 +190,14 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
                                 <TextMalet>{name}</TextMalet>
                                 <TextMalet style={{ color: 'rgba(116, 116, 116, 1)', fontSize: 13 }}>@{username}</TextMalet>
                             </View>
-                            <IconVerified width={20} height={20} fill={verification.color} />
+                            <VerificationBadge user={user} size={20} />
                         </View>
                     </View>
 
                     <ScrollView>
                         <View style={{ marginTop: 40, width: '100%', alignItems: 'center', justifyContent: 'center' }}>
                             <View style={{ alignItems: 'center', gap: 4 }}>
-                                <IconVerified width={50} height={50} fill={verification.color} />
+                                <VerificationBadge user={user} size={50} />
                                 <TextMalet style={{ fontSize: 15 }}>{verification.name}</TextMalet>
                             </View>
 
@@ -249,6 +246,7 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
         </View >
     );
 });
+DashboardHeader.displayName = 'DashboardHeader';
 
 const styles = StyleSheet.create({
     headerText: {

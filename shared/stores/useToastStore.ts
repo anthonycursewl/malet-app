@@ -13,7 +13,8 @@ export interface Toast {
 
 interface ToastStore {
   toasts: Toast[];
-  add: (toast: Omit<Toast, 'id'>) => string;
+  /** `duration` es opcional: si no se pasa, se usan 3 s. */
+  add: (toast: Omit<Toast, 'id' | 'duration'> & { duration?: number }) => string;
   update: (id: string, patch: Partial<Omit<Toast, 'id'>>) => void;
   remove: (id: string) => void;
   clear: () => void;
