@@ -21,7 +21,7 @@ export interface ReceiptPdfData {
 const RECEIPT_LOGO = require('@/assets/images/malet/breadriuss_logo.png');
 
 /** Respaldo público por si el asset no se pudiera leer del dispositivo. */
-const RECEIPT_LOGO_FALLBACK_URL =
+export const RECEIPT_LOGO_FALLBACK_URL =
     'https://negocios.breadriuss.com/breadriuss/logo_breadriuss_light.png';
 
 let logoCache: string | null | undefined;
@@ -30,7 +30,7 @@ let logoCache: string | null | undefined;
  * Logo como data URI base64 para que el PDF sea **autocontenido** y se pueda
  * generar/compartir sin conexión. Se resuelve una sola vez por sesión.
  */
-async function getReceiptLogoUri(): Promise<string | null> {
+export async function getReceiptLogoUri(): Promise<string | null> {
     if (logoCache !== undefined) return logoCache;
 
     try {

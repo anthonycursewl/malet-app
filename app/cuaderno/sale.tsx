@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Calendar, ChevronDown, Plus, Trash2, UserRound } from 'lucide-react-native';
+import { Calendar, ChevronDown, Plus, Sparkles, Trash2, UserRound } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
@@ -52,18 +52,26 @@ const parseDecimal = (text: string): number => {
 /** Línea del carrito (los importes se editan como texto). */
 interface CartLine {
     key: string;
-    productId: string;
+    /** `null` en conceptos libres (servicios sin producto). */
+    productId: string | null;
+    /** Nombre del concepto libre (los productos lo resuelven del catálogo). */
+    name: string;
     quantity: string;
     unitPrice: string;
     unitCost: string;
 }
+
+const conceptKey = () => `concept-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 /**
  * Crear o editar una venta (detalle con total y ganancia en vivo,
  * soft-delete con "Deshacer" y hard-delete para el creador).
  */
 export default function SaleFormScreen() {
-    const { store: storeId, id: saleId } = useLocalSearchParams<{ store: string; id?: string }>();
+    const { store: storeId, id: saleId } = useLocalSearchParams<{
+        store: string;
+        id?: string;
+    }>();
     const user = useAuthStore((s) => s.user);
     const products = useSalesModuleStore((s) => s.products);
     const loadProducts = useSalesModuleStore((s) => s.loadProducts);
@@ -94,6 +102,11 @@ export default function SaleFormScreen() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [productModalOpen, setProductModalOpen] = useState(false);
     const [productSearch, setProductSearch] = useState('');
+    const [conceptModalOpen, setConceptModalOpen] = useState(false);
+    const [conceptName, setConceptName] = useState('');
+    const [conceptPrice, setConceptPrice] = useState('');
+    const [conceptCost, setConceptCost] = useState('');
+    const [conceptQty, setConceptQty] = useState('1');
     const [saving, setSaving] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     /** Hay un borrado en curso (velo de carga en pantalla). */
@@ -133,8 +146,7 @@ export default function SaleFormScreen() {
 
                 // Se calcula fuera del render: en edición, abrir la venta no cuenta.
                 const dirty = isEdit
-                    ? initialSignature.current !== null &&
-                      formSignature !== initialSignature.current
+                    ? initialSignature.current !== null && formSignature !== initialSignature.current
                     : lines.length > 0;
 
                 if (!dirty) return;
@@ -153,12 +165,12 @@ export default function SaleFormScreen() {
                                 navigation.dispatch(event.data.action);
                             },
                         },
-                    ]
+                    ],
                 );
             });
 
             return unsubscribe;
-        }, [navigation, isEdit, formSignature, lines.length])
+        }, [navigation, isEdit, formSignature, lines.length]),
     );
 
     useEffect(() => {
@@ -185,17 +197,16 @@ export default function SaleFormScreen() {
             setCustomerId(fetched.customer_id ?? null);
             setLines(
                 (fetched.items ?? []).map((item) => ({
-                    key: item.product_id,
-                    productId: item.product_id,
+                    key: item.product_id ?? item.id,
+                    productId: item.product_id ?? null,
+                    name: item.name ?? item.product_name ?? 'Concepto',
                     quantity: String(item.quantity ?? 1),
                     unitPrice: String(item.unit_price ?? ''),
                     unitCost: String(item.unit_cost ?? ''),
-                }))
+                })),
             );
             setRefCurrency(fetched.reference_currency ?? null);
-            setRefAmount(
-                fetched.reference_amount != null ? String(fetched.reference_amount) : ''
-            );
+            setRefAmount(fetched.reference_amount != null ? String(fetched.reference_amount) : '');
             if (fetched.sold_at) {
                 const d = new Date(fetched.sold_at);
                 if (!Number.isNaN(d.getTime())) setSoldAt(d);
@@ -207,12 +218,18 @@ export default function SaleFormScreen() {
         };
     }, [saleId, fetchSale, fetchSaleReceipt]);
 
-    const productNameOf = (productId: string): string =>
-        products.find((p) => p.id === productId)?.name ?? 'Producto';
+    /** Nombre visible de una línea: producto del catálogo o concepto libre. */
+    const lineName = (line: CartLine): string => {
+        if (!line.productId) return line.name.trim() || 'Concepto';
+        return products.find((p) => p.id === line.productId)?.name ?? (line.name.trim() || 'Producto');
+    };
 
     /** Cliente seleccionado (el nombre se resuelve cuando carga la lista). */
     const customer: Customer | null = customerId
-        ? customers.find((c) => c.id === customerId) ?? { id: customerId, name: 'Cliente' }
+        ? (customers.find((c) => c.id === customerId) ?? {
+              id: customerId,
+              name: 'Cliente',
+          })
         : null;
 
     const lineQty = (line: CartLine) => parseInt(line.quantity, 10) || 0;
@@ -234,9 +251,7 @@ export default function SaleFormScreen() {
             const existing = prev.find((line) => line.productId === product.id);
             if (existing) {
                 return prev.map((line) =>
-                    line.productId === product.id
-                        ? { ...line, quantity: String(lineQty(line) + 1) }
-                        : line
+                    line.productId === product.id ? { ...line, quantity: String(lineQty(line) + 1) } : line,
                 );
             }
             return [
@@ -244,6 +259,7 @@ export default function SaleFormScreen() {
                 {
                     key: product.id,
                     productId: product.id,
+                    name: product.name,
                     quantity: '1',
                     unitPrice: String(product.pvp ?? 0),
                     unitCost: String(product.cost ?? 0),
@@ -254,14 +270,53 @@ export default function SaleFormScreen() {
         setProductSearch('');
     };
 
-    const updateLine = (productId: string, patch: Partial<CartLine>) => {
-        setLines((prev) =>
-            prev.map((line) => (line.productId === productId ? { ...line, ...patch } : line))
-        );
+    /** Agrega un concepto libre (servicio): no toca el catálogo de productos. */
+    const addConcept = () => {
+        const name = conceptName.trim();
+        if (!name) {
+            notify('error', 'Escribe el nombre del concepto.');
+            return;
+        }
+        const price = parseDecimal(conceptPrice);
+        if (!Number.isFinite(price) || price < 0) {
+            notify('error', 'Escribe un precio válido para el concepto.');
+            return;
+        }
+        const cost = conceptCost.trim() ? parseDecimal(conceptCost) : 0;
+        if (!Number.isFinite(cost) || cost < 0) {
+            notify('error', 'Escribe un costo válido para el concepto.');
+            return;
+        }
+        const qty = parseInt(conceptQty, 10) || 0;
+        if (qty < 1) {
+            notify('error', 'La cantidad debe ser al menos 1.');
+            return;
+        }
+
+        setLines((prev) => [
+            ...prev,
+            {
+                key: conceptKey(),
+                productId: null,
+                name,
+                quantity: String(qty),
+                unitPrice: String(price),
+                unitCost: String(cost),
+            },
+        ]);
+        setConceptName('');
+        setConceptPrice('');
+        setConceptCost('');
+        setConceptQty('1');
+        setConceptModalOpen(false);
     };
 
-    const removeLine = (productId: string) => {
-        setLines((prev) => prev.filter((line) => line.productId !== productId));
+    const updateLine = (key: string, patch: Partial<CartLine>) => {
+        setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+    };
+
+    const removeLine = (key: string) => {
+        setLines((prev) => prev.filter((line) => line.key !== key));
     };
 
     /** Valida el carrito y devuelve las líneas para la API (o null si hay error). */
@@ -272,26 +327,53 @@ export default function SaleFormScreen() {
         }
 
         for (const line of lines) {
+            if (!line.productId && !line.name.trim()) {
+                notify('error', 'Cada concepto necesita un nombre.');
+                return null;
+            }
             if (lineQty(line) < 1) {
-                notify('error', 'La cantidad debe ser al menos 1 en cada producto.');
+                notify('error', 'La cantidad debe ser al menos 1 en cada línea.');
                 return null;
             }
             if (!Number.isFinite(linePrice(line)) || linePrice(line) < 0) {
-                notify('error', `Escribe un precio válido para ${productNameOf(line.productId)}.`);
+                notify('error', `Escribe un precio válido para ${lineName(line)}.`);
                 return null;
             }
             if (!Number.isFinite(lineCost(line)) || lineCost(line) < 0) {
-                notify('error', `Escribe un costo válido para ${productNameOf(line.productId)}.`);
+                notify('error', `Escribe un costo válido para ${lineName(line)}.`);
                 return null;
             }
         }
 
-        return lines.map((line) => ({
-            product_id: line.productId,
-            quantity: lineQty(line),
-            unit_price: linePrice(line),
-            unit_cost: lineCost(line),
-        }));
+        return lines.map((line) => {
+            if (line.productId) {
+                const exists = products.some((p) => p.id === line.productId);
+                // Producto eliminado del catálogo: se conserva como concepto libre
+                // con el nombre/precio congelados (no falla el guardado).
+                if (!exists) {
+                    return {
+                        name: line.name.trim() || 'Producto',
+                        item_type: 'service' as const,
+                        quantity: lineQty(line),
+                        unit_price: linePrice(line),
+                        unit_cost: lineCost(line),
+                    };
+                }
+                return {
+                    product_id: line.productId,
+                    quantity: lineQty(line),
+                    unit_price: linePrice(line),
+                    unit_cost: lineCost(line),
+                };
+            }
+            return {
+                name: line.name.trim(),
+                item_type: 'service' as const,
+                quantity: lineQty(line),
+                unit_price: linePrice(line),
+                unit_cost: lineCost(line),
+            };
+        });
     };
 
     const openNumericPicker = () => setShowDatePicker(true);
@@ -314,14 +396,14 @@ export default function SaleFormScreen() {
 
         setDraft({
             items: lines.map((line) => ({
-                productName: productNameOf(line.productId),
+                productName: lineName(line),
                 quantity: lineQty(line),
                 unitPrice: linePrice(line),
                 unitCost: lineCost(line),
                 total: lineTotal(line),
             })),
             paymentMethodName: paymentMethodId
-                ? paymentMethods.find((m) => m.id === paymentMethodId)?.name ?? null
+                ? (paymentMethods.find((m) => m.id === paymentMethodId)?.name ?? null)
                 : null,
             customerName: customer?.name ?? null,
             soldAtLabel: formatDateShort(soldAt),
@@ -341,11 +423,7 @@ export default function SaleFormScreen() {
 
         // La política de la tienda manda (defensa extra al backend).
         const wantsReceipt =
-            receiptMode === 'always'
-                ? true
-                : receiptMode === 'never'
-                  ? false
-                  : receipt.enabled;
+            receiptMode === 'always' ? true : receiptMode === 'never' ? false : receipt.enabled;
 
         const refText = refAmount.trim();
         const hasRefCurrency = refCurrency != null;
@@ -445,41 +523,36 @@ export default function SaleFormScreen() {
 
     const confirmHardDelete = () => {
         if (!saleId) return;
-        Alert.alert(
-            'Eliminar definitivamente',
-            'Esta venta se borrará para siempre. No se puede deshacer.',
-            [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                    text: 'Eliminar',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setDeleting(true);
-                        try {
-                            const err = await hardDeleteSale(saleId);
-                            if (err) {
-                                notify('error', err);
-                                return;
-                            }
-                            notify('success', 'Venta eliminada definitivamente.');
-                            // El detalle deja de existir: volvemos directo al panel de la tienda.
-                            allowExit.current = true;
-                            router.dismissTo('/cuaderno/store' as any);
-                        } finally {
-                            setDeleting(false);
+        Alert.alert('Eliminar definitivamente', 'Esta venta se borrará para siempre. No se puede deshacer.', [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+                text: 'Eliminar',
+                style: 'destructive',
+                onPress: async () => {
+                    setDeleting(true);
+                    try {
+                        const err = await hardDeleteSale(saleId);
+                        if (err) {
+                            notify('error', err);
+                            return;
                         }
-                    },
+                        notify('success', 'Venta eliminada definitivamente.');
+                        // El detalle deja de existir: volvemos directo al panel de la tienda.
+                        allowExit.current = true;
+                        router.dismissTo('/cuaderno/store' as any);
+                    } finally {
+                        setDeleting(false);
+                    }
                 },
-            ]
-        );
+            },
+        ]);
     };
 
     const canHardDelete = !!sale && (sale.created_by ?? null) === user?.id;
-    const saleHasReference =
-        !!sale && (sale.reference_currency != null || sale.reference_amount != null);
+    const saleHasReference = !!sale && (sale.reference_currency != null || sale.reference_amount != null);
     const activeMethods = paymentMethods.filter((m) => m.active || m.id === paymentMethodId);
     const visibleProducts = products.filter((p) =>
-        p.name.toLowerCase().includes(productSearch.trim().toLowerCase())
+        p.name.toLowerCase().includes(productSearch.trim().toLowerCase()),
     );
 
     if (loadingSale) {
@@ -487,10 +560,7 @@ export default function SaleFormScreen() {
             <LayoutAuthenticated>
                 <View style={styles.container}>
                     <View style={styles.headerPad}>
-                        <CuadernoHeader
-                            title={isEdit ? 'Editar venta' : 'Nueva venta'}
-                            bleed={19}
-                        />
+                        <CuadernoHeader title={isEdit ? 'Editar venta' : 'Nueva venta'} bleed={19} />
                     </View>
                     <SaleFormSkeleton />
                 </View>
@@ -514,37 +584,50 @@ export default function SaleFormScreen() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-
-                    {/* Productos (carrito) */}
+                    {/* Productos y conceptos (carrito) */}
                     <View style={styles.group}>
                         <View style={styles.productsHeader}>
-                            <TextMalet style={styles.label}>Productos</TextMalet>
+                            <TextMalet style={styles.label}>Productos y conceptos</TextMalet>
                             {lines.length > 0 && (
                                 <TextMalet style={styles.productsCount}>
-                                    {lines.length} {lines.length === 1 ? 'producto' : 'productos'}
+                                    {lines.length} {lines.length === 1 ? 'línea' : 'líneas'}
                                 </TextMalet>
                             )}
                         </View>
 
                         {lines.length === 0 && (
                             <TextMalet style={styles.hintSmall}>
-                                Agrega uno o varios productos a la venta.
+                                Agrega productos o servicios libres (sin crear un producto).
                             </TextMalet>
                         )}
 
                         {lines.map((line) => (
                             <View key={line.key} style={styles.lineCard}>
                                 <View style={styles.lineHeader}>
-                                    <TextMalet style={styles.lineTitle} numberOfLines={1}>
-                                        {productNameOf(line.productId)}
-                                    </TextMalet>
+                                    <View style={{ flex: 1 }}>
+                                        <TextMalet style={styles.lineTitle} numberOfLines={1}>
+                                            {lineName(line)}
+                                        </TextMalet>
+                                        {!line.productId && (
+                                            <TextMalet style={styles.serviceBadge}>Servicio</TextMalet>
+                                        )}
+                                    </View>
                                     <TouchableOpacity
-                                        onPress={() => removeLine(line.productId)}
+                                        onPress={() => removeLine(line.key)}
                                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                     >
                                         <Trash2 size={16} color="#dc2626" />
                                     </TouchableOpacity>
                                 </View>
+
+                                {!line.productId && (
+                                    <InputField
+                                        label="Concepto"
+                                        placeholder="Ej. Desarrollo de app"
+                                        value={line.name}
+                                        onChangeText={(text) => updateLine(line.key, { name: text })}
+                                    />
+                                )}
 
                                 <View style={styles.lineInputs}>
                                     <View style={{ width: 74 }}>
@@ -553,7 +636,7 @@ export default function SaleFormScreen() {
                                             placeholder="1"
                                             value={line.quantity}
                                             onChangeText={(t) =>
-                                                updateLine(line.productId, {
+                                                updateLine(line.key, {
                                                     quantity: t.replace(/[^0-9]/g, ''),
                                                 })
                                             }
@@ -566,7 +649,7 @@ export default function SaleFormScreen() {
                                             placeholder="0.00"
                                             value={line.unitPrice}
                                             onChangeText={(t) =>
-                                                updateLine(line.productId, {
+                                                updateLine(line.key, {
                                                     unitPrice: sanitizeDecimal(t),
                                                 })
                                             }
@@ -579,7 +662,7 @@ export default function SaleFormScreen() {
                                             placeholder="0.00"
                                             value={line.unitCost}
                                             onChangeText={(t) =>
-                                                updateLine(line.productId, {
+                                                updateLine(line.key, {
                                                     unitCost: sanitizeDecimal(t),
                                                 })
                                             }
@@ -594,12 +677,20 @@ export default function SaleFormScreen() {
                             </View>
                         ))}
 
-                        <Button
-                            text="Agregar producto"
-                            icon={<Plus size={15} color="#fff" />}
-                            onPress={() => setProductModalOpen(true)}
-                            style={styles.addProductBtn}
-                        />
+                        <View style={styles.addButtons}>
+                            <Button
+                                text="Agregar producto"
+                                icon={<Plus size={15} color="#fff" />}
+                                onPress={() => setProductModalOpen(true)}
+                                style={styles.addProductBtn}
+                            />
+                            <Button
+                                text="Agregar concepto"
+                                icon={<Sparkles size={15} color="#fff" />}
+                                onPress={() => setConceptModalOpen(true)}
+                                style={styles.addProductBtn}
+                            />
+                        </View>
                     </View>
 
                     {/* Método de cobro */}
@@ -611,7 +702,10 @@ export default function SaleFormScreen() {
                                 onPress={() => setPaymentMethodId(null)}
                             >
                                 <TextMalet
-                                    style={[styles.chipText, paymentMethodId == null && styles.chipTextActive]}
+                                    style={[
+                                        styles.chipText,
+                                        paymentMethodId == null && styles.chipTextActive,
+                                    ]}
                                 >
                                     Sin método
                                 </TextMalet>
@@ -624,9 +718,7 @@ export default function SaleFormScreen() {
                                         style={[styles.chip, active && styles.chipActive]}
                                         onPress={() => setPaymentMethodId(active ? null : m.id)}
                                     >
-                                        <TextMalet
-                                            style={[styles.chipText, active && styles.chipTextActive]}
-                                        >
+                                        <TextMalet style={[styles.chipText, active && styles.chipTextActive]}>
                                             {m.name}
                                         </TextMalet>
                                     </TouchableOpacity>
@@ -664,9 +756,7 @@ export default function SaleFormScreen() {
                                             if (active) setRefAmount('');
                                         }}
                                     >
-                                        <TextMalet
-                                            style={[styles.chipText, active && styles.chipTextActive]}
-                                        >
+                                        <TextMalet style={[styles.chipText, active && styles.chipTextActive]}>
                                             {c}
                                         </TextMalet>
                                     </TouchableOpacity>
@@ -711,18 +801,13 @@ export default function SaleFormScreen() {
                     <View style={styles.previewCard}>
                         <View style={styles.previewRow}>
                             <TextMalet style={styles.previewLabel}>Total</TextMalet>
-                            <TextMalet style={styles.previewValue}>
-                                {formatMoney(total, currency)}
-                            </TextMalet>
+                            <TextMalet style={styles.previewValue}>{formatMoney(total, currency)}</TextMalet>
                         </View>
                         <View style={styles.previewDivider} />
                         <View style={styles.previewRow}>
                             <TextMalet style={styles.previewLabel}>Ganancia</TextMalet>
                             <TextMalet
-                                style={[
-                                    styles.previewValue,
-                                    { color: profit >= 0 ? '#16a34a' : '#dc2626' },
-                                ]}
+                                style={[styles.previewValue, { color: profit >= 0 ? '#16a34a' : '#dc2626' }]}
                             >
                                 {formatMoney(profit, currency)}
                             </TextMalet>
@@ -819,11 +904,7 @@ export default function SaleFormScreen() {
                     keyboardShouldPersistTaps="handled"
                 >
                     {visibleProducts.map((p) => (
-                        <TouchableOpacity
-                            key={p.id}
-                            style={styles.modalRow}
-                            onPress={() => addProduct(p)}
-                        >
+                        <TouchableOpacity key={p.id} style={styles.modalRow} onPress={() => addProduct(p)}>
                             <View style={{ flex: 1 }}>
                                 <TextMalet style={styles.modalRowTitle}>{p.name}</TextMalet>
                                 <TextMalet style={styles.modalRowSub}>
@@ -842,6 +923,56 @@ export default function SaleFormScreen() {
                         </TextMalet>
                     )}
                 </ScrollView>
+            </ModalOptions>
+
+            {/* Concepto libre (servicio) */}
+            <ModalOptions
+                visible={conceptModalOpen}
+                onClose={() => setConceptModalOpen(false)}
+                heightRatio={0.72}
+            >
+                <TextMalet style={styles.modalTitle}>Agregar concepto</TextMalet>
+                <TextMalet style={styles.hintSmall}>
+                    Para servicios: no se crea nada en el catálogo de productos.
+                </TextMalet>
+
+                <InputField
+                    label="Concepto"
+                    placeholder="Ej. Desarrollo de app"
+                    value={conceptName}
+                    onChangeText={setConceptName}
+                />
+                <View style={styles.lineInputs}>
+                    <View style={{ flex: 1 }}>
+                        <InputField
+                            label="Precio"
+                            placeholder="0.00"
+                            value={conceptPrice}
+                            onChangeText={(text) => setConceptPrice(sanitizeDecimal(text))}
+                            keyboardType="decimal-pad"
+                        />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <InputField
+                            label="Costo (opcional)"
+                            placeholder="0.00"
+                            value={conceptCost}
+                            onChangeText={(text) => setConceptCost(sanitizeDecimal(text))}
+                            keyboardType="decimal-pad"
+                        />
+                    </View>
+                </View>
+                <View style={{ width: 90 }}>
+                    <InputField
+                        label="Cantidad"
+                        placeholder="1"
+                        value={conceptQty}
+                        onChangeText={(text) => setConceptQty(text.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                    />
+                </View>
+
+                <Button text="Agregar" onPress={addConcept} style={{ marginTop: 8 }} />
             </ModalOptions>
         </LayoutAuthenticated>
     );
@@ -894,6 +1025,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#111',
     },
+    serviceBadge: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#7c3aed',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginTop: 2,
+    },
     lineInputs: {
         flexDirection: 'row',
         gap: 8,
@@ -906,6 +1045,11 @@ const styles = StyleSheet.create({
     },
     addProductBtn: {
         alignSelf: 'flex-start',
+    },
+    addButtons: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
     },
     label: {
         fontSize: 14,

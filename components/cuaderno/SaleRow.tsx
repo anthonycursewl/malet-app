@@ -29,7 +29,7 @@ function SaleRow({ sale, paymentMethodName, currency, onPress }: SaleRowProps) {
     const first = items[0];
     const extra = items.length - 1;
     const units = saleUnits(sale);
-    const baseName = first?.product_name ?? 'Producto';
+    const baseName = first?.name ?? first?.product_name ?? 'Producto';
     const title =
         extra > 0
             ? `${baseName} +${extra} ${extra === 1 ? 'producto' : 'productos'}`

@@ -3,6 +3,12 @@ import {
     Customer,
     CustomerInput,
     CustomerStats,
+    Invoice,
+    InvoiceInput,
+    InvoicePayInput,
+    InvoicePaymentResult,
+    InvoiceStatus,
+    InvoiceTotals,
     PaymentMethod,
     Receipt,
     Sale,
@@ -18,6 +24,7 @@ import {
     StoreMember,
     StoreNotificationGroup,
     StoreNotificationsConfig,
+    StorePhotoEditMode,
     StorePhotoKind,
     StoreProduct,
     StoreReceiptMode,
@@ -32,7 +39,11 @@ interface Pagination {
     isEnd: boolean;
 }
 
-const freshPagination = (take: number): Pagination => ({ cursor: null, take, isEnd: false });
+const freshPagination = (take: number): Pagination => ({
+    cursor: null,
+    take,
+    isEnd: false,
+});
 
 /**
  * Filtro por defecto del panel de la tienda: siempre **Hoy**, así el resumen,
@@ -80,6 +91,13 @@ interface SalesModuleStore {
     receiptsLoading: boolean;
     receiptsPagination: Pagination;
 
+    // Facturas
+    invoices: Invoice[];
+    invoicesLoading: boolean;
+    invoicesPagination: Pagination;
+    invoiceStatus: InvoiceStatus | null;
+    invoiceTotals: InvoiceTotals | null;
+
     // Clientes
     customers: Customer[];
     customersLoading: boolean;
@@ -110,7 +128,9 @@ interface SalesModuleStore {
             email?: string | null;
             address?: string | null;
             receipt_mode?: StoreReceiptMode;
-        }
+            avatar_edit_mode?: StorePhotoEditMode;
+            banner_edit_mode?: StorePhotoEditMode;
+        },
     ) => Promise<string | null>;
     /**
      * Sube la foto (avatar o banner) de la tienda actual: el cliente acota la
@@ -119,7 +139,7 @@ interface SalesModuleStore {
     uploadStorePhoto: (
         kind: StorePhotoKind,
         file: { uri: string; name: string; type: string },
-        onProgress?: (ratio: number) => void
+        onProgress?: (ratio: number) => void,
     ) => Promise<string | null>;
     deleteStore: (storeId: string) => Promise<string | null>;
     restoreStore: (storeId: string) => Promise<string | null>;
@@ -140,7 +160,7 @@ interface SalesModuleStore {
     createProduct: (body: { name: string; cost: number; pvp: number }) => Promise<string | null>;
     updateProduct: (
         productId: string,
-        body: Partial<{ name: string; cost: number; pvp: number }>
+        body: Partial<{ name: string; cost: number; pvp: number }>,
     ) => Promise<string | null>;
     deleteProduct: (productId: string) => Promise<string | null>;
     restoreProduct: (productId: string) => Promise<string | null>;
@@ -151,7 +171,7 @@ interface SalesModuleStore {
     createPaymentMethod: (name: string) => Promise<string | null>;
     updatePaymentMethod: (
         methodId: string,
-        body: { name?: string; active?: boolean }
+        body: { name?: string; active?: boolean },
     ) => Promise<string | null>;
     deletePaymentMethod: (methodId: string) => Promise<string | null>;
     restorePaymentMethod: (methodId: string) => Promise<string | null>;
@@ -174,12 +194,10 @@ interface SalesModuleStore {
     // Recibos
     loadReceipts: (opts?: { refresh?: boolean }) => Promise<void>;
     fetchReceipt: (receiptId: string) => Promise<{ receipt: Receipt | null; error: string | null }>;
-    fetchSaleReceipt: (
-        saleId: string
-    ) => Promise<{ receipt: Receipt | null; error: string | null }>;
+    fetchSaleReceipt: (saleId: string) => Promise<{ receipt: Receipt | null; error: string | null }>;
     issueReceipt: (
         saleId: string,
-        body?: { customer_name?: string }
+        body?: { customer_name?: string },
     ) => Promise<{ receipt: Receipt | null; error: string | null }>;
     deleteReceipt: (receiptId: string) => Promise<string | null>;
     restoreReceipt: (receiptId: string) => Promise<string | null>;
@@ -187,29 +205,43 @@ interface SalesModuleStore {
     /** Corrección auditada del "Facturar a" de un recibo emitido. */
     updateReceipt: (receiptId: string, customerName: string | null) => Promise<string | null>;
 
+    // Facturas
+    loadInvoices: (opts?: { refresh?: boolean }) => Promise<void>;
+    setInvoiceStatus: (status: InvoiceStatus | null) => Promise<void>;
+    loadInvoiceTotals: () => Promise<void>;
+    refreshInvoicesAll: () => Promise<void>;
+    fetchInvoice: (invoiceId: string) => Promise<{ invoice: Invoice | null; error: string | null }>;
+    createInvoice: (body: InvoiceInput) => Promise<{ invoice: Invoice | null; error: string | null }>;
+    updateInvoice: (invoiceId: string, body: Partial<InvoiceInput>) => Promise<string | null>;
+    cancelInvoice: (invoiceId: string) => Promise<string | null>;
+    /** Paga la factura: crea la venta + recibo en el backend. */
+    payInvoice: (
+        invoiceId: string,
+        body: InvoicePayInput,
+    ) => Promise<{ result: InvoicePaymentResult | null; error: string | null }>;
+    deleteInvoice: (invoiceId: string) => Promise<string | null>;
+
     // Clientes
     loadCustomers: (opts?: { refresh?: boolean }) => Promise<void>;
     setCustomersSearch: (search: string) => Promise<void>;
-    createCustomer: (
-        body: CustomerInput
-    ) => Promise<{ customer: Customer | null; linkedExisting: boolean; error: string | null }>;
+    createCustomer: (body: CustomerInput) => Promise<{
+        customer: Customer | null;
+        linkedExisting: boolean;
+        error: string | null;
+    }>;
     linkCustomer: (customerId: string) => Promise<string | null>;
     updateCustomer: (customerId: string, body: Partial<CustomerInput>) => Promise<string | null>;
     unlinkCustomer: (customerId: string) => Promise<string | null>;
     hardDeleteCustomer: (customerId: string) => Promise<string | null>;
     fetchCustomerStats: (
-        customerId: string
+        customerId: string,
     ) => Promise<{ stats: CustomerStats | null; error: string | null }>;
 
     // Invitaciones por QR
     generateInvite: (storeId: string) => Promise<{ invite: StoreInvite | null; error: string | null }>;
     revokeInvite: (storeId: string) => Promise<string | null>;
-    fetchInviteInfo: (
-        token: string
-    ) => Promise<{ info: StoreInviteInfo | null; error: string | null }>;
-    acceptInvite: (
-        token: string
-    ) => Promise<{ ok: boolean; storeId: string | null; error: string | null }>;
+    fetchInviteInfo: (token: string) => Promise<{ info: StoreInviteInfo | null; error: string | null }>;
+    acceptInvite: (token: string) => Promise<{ ok: boolean; storeId: string | null; error: string | null }>;
 }
 
 export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
@@ -244,6 +276,12 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
     receiptsLoading: false,
     receiptsPagination: freshPagination(20),
 
+    invoices: [],
+    invoicesLoading: false,
+    invoicesPagination: freshPagination(20),
+    invoiceStatus: null,
+    invoiceTotals: null,
+
     customers: [],
     customersLoading: false,
     customersPagination: freshPagination(20),
@@ -276,10 +314,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
 
         set({ notificationsSaving: true });
         try {
-            const { error, response } = await salesModuleService.updateStoreNotifications(
-                storeId,
-                body
-            );
+            const { error, response } = await salesModuleService.updateStoreNotifications(storeId, body);
             set({
                 notificationsSaving: false,
                 notifications: response ?? get().notifications,
@@ -331,10 +366,15 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
 
     createStore: async (name, currency) => {
         try {
-            const { error, response } = await salesModuleService.createStore({ name, currency });
+            const { error, response } = await salesModuleService.createStore({
+                name,
+                currency,
+            });
             if (error) return error;
             if (response) {
-                set((s) => ({ stores: [response, ...s.stores.filter((x) => x.id !== response.id)] }));
+                set((s) => ({
+                    stores: [response, ...s.stores.filter((x) => x.id !== response.id)],
+                }));
             } else {
                 await get().loadStores({ refresh: true });
             }
@@ -368,7 +408,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
                 storeId,
                 kind,
                 file,
-                onProgress
+                onProgress,
             );
             if (error) return error;
             if (!response) return 'El servidor no devolvió la tienda actualizada';
@@ -377,9 +417,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             set((s) => ({
                 stores: s.stores.map((x) => (x.id === storeId ? { ...x, ...response } : x)),
                 currentStore:
-                    s.currentStore?.id === storeId
-                        ? { ...s.currentStore, ...response }
-                        : s.currentStore,
+                    s.currentStore?.id === storeId ? { ...s.currentStore, ...response } : s.currentStore,
             }));
             return null;
         } catch (e: any) {
@@ -454,6 +492,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             receipts: [],
             receiptsLoading: false,
             receiptsPagination: freshPagination(20),
+            invoices: [],
+            invoicesLoading: false,
+            invoicesPagination: freshPagination(20),
+            invoiceStatus: null,
+            invoiceTotals: null,
             customers: [],
             customersLoading: false,
             customersPagination: freshPagination(20),
@@ -477,12 +520,17 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
                 get().loadSummary(),
                 get().loadSeries(),
                 get().loadReceipts({ refresh: true }),
+                get().loadInvoices({ refresh: true }),
+                get().loadInvoiceTotals(),
                 get().loadCustomers({ refresh: true }),
             ]);
             set({ loading: false });
             return true;
         } catch (e: any) {
-            set({ loading: false, error: e?.message ?? 'No se pudo abrir la tienda' });
+            set({
+                loading: false,
+                error: e?.message ?? 'No se pudo abrir la tienda',
+            });
             return false;
         }
     },
@@ -734,7 +782,10 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         try {
             const { error, response } = await salesModuleService.getPaymentMethods(storeId);
             if (error) throw new Error(error);
-            set({ paymentMethods: response?.data ?? [], paymentMethodsLoading: false });
+            set({
+                paymentMethods: response?.data ?? [],
+                paymentMethodsLoading: false,
+            });
         } catch (e: any) {
             set({
                 paymentMethodsLoading: false,
@@ -751,10 +802,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             if (error) return error;
             if (response) {
                 set((s) => ({
-                    paymentMethods: [
-                        response,
-                        ...s.paymentMethods.filter((x) => x.id !== response.id),
-                    ],
+                    paymentMethods: [response, ...s.paymentMethods.filter((x) => x.id !== response.id)],
                 }));
             } else {
                 await get().loadPaymentMethods();
@@ -772,9 +820,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             const { error } = await salesModuleService.updatePaymentMethod(storeId, methodId, body);
             if (error) return error;
             set((s) => ({
-                paymentMethods: s.paymentMethods.map((m) =>
-                    m.id === methodId ? { ...m, ...body } : m
-                ),
+                paymentMethods: s.paymentMethods.map((m) => (m.id === methodId ? { ...m, ...body } : m)),
             }));
             return null;
         } catch (e: any) {
@@ -788,7 +834,9 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         try {
             const { error } = await salesModuleService.deletePaymentMethod(storeId, methodId);
             if (error) return error;
-            set((s) => ({ paymentMethods: s.paymentMethods.filter((m) => m.id !== methodId) }));
+            set((s) => ({
+                paymentMethods: s.paymentMethods.filter((m) => m.id !== methodId),
+            }));
             return null;
         } catch (e: any) {
             return e?.message ?? 'Error al eliminar el método de pago';
@@ -814,7 +862,9 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         try {
             const { error } = await salesModuleService.hardDeletePaymentMethod(storeId, methodId);
             if (error) return error;
-            set((s) => ({ paymentMethods: s.paymentMethods.filter((m) => m.id !== methodId) }));
+            set((s) => ({
+                paymentMethods: s.paymentMethods.filter((m) => m.id !== methodId),
+            }));
             return null;
         } catch (e: any) {
             return e?.message ?? 'Error al eliminar el método de pago';
@@ -833,11 +883,10 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         set({ salesLoading: true });
         try {
             const cursor = refresh ? null : state.salesPagination.cursor;
-            const { error, response } = await salesModuleService.getSales(
-                storeId,
-                state.salesFilters,
-                { take: state.salesPagination.take, cursor }
-            );
+            const { error, response } = await salesModuleService.getSales(storeId, state.salesFilters, {
+                take: state.salesPagination.take,
+                cursor,
+            });
             if (error) throw new Error(error);
 
             const data = response?.data ?? [];
@@ -950,21 +999,14 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
     },
 
     refreshSalesAll: async () => {
-        await Promise.all([
-            get().loadSales({ refresh: true }),
-            get().loadSummary(),
-            get().loadSeries(),
-        ]);
+        await Promise.all([get().loadSales({ refresh: true }), get().loadSummary(), get().loadSeries()]);
     },
 
     loadSummary: async () => {
         const storeId = get().currentStore?.id;
         if (!storeId) return;
         try {
-            const { error, response } = await salesModuleService.getSummary(
-                storeId,
-                get().salesFilters
-            );
+            const { error, response } = await salesModuleService.getSummary(storeId, get().salesFilters);
             if (error) throw new Error(error);
             set({ summary: response ?? null });
         } catch (e: any) {
@@ -979,12 +1021,168 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             const { error, response } = await salesModuleService.getSeries(
                 storeId,
                 get().salesFilters,
-                get().seriesPeriod
+                get().seriesPeriod,
             );
             if (error) throw new Error(error);
             set({ series: response ?? null });
         } catch (e: any) {
             set({ error: e?.message ?? 'Error al cargar la serie' });
+        }
+    },
+
+    // ---------------- Facturas ----------------
+    loadInvoices: async (opts) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return;
+        const refresh = opts?.refresh ?? false;
+        const state = get();
+        if (state.invoicesLoading && !refresh) return;
+        if (!refresh && state.invoicesPagination.isEnd) return;
+
+        set({ invoicesLoading: true });
+        try {
+            const cursor = refresh ? null : state.invoicesPagination.cursor;
+            const { error, response } = await salesModuleService.getInvoices(
+                storeId,
+                { status: state.invoiceStatus ?? undefined },
+                { take: state.invoicesPagination.take, cursor },
+            );
+            if (error) throw new Error(error);
+
+            const data = response?.data ?? [];
+            const nextCursor = response?.nextCursor ?? null;
+            set((s) => ({
+                invoices: refresh
+                    ? data
+                    : [...s.invoices, ...data.filter((d) => !s.invoices.some((x) => x.id === d.id))],
+                invoicesPagination: {
+                    ...s.invoicesPagination,
+                    cursor: nextCursor,
+                    isEnd: nextCursor === null || data.length === 0,
+                },
+                invoicesLoading: false,
+            }));
+        } catch (e: any) {
+            set((s) => ({
+                invoicesLoading: false,
+                error: e?.message ?? 'Error al cargar las facturas',
+                invoicesPagination: { ...s.invoicesPagination, isEnd: true },
+            }));
+        }
+    },
+
+    setInvoiceStatus: async (status) => {
+        set({ invoiceStatus: status });
+        await get().loadInvoices({ refresh: true });
+    },
+
+    loadInvoiceTotals: async () => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return;
+        try {
+            const { error, response } = await salesModuleService.getInvoiceTotals(storeId);
+            if (error) throw new Error(error);
+            set({ invoiceTotals: response ?? null });
+        } catch {
+            set({ invoiceTotals: null });
+        }
+    },
+
+    refreshInvoicesAll: async () => {
+        await Promise.all([get().loadInvoices({ refresh: true }), get().loadInvoiceTotals()]);
+    },
+
+    fetchInvoice: async (invoiceId) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return { invoice: null, error: 'No hay una tienda seleccionada.' };
+        try {
+            const { error, response } = await salesModuleService.getInvoice(storeId, invoiceId);
+            if (error || !response) {
+                return { invoice: null, error: error ?? 'Factura no encontrada.' };
+            }
+            return { invoice: response, error: null };
+        } catch (e: any) {
+            return { invoice: null, error: e?.message ?? 'Factura no encontrada.' };
+        }
+    },
+
+    createInvoice: async (body) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return { invoice: null, error: 'No hay una tienda seleccionada.' };
+        try {
+            const { error, response } = await salesModuleService.createInvoice(storeId, body);
+            if (error || !response) {
+                return { invoice: null, error: error ?? 'Error al crear la factura' };
+            }
+            await get().refreshInvoicesAll();
+            return { invoice: response, error: null };
+        } catch (e: any) {
+            return {
+                invoice: null,
+                error: e?.message ?? 'Error al crear la factura',
+            };
+        }
+    },
+
+    updateInvoice: async (invoiceId, body) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return 'No hay una tienda seleccionada.';
+        try {
+            const { error } = await salesModuleService.updateInvoice(storeId, invoiceId, body);
+            if (error) return error;
+            await get().refreshInvoicesAll();
+            return null;
+        } catch (e: any) {
+            return e?.message ?? 'Error al actualizar la factura';
+        }
+    },
+
+    cancelInvoice: async (invoiceId) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return 'No hay una tienda seleccionada.';
+        try {
+            const { error } = await salesModuleService.cancelInvoice(storeId, invoiceId);
+            if (error) return error;
+            await get().refreshInvoicesAll();
+            return null;
+        } catch (e: any) {
+            return e?.message ?? 'Error al cancelar la factura';
+        }
+    },
+
+    payInvoice: async (invoiceId, body) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return { result: null, error: 'No hay una tienda seleccionada.' };
+        try {
+            const { error, response } = await salesModuleService.payInvoice(storeId, invoiceId, body);
+            if (error || !response) {
+                return { result: null, error: error ?? 'Error al registrar el pago' };
+            }
+            // El pago crea una venta y un recibo: se refresca todo el contexto.
+            await Promise.all([
+                get().refreshInvoicesAll(),
+                get().refreshSalesAll(),
+                get().loadReceipts({ refresh: true }),
+            ]);
+            return { result: response, error: null };
+        } catch (e: any) {
+            return {
+                result: null,
+                error: e?.message ?? 'Error al registrar el pago',
+            };
+        }
+    },
+
+    deleteInvoice: async (invoiceId) => {
+        const storeId = get().currentStore?.id;
+        if (!storeId) return 'No hay una tienda seleccionada.';
+        try {
+            const { error } = await salesModuleService.deleteInvoice(storeId, invoiceId);
+            if (error) return error;
+            await get().refreshInvoicesAll();
+            return null;
+        } catch (e: any) {
+            return e?.message ?? 'Error al eliminar la factura';
         }
     },
 
@@ -1012,10 +1210,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             set((s) => ({
                 customers: refresh
                     ? data
-                    : [
-                          ...s.customers,
-                          ...data.filter((d) => !s.customers.some((x) => x.id === d.id)),
-                      ],
+                    : [...s.customers, ...data.filter((d) => !s.customers.some((x) => x.id === d.id))],
                 customersPagination: {
                     ...s.customersPagination,
                     cursor: nextCursor,
@@ -1037,7 +1232,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         set((s) => ({
             customersSearch: search,
             customers: [],
-            customersPagination: { ...s.customersPagination, cursor: null, isEnd: false },
+            customersPagination: {
+                ...s.customersPagination,
+                cursor: null,
+                isEnd: false,
+            },
         }));
         await get().loadCustomers({ refresh: true });
     },
@@ -1052,10 +1251,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             };
         }
         try {
-            const { error, response } = await salesModuleService.createCustomer(
-                storeId,
-                body
-            );
+            const { error, response } = await salesModuleService.createCustomer(storeId, body);
             if (error || !response) {
                 return {
                     customer: null,
@@ -1095,15 +1291,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return 'No hay una tienda seleccionada.';
         try {
-            const { error, response } = await salesModuleService.updateCustomer(
-                storeId,
-                customerId,
-                body
-            );
+            const { error, response } = await salesModuleService.updateCustomer(storeId, customerId, body);
             if (error) return error;
             set((s) => ({
                 customers: s.customers.map((c) =>
-                    c.id === customerId && response ? { ...c, ...response } : c
+                    c.id === customerId && response ? { ...c, ...response } : c,
                 ),
             }));
             return null;
@@ -1118,7 +1310,9 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         try {
             const { error } = await salesModuleService.unlinkCustomer(storeId, customerId);
             if (error) return error;
-            set((s) => ({ customers: s.customers.filter((c) => c.id !== customerId) }));
+            set((s) => ({
+                customers: s.customers.filter((c) => c.id !== customerId),
+            }));
             return null;
         } catch (e: any) {
             return e?.message ?? 'Error al quitar el cliente';
@@ -1129,12 +1323,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return 'No hay una tienda seleccionada.';
         try {
-            const { error } = await salesModuleService.hardDeleteCustomer(
-                storeId,
-                customerId
-            );
+            const { error } = await salesModuleService.hardDeleteCustomer(storeId, customerId);
             if (error) return error;
-            set((s) => ({ customers: s.customers.filter((c) => c.id !== customerId) }));
+            set((s) => ({
+                customers: s.customers.filter((c) => c.id !== customerId),
+            }));
             return null;
         } catch (e: any) {
             return e?.message ?? 'Error al eliminar el cliente';
@@ -1145,10 +1338,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return { stats: null, error: 'No hay una tienda seleccionada.' };
         try {
-            const { error, response } = await salesModuleService.getCustomerStats(
-                storeId,
-                customerId
-            );
+            const { error, response } = await salesModuleService.getCustomerStats(storeId, customerId);
             if (error || !response) {
                 return {
                     stats: null,
@@ -1187,10 +1377,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             set((s) => ({
                 receipts: refresh
                     ? data
-                    : [
-                          ...s.receipts,
-                          ...data.filter((d) => !s.receipts.some((x) => x.id === d.id)),
-                      ],
+                    : [...s.receipts, ...data.filter((d) => !s.receipts.some((x) => x.id === d.id))],
                 receiptsPagination: {
                     ...s.receiptsPagination,
                     cursor: nextCursor,
@@ -1211,10 +1398,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return { receipt: null, error: 'No hay una tienda seleccionada.' };
         try {
-            const { error, response } = await salesModuleService.getReceipt(
-                storeId,
-                receiptId
-            );
+            const { error, response } = await salesModuleService.getReceipt(storeId, receiptId);
             if (error || !response) {
                 return { receipt: null, error: error ?? 'Recibo no encontrado.' };
             }
@@ -1228,16 +1412,16 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return { receipt: null, error: 'No hay una tienda seleccionada.' };
         try {
-            const { error, response } = await salesModuleService.getSaleReceipt(
-                storeId,
-                saleId
-            );
+            const { error, response } = await salesModuleService.getSaleReceipt(storeId, saleId);
             if (error || !response) {
                 return { receipt: null, error: error ?? 'Esta venta no tiene recibo.' };
             }
             return { receipt: response, error: null };
         } catch (e: any) {
-            return { receipt: null, error: e?.message ?? 'Esta venta no tiene recibo.' };
+            return {
+                receipt: null,
+                error: e?.message ?? 'Esta venta no tiene recibo.',
+            };
         }
     },
 
@@ -1245,18 +1429,20 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return { receipt: null, error: 'No hay una tienda seleccionada.' };
         try {
-            const { error, response } = await salesModuleService.issueReceipt(
-                storeId,
-                saleId,
-                body
-            );
+            const { error, response } = await salesModuleService.issueReceipt(storeId, saleId, body);
             if (error || !response) {
-                return { receipt: null, error: error ?? 'No se pudo emitir el recibo.' };
+                return {
+                    receipt: null,
+                    error: error ?? 'No se pudo emitir el recibo.',
+                };
             }
             await get().loadReceipts({ refresh: true });
             return { receipt: response, error: null };
         } catch (e: any) {
-            return { receipt: null, error: e?.message ?? 'No se pudo emitir el recibo.' };
+            return {
+                receipt: null,
+                error: e?.message ?? 'No se pudo emitir el recibo.',
+            };
         }
     },
 
@@ -1303,16 +1489,12 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         const storeId = get().currentStore?.id;
         if (!storeId) return 'No hay una tienda seleccionada.';
         try {
-            const { error, response } = await salesModuleService.updateReceipt(
-                storeId,
-                receiptId,
-                { customer_name: customerName }
-            );
+            const { error, response } = await salesModuleService.updateReceipt(storeId, receiptId, {
+                customer_name: customerName,
+            });
             if (error) return error;
             set((s) => ({
-                receipts: s.receipts.map((r) =>
-                    r.id === receiptId && response ? { ...r, ...response } : r
-                ),
+                receipts: s.receipts.map((r) => (r.id === receiptId && response ? { ...r, ...response } : r)),
             }));
             return null;
         } catch (e: any) {
@@ -1325,11 +1507,17 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         try {
             const { error, response } = await salesModuleService.generateInvite(storeId);
             if (error || !response) {
-                return { invite: null, error: error ?? 'No se pudo generar la invitación.' };
+                return {
+                    invite: null,
+                    error: error ?? 'No se pudo generar la invitación.',
+                };
             }
             return { invite: response, error: null };
         } catch (e: any) {
-            return { invite: null, error: e?.message ?? 'No se pudo generar la invitación.' };
+            return {
+                invite: null,
+                error: e?.message ?? 'No se pudo generar la invitación.',
+            };
         }
     },
 
@@ -1371,7 +1559,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
             }
             return { ok: true, storeId: response.store_id ?? null, error: null };
         } catch (e: any) {
-            return { ok: false, storeId: null, error: e?.message ?? 'No se pudo aceptar la invitación.' };
+            return {
+                ok: false,
+                storeId: null,
+                error: e?.message ?? 'No se pudo aceptar la invitación.',
+            };
         }
     },
 }));

@@ -15,7 +15,9 @@ import Button from '@/components/Button/Button';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import {
     STORE_PHOTO_ASPECT,
+    STORE_PHOTO_EDIT_OPTIONS,
     STORE_PHOTO_UPLOAD_WIDTH,
+    StorePhotoEditMode,
     StorePhotoKind,
     storePhotoUrl,
 } from '@/shared/entities/SalesModule';
@@ -59,6 +61,7 @@ export default function StorePhotosCard() {
     const user = useAuthStore((s) => s.user);
     const currentStore = useSalesModuleStore((s) => s.currentStore);
     const uploadStorePhoto = useSalesModuleStore((s) => s.uploadStorePhoto);
+    const updateStore = useSalesModuleStore((s) => s.updateStore);
 
     /** Foto que se está subiendo (para el overlay de progreso). */
     const [busy, setBusy] = useState<StorePhotoKind | null>(null);
@@ -69,6 +72,13 @@ export default function StorePhotosCard() {
     const [failed, setFailed] = useState({ avatar: false, banner: false });
 
     const isOwner = currentStore?.user_id === user?.id;
+    /** El dueño decide en Ajustes quién puede cambiar cada foto. */
+    const avatarMode: StorePhotoEditMode = currentStore?.avatar_edit_mode ?? 'owner';
+    const bannerMode: StorePhotoEditMode = currentStore?.banner_edit_mode ?? 'owner';
+    const canEditAvatar = isOwner || avatarMode === 'members';
+    const canEditBanner = isOwner || bannerMode === 'members';
+    const canEdit = (kind: StorePhotoKind) =>
+        kind === 'avatar' ? canEditAvatar : canEditBanner;
     const avatarUrl = failed.avatar
         ? null
         : storePhotoUrl(currentStore, 'avatar', 'medium');
@@ -81,8 +91,8 @@ export default function StorePhotosCard() {
         setFailed((prev) => ({ ...prev, [kind]: true }));
 
     const pickPhoto = async (kind: StorePhotoKind) => {
-        if (!isOwner) {
-            notify('error', 'Solo el dueño de la tienda puede cambiar las fotos.');
+        if (!canEdit(kind)) {
+            notify('error', 'No tienes permiso para cambiar esta foto.');
             return;
         }
 
@@ -136,6 +146,24 @@ export default function StorePhotosCard() {
             setBusy(null);
             setProgress(0);
         }
+    };
+
+    /** Guarda el permiso de una foto (solo el dueño llega aquí). */
+    const changeMode = async (kind: StorePhotoKind, mode: StorePhotoEditMode) => {
+        if (!currentStore) return;
+        if ((kind === 'avatar' ? avatarMode : bannerMode) === mode) return;
+
+        const error = await updateStore(currentStore.id, {
+            ...(kind === 'avatar'
+                ? { avatar_edit_mode: mode }
+                : { banner_edit_mode: mode }),
+        });
+
+        if (error) {
+            notify('error', error);
+            return;
+        }
+        notify('success', 'Permiso actualizado.');
     };
 
     if (!currentStore) return null;
@@ -203,26 +231,54 @@ export default function StorePhotosCard() {
                 resoluciones: 96/256/512 px para la foto y 480/960/1600 px para el banner.
             </TextMalet>
 
-            {isOwner ? (
+            {canEditAvatar || canEditBanner ? (
                 <View style={styles.actions}>
-                    <Button
-                        text={avatarUrl ? 'Cambiar foto' : 'Añadir foto'}
-                        onPress={() => pickPhoto('avatar')}
-                        disabled={busy !== null}
-                        style={styles.action}
-                    />
-                    <Button
-                        text={bannerUrl ? 'Cambiar banner' : 'Añadir banner'}
-                        onPress={() => pickPhoto('banner')}
-                        disabled={busy !== null}
-                        style={styles.action}
-                    />
+                    {canEditAvatar && (
+                        <Button
+                            text={avatarUrl ? 'Cambiar foto' : 'Añadir foto'}
+                            onPress={() => pickPhoto('avatar')}
+                            disabled={busy !== null}
+                            style={styles.action}
+                        />
+                    )}
+                    {canEditBanner && (
+                        <Button
+                            text={bannerUrl ? 'Cambiar banner' : 'Añadir banner'}
+                            onPress={() => pickPhoto('banner')}
+                            disabled={busy !== null}
+                            style={styles.action}
+                        />
+                    )}
                 </View>
             ) : (
                 <TextMalet style={styles.hint}>
                     Solo el dueño de la tienda puede cambiar las fotos.
                 </TextMalet>
             )}
+
+            {/* Privacidad de las fotos (solo el dueño la configura) */}
+            {isOwner && currentStore ? (
+                <View style={styles.permissions}>
+                    <TextMalet style={styles.permissionsTitle}>
+                        ¿Quién puede cambiar las fotos?
+                    </TextMalet>
+
+                    <PermissionPicker
+                        label="Foto de perfil"
+                        value={avatarMode}
+                        onChange={(mode) => changeMode('avatar', mode)}
+                    />
+                    <PermissionPicker
+                        label="Banner"
+                        value={bannerMode}
+                        onChange={(mode) => changeMode('banner', mode)}
+                    />
+
+                    <TextMalet style={styles.hint}>
+                        Solo el dueño puede cambiar estos permisos.
+                    </TextMalet>
+                </View>
+            ) : null}
 
             <Modal
                 visible={viewer !== null}
@@ -250,8 +306,49 @@ export default function StorePhotosCard() {
     );
 }
 
-const styles = StyleSheet.create({
-    card: {
+/** Selector de quién puede cambiar una foto (lo usa solo el dueño). */
+function PermissionPicker({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: StorePhotoEditMode;
+    onChange: (mode: StorePhotoEditMode) => void;
+}) {
+    return (
+        <View style={styles.permissionRow}>
+            <TextMalet style={styles.permissionLabel}>{label}</TextMalet>
+            <View style={styles.permissionChips}>
+                {STORE_PHOTO_EDIT_OPTIONS.map((option) => {
+                    const active = option.value === value;
+                    return (
+                        <TouchableOpacity
+                            key={option.value}
+                            style={[
+                                styles.permissionChip,
+                                active && styles.permissionChipActive,
+                            ]}
+                            onPress={() => onChange(option.value)}
+                            activeOpacity={0.7}
+                        >
+                            <TextMalet
+                                style={[
+                                    styles.permissionChipText,
+                                    active && styles.permissionChipTextActive,
+                                ]}
+                            >
+                                {option.label}
+                            </TextMalet>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({    card: {
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.08)',
@@ -344,6 +441,53 @@ const styles = StyleSheet.create({
         color: 'rgba(0,0,0,0.45)',
         marginTop: 8,
         lineHeight: 16,
+    },
+    permissions: {
+        marginTop: 14,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.06)',
+        gap: 8,
+    },
+    permissionsTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: 'rgba(0,0,0,0.55)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+    },
+    permissionRow: {
+        gap: 6,
+    },
+    permissionLabel: {
+        fontSize: 12.5,
+        fontWeight: '600',
+        color: '#333',
+    },
+    permissionChips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    permissionChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 14,
+        backgroundColor: '#f4f4f5',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+    },
+    permissionChipActive: {
+        backgroundColor: '#111',
+        borderColor: '#111',
+    },
+    permissionChipText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#555',
+    },
+    permissionChipTextActive: {
+        color: '#fff',
     },
     viewerBackdrop: {
         flex: 1,

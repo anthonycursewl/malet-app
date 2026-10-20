@@ -19,6 +19,17 @@ export type StoreReceiptMode = 'ask' | 'always' | 'never';
 
 /** Tipo de foto de la tienda. */
 export type StorePhotoKind = 'avatar' | 'banner';
+
+/** Quién puede cambiar las fotos de la tienda (lo decide el dueño). */
+export type StorePhotoEditMode = 'owner' | 'members';
+
+export const STORE_PHOTO_EDIT_OPTIONS: {
+    value: StorePhotoEditMode;
+    label: string;
+}[] = [
+    { value: 'owner', label: 'Solo el dueño' },
+    { value: 'members', label: 'Todos los miembros' },
+];
 /** Resoluciones que genera el backend para cada foto. */
 export type StorePhotoSize = 'small' | 'medium' | 'large';
 
@@ -128,6 +139,10 @@ export interface SalesStore {
     banner_small_url?: string | null;
     banner_medium_url?: string | null;
     banner_large_url?: string | null;
+    /** Quién puede cambiar la foto de perfil: `owner` | `members`. */
+    avatar_edit_mode?: StorePhotoEditMode;
+    /** Quién puede cambiar el banner: `owner` | `members`. */
+    banner_edit_mode?: StorePhotoEditMode;
     member_count?: number;
     created_at?: string;
     updated_at?: string;
@@ -141,7 +156,7 @@ export interface SalesStore {
 export function storePhotoUrl(
     store: SalesStore | null | undefined,
     kind: StorePhotoKind,
-    size: StorePhotoSize = 'medium'
+    size: StorePhotoSize = 'medium',
 ): string | null {
     if (!store) return null;
 
@@ -214,20 +229,33 @@ export interface PaymentMethod {
     deleted_at?: string | null;
 }
 
-/** Línea de una venta: un producto con sus precios (snapshot). */
+/** Tipo de línea de venta: producto del catálogo o concepto libre (servicio). */
+export type SaleItemType = 'product' | 'service';
+
+/** Línea de una venta: un producto o un concepto libre (snapshot de precios). */
 export interface SaleItem {
     id: string;
-    product_id: string;
+    /** `null` en conceptos libres (servicios sin producto). */
+    product_id: string | null;
+    /** Snapshot del nombre (producto o servicio). */
+    name?: string;
+    item_type?: SaleItemType;
     quantity: number;
     unit_price: number;
     unit_cost: number;
-    /** Nombre del producto resuelto por el backend al leer la venta. */
+    /** Alias heredado del nombre resuelto por el backend. */
     product_name?: string;
 }
 
-/** Línea enviada al registrar/editar una venta (precios opcionales → PVP/costo del producto). */
+/**
+ * Línea enviada al registrar/editar una venta o factura.
+ * - Producto: `{ product_id, quantity?, unit_price?, unit_cost? }`.
+ * - Concepto libre: `{ name, unit_price, quantity?, unit_cost? }`.
+ */
 export interface SaleItemInput {
-    product_id: string;
+    product_id?: string | null;
+    name?: string;
+    item_type?: SaleItemType;
     quantity?: number;
     unit_price?: number;
     unit_cost?: number;
@@ -296,10 +324,7 @@ export const SALES_DATE_PRESETS: SalesDatePreset[] = [
 
 /** Valida un valor guardado en el dispositivo antes de usarlo como filtro. */
 export function isSalesDatePreset(value: unknown): value is SalesDatePreset {
-    return (
-        typeof value === 'string' &&
-        (SALES_DATE_PRESETS as string[]).includes(value)
-    );
+    return typeof value === 'string' && (SALES_DATE_PRESETS as string[]).includes(value);
 }
 
 /** Filtros compartidos entre /sales, /summary y /series. */
@@ -344,7 +369,8 @@ export interface SalesSeries {
 
 /** Línea imprimible de un recibo (snapshot inmutable). */
 export interface ReceiptLine {
-    product_id: string;
+    /** `null` en conceptos libres (servicios sin producto). */
+    product_id: string | null;
     product_name: string;
     quantity: number;
     unit_price: number;
@@ -400,6 +426,100 @@ export interface Receipt {
 export interface SaleReceiptInput {
     enabled: boolean;
     customer_name?: string;
+}
+
+// ---------- Facturas (documento previo al pago) ----------
+
+export type InvoiceStatus = 'pending' | 'paid' | 'cancelled';
+
+export const INVOICE_STATUS_OPTIONS: {
+    value: InvoiceStatus;
+    label: string;
+    color: string;
+}[] = [
+    { value: 'pending', label: 'Pendiente', color: '#b45309' },
+    { value: 'paid', label: 'Pagada', color: '#15803d' },
+    { value: 'cancelled', label: 'Cancelada', color: '#6b7280' },
+];
+
+export const invoiceStatusLabel = (status: InvoiceStatus): string =>
+    INVOICE_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
+
+/** Línea imprimible de una factura (snapshot al crearla). */
+export interface InvoiceLine {
+    product_id: string | null;
+    name: string;
+    item_type: SaleItemType;
+    quantity: number;
+    unit_price: number;
+    unit_cost: number;
+    total: number;
+}
+
+/**
+ * Factura: desglose de lo que se cobrará. No afecta ingresos ni emite recibo
+ * hasta que se paga (`pay` crea la venta y el recibo en ese momento).
+ */
+export interface Invoice {
+    id: string;
+    store_id?: string;
+    customer_id?: string | null;
+    customer_name?: string | null;
+    sequence: number;
+    year: number;
+    /** Folio completo, ej: `F-BRD-2026-000001`. */
+    number: string;
+    currency: StoreCurrency;
+    subtotal: number;
+    total: number;
+    notes?: string | null;
+    status: InvoiceStatus;
+    issued_at: string;
+    due_at?: string | null;
+    paid_at?: string | null;
+    payment_method_id?: string | null;
+    /** Venta creada al pagar (null mientras está pendiente). */
+    sale_id?: string | null;
+    /** Recibo emitido al pagar (null mientras está pendiente). */
+    receipt_id?: string | null;
+    lines: InvoiceLine[];
+    created_by?: string;
+    created_at?: string;
+    updated_at?: string;
+    deleted_at?: string | null;
+}
+
+/** Body de POST/PUT /invoices (mismas líneas que una venta). */
+export interface InvoiceInput {
+    items: SaleItemInput[];
+    customer_id?: string | null;
+    /** "Facturar a" (puede ser distinto del cliente o no existir como cliente). */
+    customer_name?: string | null;
+    notes?: string | null;
+    issued_at?: string;
+    due_at?: string | null;
+}
+
+/** Body de POST /invoices/:id/pay. */
+export interface InvoicePayInput {
+    payment_method_id?: string | null;
+    paid_at?: string;
+    receipt_customer_name?: string;
+}
+
+/** Resumen "por cobrar" de la tienda. */
+export interface InvoiceTotals {
+    pending_count: number;
+    pending_total: number;
+    paid_count: number;
+    paid_total: number;
+}
+
+/** Resultado de pagar una factura. */
+export interface InvoicePaymentResult {
+    invoice: Invoice;
+    sale: Sale;
+    receipt: Receipt;
 }
 
 /**
@@ -466,7 +586,7 @@ export interface CustomerStats {
     recent_sales: CustomerRecentSale[];
 }
 
-/** POST /stores/:id/invites — QR de invitación con TTL de 60 s. */export interface StoreInvite {
+/** POST /stores/:id/invites — QR de invitación con TTL de 60 s. */ export interface StoreInvite {
     token: string;
     qr_payload: string;
     expires_at: string;
@@ -481,10 +601,7 @@ export interface StoreInviteInfo {
 
 /** Total de una línea (usa el valor del backend si viene). */
 export const itemTotal = (item: SaleItem): number =>
-    Number(
-        (item as { total?: number }).total ??
-            Number(item.unit_price ?? 0) * Number(item.quantity ?? 0)
-    );
+    Number((item as { total?: number }).total ?? Number(item.unit_price ?? 0) * Number(item.quantity ?? 0));
 
 /** Ganancia de una línea. */
 export const itemProfit = (item: SaleItem): number =>
@@ -492,15 +609,11 @@ export const itemProfit = (item: SaleItem): number =>
 
 /** Total de una venta (usa el valor del backend o suma sus líneas). */
 export const saleTotal = (sale: Sale): number =>
-    Number(
-        sale.total ?? (sale.items ?? []).reduce((acc, item) => acc + itemTotal(item), 0)
-    );
+    Number(sale.total ?? (sale.items ?? []).reduce((acc, item) => acc + itemTotal(item), 0));
 
 /** Ganancia de una venta (usa el valor del backend o suma sus líneas). */
 export const saleProfit = (sale: Sale): number =>
-    Number(
-        sale.profit ?? (sale.items ?? []).reduce((acc, item) => acc + itemProfit(item), 0)
-    );
+    Number(sale.profit ?? (sale.items ?? []).reduce((acc, item) => acc + itemProfit(item), 0));
 
 /** Unidades totales de una venta. */
 export const saleUnits = (sale: Sale): number =>

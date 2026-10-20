@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import {
     CreditCard,
+    FileText,
     LucideIcon,
     Package,
     ReceiptText,
@@ -16,6 +17,7 @@ import LayoutAuthenticated, {
 } from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import CustomersSection from '@/components/cuaderno/CustomersSection';
+import InvoicesSection from '@/components/cuaderno/InvoicesSection';
 import { StorePanelSkeleton } from '@/components/cuaderno/Skeletons';
 import { useChipScroll } from '@/components/cuaderno/useChipScroll';
 import MembersSection from '@/components/cuaderno/MembersSection';
@@ -28,7 +30,15 @@ import StoreSettingsSection from '@/components/cuaderno/StoreSettingsSection';
 import { StoreHeaderScrollProvider } from '@/components/cuaderno/storeHeaderScroll';
 import { useSalesModuleStore } from '@/shared/stores/useSalesModuleStore';
 
-type Tab = 'ventas' | 'recibos' | 'productos' | 'pagos' | 'clientes' | 'miembros' | 'ajustes';
+type Tab =
+    | 'ventas'
+    | 'facturas'
+    | 'recibos'
+    | 'productos'
+    | 'pagos'
+    | 'clientes'
+    | 'miembros'
+    | 'ajustes';
 
 /** Padding horizontal propio de esta pantalla (además del que trae el layout). */
 const SCREEN_PADDING = 4;
@@ -38,6 +48,7 @@ const HEADER_BLEED = LAYOUT_HORIZONTAL_PADDING + SCREEN_PADDING;
 
 const TABS: { value: Tab; label: string; icon: LucideIcon }[] = [
     { value: 'ventas', label: 'Ventas', icon: ShoppingCart },
+    { value: 'facturas', label: 'Facturas', icon: FileText },
     { value: 'recibos', label: 'Recibos', icon: ReceiptText },
     { value: 'productos', label: 'Productos', icon: Package },
     { value: 'pagos', label: 'Métodos de cobro', icon: CreditCard },
@@ -154,6 +165,7 @@ export default function StorePanelScreen() {
                 <StoreHeaderScrollProvider onScroll={handleHeaderScroll}>
                     <View style={styles.section}>
                         {tab === 'ventas' && <SalesSection storeId={storeId ?? ''} />}
+                        {tab === 'facturas' && <InvoicesSection storeId={storeId ?? ''} />}
                         {tab === 'recibos' && <ReceiptsSection storeId={storeId ?? ''} />}
                         {tab === 'productos' && <ProductsSection storeId={storeId ?? ''} />}
                         {tab === 'pagos' && <PaymentMethodsSection />}

@@ -72,6 +72,7 @@ export default function ReceiptsSection({ storeId }: { storeId: string }) {
         if (!sale) return 'Venta';
         const firstItem = sale.items?.[0];
         return (
+            firstItem?.name ??
             firstItem?.product_name ??
             products.find((p) => p.id === firstItem?.product_id)?.name ??
             'Venta'

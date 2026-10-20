@@ -119,7 +119,10 @@ export default function SaleDetailScreen() {
 
     const items = sale?.items ?? [];
     const itemName = (item: SaleItem): string =>
-        item.product_name ?? products.find((p) => p.id === item.product_id)?.name ?? 'Producto';
+        item.name ??
+        item.product_name ??
+        products.find((p) => p.id === item.product_id)?.name ??
+        'Producto';
     const paymentMethodName = sale?.payment_method_id
         ? paymentMethods.find((m) => m.id === sale.payment_method_id)?.name ?? 'Sin método'
         : 'Sin método';
