@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar, ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
 import { InputField } from '@/components/AddWallet/InputField';
 import TextMalet from '@/components/TextMalet/TextMalet';
@@ -55,79 +55,112 @@ export default function PayInvoiceModal({ visible, invoice, onClose, onPaid }: P
     };
 
     return (
-        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.62}>
-            <TextMalet style={styles.title}>Registrar pago</TextMalet>
-            <TextMalet style={styles.subtitle}>
-                Se registrará la venta y se emitirá el recibo de {invoice?.number ?? ''}.
-            </TextMalet>
-
-            {invoice && (
-                <View style={styles.amountCard}>
-                    <TextMalet style={styles.amountLabel}>Total a cobrar</TextMalet>
-                    <TextMalet style={styles.amountValue}>{formatMoney(invoice.total, currency)}</TextMalet>
-                </View>
-            )}
-
-            <TextMalet style={styles.label}>Método de pago (opcional)</TextMalet>
-            <View style={styles.chipsRow}>
-                <TouchableOpacity
-                    style={[styles.chip, methodId == null && styles.chipActive]}
-                    onPress={() => setMethodId(null)}
-                >
-                    <TextMalet style={[styles.chipText, methodId == null && styles.chipTextActive]}>
-                        Sin método
+        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.64}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.content}
+            >
+                <View style={styles.header}>
+                    <TextMalet style={styles.title}>Registrar pago</TextMalet>
+                    <TextMalet style={styles.subtitle}>
+                        Se registrará la venta y se emitirá el recibo de {invoice?.number ?? ''}.
                     </TextMalet>
-                </TouchableOpacity>
-                {activeMethods.map((method) => {
-                    const active = methodId === method.id;
-                    return (
+                </View>
+
+                {invoice && (
+                    <View style={styles.amountCard}>
+                        <TextMalet style={styles.amountLabel}>Total a cobrar</TextMalet>
+                        <TextMalet style={styles.amountValue}>
+                            {formatMoney(invoice.total, currency)}
+                        </TextMalet>
+                    </View>
+                )}
+
+                <View style={styles.group}>
+                    <TextMalet style={styles.label}>Método de pago (opcional)</TextMalet>
+                    <View style={styles.chipsRow}>
                         <TouchableOpacity
-                            key={method.id}
-                            style={[styles.chip, active && styles.chipActive]}
-                            onPress={() => setMethodId(active ? null : method.id)}
+                            style={[styles.chip, methodId == null && styles.chipActive]}
+                            onPress={() => setMethodId(null)}
                         >
-                            <TextMalet style={[styles.chipText, active && styles.chipTextActive]}>
-                                {method.name}
+                            <TextMalet
+                                style={[styles.chipText, methodId == null && styles.chipTextActive]}
+                            >
+                                Sin método
                             </TextMalet>
                         </TouchableOpacity>
-                    );
-                })}
-            </View>
+                        {activeMethods.map((method) => {
+                            const active = methodId === method.id;
+                            return (
+                                <TouchableOpacity
+                                    key={method.id}
+                                    style={[styles.chip, active && styles.chipActive]}
+                                    onPress={() => setMethodId(active ? null : method.id)}
+                                >
+                                    <TextMalet
+                                        style={[styles.chipText, active && styles.chipTextActive]}
+                                    >
+                                        {method.name}
+                                    </TextMalet>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
 
-            <InputField
-                label="Fecha de pago"
-                placeholder="Seleccionar fecha"
-                value={formatDateShort(paidAt)}
-                onPress={() => setShowPicker(true)}
-                icon={<Calendar size={16} color="#666" />}
-                rightIcon={<ChevronDown size={16} color="rgba(0,0,0,0.35)" />}
-                onRightIconPress={() => setShowPicker(true)}
-            />
-            {showPicker && (
-                <DateTimePicker
-                    value={paidAt}
-                    mode="date"
-                    onValueChange={(_, date) => {
-                        setShowPicker(false);
-                        setPaidAt(date);
-                    }}
-                    onDismiss={() => setShowPicker(false)}
+                <InputField
+                    label="Fecha de pago"
+                    placeholder="Seleccionar fecha"
+                    value={formatDateShort(paidAt)}
+                    onPress={() => setShowPicker(true)}
+                    icon={<Calendar size={16} color="#666" />}
+                    rightIcon={<ChevronDown size={16} color="rgba(0,0,0,0.35)" />}
+                    onRightIconPress={() => setShowPicker(true)}
                 />
-            )}
+                {showPicker && (
+                    <DateTimePicker
+                        value={paidAt}
+                        mode="date"
+                        onValueChange={(_, date) => {
+                            setShowPicker(false);
+                            setPaidAt(date);
+                        }}
+                        onDismiss={() => setShowPicker(false)}
+                    />
+                )}
 
-            <InputField
-                label="Facturar a (recibo)"
-                placeholder="Nombre en el recibo"
-                value={receiptName}
-                onChangeText={setReceiptName}
-            />
+                <InputField
+                    label="Facturar a (recibo)"
+                    placeholder="Nombre en el recibo"
+                    value={receiptName}
+                    onChangeText={setReceiptName}
+                />
 
-            <Button text="Confirmar pago" onPress={submit} loading={paying} style={styles.submit} />
+                <Button
+                    text="Confirmar pago"
+                    onPress={submit}
+                    loading={paying}
+                    style={styles.submit}
+                />
+            </ScrollView>
         </ModalOptions>
     );
 }
 
 const styles = StyleSheet.create({
+    content: {
+        gap: 14,
+        paddingHorizontal: 6,
+        paddingTop: 2,
+        paddingBottom: 10,
+    },
+    header: {
+        gap: 4,
+    },
+    group: {
+        gap: 8,
+    },
     title: {
         fontSize: 17,
         fontWeight: '700',

@@ -1160,11 +1160,13 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     conceptContent: {
-        gap: 12,
-        paddingBottom: 8,
+        gap: 14,
+        paddingHorizontal: 6,
+        paddingTop: 2,
+        paddingBottom: 10,
     },
     conceptHeader: {
-        gap: 2,
+        gap: 4,
     },
     conceptTitle: {
         fontSize: 16,
