@@ -616,50 +616,58 @@ export default function InvoiceFormScreen() {
             <ModalOptions
                 visible={conceptModalOpen}
                 onClose={() => setConceptModalOpen(false)}
-                heightRatio={0.72}
+                heightRatio={0.55}
             >
-                <TextMalet style={styles.modalTitle}>Agregar concepto</TextMalet>
-                <TextMalet style={styles.hintSmall}>
-                    Para servicios: no se crea nada en el catálogo de productos.
-                </TextMalet>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={styles.conceptContent}
+                >
+                    <View style={styles.conceptHeader}>
+                        <TextMalet style={styles.conceptTitle}>Agregar concepto</TextMalet>
+                        <TextMalet style={styles.hintSmall}>
+                            Para servicios: no se crea nada en el catálogo de productos.
+                        </TextMalet>
+                    </View>
 
-                <InputField
-                    label="Concepto"
-                    placeholder="Ej. Desarrollo de app"
-                    value={conceptName}
-                    onChangeText={setConceptName}
-                />
-                <View style={styles.lineInputs}>
-                    <View style={{ flex: 1 }}>
-                        <InputField
-                            label="Precio"
-                            placeholder="0.00"
-                            value={conceptPrice}
-                            onChangeText={(text) => setConceptPrice(sanitizeDecimal(text))}
-                            keyboardType="decimal-pad"
-                        />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <InputField
-                            label="Costo (opcional)"
-                            placeholder="0.00"
-                            value={conceptCost}
-                            onChangeText={(text) => setConceptCost(sanitizeDecimal(text))}
-                            keyboardType="decimal-pad"
-                        />
-                    </View>
-                </View>
-                <View style={{ width: 90 }}>
                     <InputField
-                        label="Cantidad"
-                        placeholder="1"
-                        value={conceptQty}
-                        onChangeText={(text) => setConceptQty(text.replace(/[^0-9]/g, ''))}
-                        keyboardType="number-pad"
+                        label="Concepto"
+                        placeholder="Ej. Desarrollo de app"
+                        value={conceptName}
+                        onChangeText={setConceptName}
                     />
-                </View>
+                    <View style={styles.lineInputs}>
+                        <View style={{ flex: 1 }}>
+                            <InputField
+                                label="Precio"
+                                placeholder="0.00"
+                                value={conceptPrice}
+                                onChangeText={(text) => setConceptPrice(sanitizeDecimal(text))}
+                                keyboardType="decimal-pad"
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <InputField
+                                label="Costo (opcional)"
+                                placeholder="0.00"
+                                value={conceptCost}
+                                onChangeText={(text) => setConceptCost(sanitizeDecimal(text))}
+                                keyboardType="decimal-pad"
+                            />
+                        </View>
+                    </View>
+                    <View style={{ width: 90 }}>
+                        <InputField
+                            label="Cantidad"
+                            placeholder="1"
+                            value={conceptQty}
+                            onChangeText={(text) => setConceptQty(text.replace(/[^0-9]/g, ''))}
+                            keyboardType="number-pad"
+                        />
+                    </View>
 
-                <Button text="Agregar" onPress={addConcept} style={{ marginTop: 8 }} />
+                    <Button text="Agregar" onPress={addConcept} style={styles.conceptSubmit} />
+                </ScrollView>
             </ModalOptions>
         </LayoutAuthenticated>
     );
@@ -798,6 +806,21 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#111',
         marginBottom: 4,
+    },
+    conceptContent: {
+        gap: 12,
+        paddingBottom: 8,
+    },
+    conceptHeader: {
+        gap: 2,
+    },
+    conceptTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111',
+    },
+    conceptSubmit: {
+        marginTop: 4,
     },
     modalList: {
         flex: 1,
