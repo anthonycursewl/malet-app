@@ -1,7 +1,15 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { FileText, Pencil, ReceiptText, Share2, ShoppingCart, X } from 'lucide-react-native';
+import { Pencil, ReceiptText, Share2, ShoppingCart, Trash2, X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+    Alert,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import Button from '@/components/Button/Button';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
@@ -18,8 +26,39 @@ import {
 } from '@/shared/entities/SalesModule';
 import { useSalesModuleStore } from '@/shared/stores/useSalesModuleStore';
 
-/** Detalle de una factura: pagar (emite el recibo), editar, cancelar y PDF. */
-export default function InvoiceDetailScreen() {
+interface MetaRowProps {
+    label: string;
+    value: string;
+    strong?: boolean;
+}
+
+/** Fila de metadatos del documento (número, fechas...). */
+function MetaRow({ label, value, strong }: MetaRowProps) {
+    return (
+        <View style={styles.metaRow}>
+            <TextMalet style={styles.metaLabel}>{label}</TextMalet>
+            <TextMalet style={[styles.metaValue, strong && styles.metaValueStrong]}>
+                {value}
+            </TextMalet>
+        </View>
+    );
+}
+
+/** Fila de los totales del documento. */
+function LineRow({ label, value }: { label: string; value: string }) {
+    return (
+        <View style={styles.lineRow}>
+            <TextMalet style={styles.lineLabel}>{label}</TextMalet>
+            <TextMalet style={styles.lineValue}>{value}</TextMalet>
+        </View>
+    );
+}
+
+/**
+ * Documento de la factura con el mismo formato del recibo (logo, tabla y
+ * totales). Se paga desde aquí: en ese momento se crea la venta y el recibo.
+ */
+export default function InvoiceScreen() {
     const { store: storeId, id: invoiceId } = useLocalSearchParams<{
         store: string;
         id: string;
@@ -28,44 +67,58 @@ export default function InvoiceDetailScreen() {
     const cancelInvoice = useSalesModuleStore((s) => s.cancelInvoice);
     const deleteInvoice = useSalesModuleStore((s) => s.deleteInvoice);
     const currentStore = useSalesModuleStore((s) => s.currentStore);
-    const currency = useSalesModuleStore((s) => currencyOf(currentStore));
+    const storeCurrency = useSalesModuleStore((s) => currencyOf(s.currentStore));
 
     const [invoice, setInvoice] = useState<Invoice | null>(null);
     const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [payOpen, setPayOpen] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const [busy, setBusy] = useState(false);
 
     const load = useCallback(async () => {
-        if (!invoiceId) return;
+        if (!invoiceId) {
+            setErrorMsg('Factura no encontrada.');
+            setLoading(false);
+            return;
+        }
         const { invoice: fetched, error } = await fetchInvoice(invoiceId);
         if (error || !fetched) {
+            setErrorMsg(error ?? 'Factura no encontrada.');
             setLoading(false);
-            notify('error', error ?? 'Factura no encontrada.');
             return;
         }
         setInvoice(fetched);
         setLoading(false);
     }, [invoiceId, fetchInvoice]);
 
+    // Al volver de editar/pagar, el documento se vuelve a leer.
     useFocusEffect(
         useCallback(() => {
             load();
         }, [load]),
     );
 
+    const currency = invoice?.currency ?? storeCurrency;
+    const isPending = invoice?.status === 'pending';
+    const isPaid = invoice?.status === 'paid';
     const statusColor =
-        INVOICE_STATUS_OPTIONS.find((option) => option.value === invoice?.status)?.color ?? '#6b7280';
+        INVOICE_STATUS_OPTIONS.find((option) => option.value === invoice?.status)?.color ??
+        '#6b7280';
 
-    const sharePdf = async () => {
+    const handleShare = async () => {
         if (!invoice) return;
-        await shareInvoicePdf({
+        setSharing(true);
+        const { error } = await shareInvoicePdf({
             invoice,
-            storeName: currentStore?.name ?? 'Malet Sales',
-            currency: invoice.currency ?? currency,
+            storeName: currentStore?.name || 'Tienda',
+            currency,
             storePhone: currentStore?.phone,
             storeEmail: currentStore?.email,
             storeAddress: currentStore?.address,
         });
+        setSharing(false);
+        if (error) notify('error', error);
     };
 
     const confirmCancel = () => {
@@ -113,11 +166,7 @@ export default function InvoiceDetailScreen() {
                             return;
                         }
                         notify('success', 'Factura eliminada.');
-                        if (router.canGoBack()) {
-                            router.back();
-                        } else {
-                            router.dismissTo(`/cuaderno/store?store=${storeId}` as any);
-                        }
+                        if (router.canGoBack()) router.back();
                     } finally {
                         setBusy(false);
                     }
@@ -136,19 +185,19 @@ export default function InvoiceDetailScreen() {
         } as any);
     };
 
-    const isPending = invoice?.status === 'pending';
-    const isPaid = invoice?.status === 'paid';
-
     return (
         <LayoutAuthenticated>
             <View style={styles.container}>
-                <CuadernoHeader title="Factura" subtitle={invoice?.number} />
+                <CuadernoHeader title="Factura" subtitle={invoice?.number ?? undefined} />
 
                 {loading && !invoice ? (
                     <ReceiptDocSkeleton />
                 ) : !invoice ? (
                     <View style={styles.errorBox}>
                         <TextMalet style={styles.errorTitle}>Factura no disponible</TextMalet>
+                        <TextMalet style={styles.errorText}>
+                            {errorMsg ?? 'Esta factura ya no existe.'}
+                        </TextMalet>
                         <Button
                             text="Volver"
                             onPress={() => {
@@ -163,107 +212,187 @@ export default function InvoiceDetailScreen() {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Cabecera del documento */}
-                            <View style={styles.card}>
-                                <View style={styles.docHeader}>
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.numberRow}>
-                                            <FileText size={16} color="#111" />
-                                            <TextMalet style={styles.number}>{invoice.number}</TextMalet>
+                            <View style={styles.docHeader}>
+                                <View style={styles.docHeaderTexts}>
+                                    <TextMalet style={styles.docTitle}>Factura</TextMalet>
+                                    <MetaRow
+                                        label="Número de factura"
+                                        value={invoice.number}
+                                        strong
+                                    />
+                                    <MetaRow
+                                        label="Fecha de emisión"
+                                        value={formatSaleDate(invoice.issued_at)}
+                                    />
+                                    {invoice.due_at ? (
+                                        <MetaRow
+                                            label="Vence"
+                                            value={formatSaleDate(invoice.due_at)}
+                                        />
+                                    ) : null}
+                                    <View style={styles.metaRow}>
+                                        <TextMalet style={styles.metaLabel}>Estado</TextMalet>
+                                        <View
+                                            style={[
+                                                styles.statusBadge,
+                                                { backgroundColor: `${statusColor}14` },
+                                            ]}
+                                        >
+                                            <TextMalet
+                                                style={[styles.statusText, { color: statusColor }]}
+                                            >
+                                                {invoiceStatusLabel(invoice.status)}
+                                            </TextMalet>
                                         </View>
-                                        <TextMalet style={styles.meta}>
-                                            Emitida {formatSaleDate(invoice.issued_at)}
-                                        </TextMalet>
-                                        {invoice.due_at && (
-                                            <TextMalet style={styles.meta}>
-                                                Vence {formatSaleDate(invoice.due_at)}
-                                            </TextMalet>
-                                        )}
-                                        {invoice.paid_at && (
-                                            <TextMalet style={styles.meta}>
-                                                Pagada {formatSaleDate(invoice.paid_at)}
-                                            </TextMalet>
-                                        )}
-                                    </View>
-                                    <View style={[styles.badge, { backgroundColor: `${statusColor}14` }]}>
-                                        <TextMalet style={[styles.badgeText, { color: statusColor }]}>
-                                            {invoiceStatusLabel(invoice.status)}
-                                        </TextMalet>
                                     </View>
                                 </View>
-
-                                <View style={styles.divider} />
-
-                                <TextMalet style={styles.label}>Facturar a</TextMalet>
-                                <TextMalet style={styles.customer}>
-                                    {invoice.customer_name?.trim() || 'Cliente no especificado'}
-                                </TextMalet>
-                                <TextMalet style={styles.store}>
-                                    {currentStore?.name ?? 'Malet Sales'}
-                                </TextMalet>
+                                <Image
+                                    source={require('@/assets/images/malet/breadriuss_logo.png')}
+                                    style={styles.docLogo}
+                                    resizeMode="contain"
+                                />
                             </View>
 
-                            {/* Conceptos */}
-                            <View style={styles.card}>
-                                <TextMalet style={styles.sectionTitle}>Conceptos</TextMalet>
+                            {/* Facturar a */}
+                            <View style={styles.billingBlock}>
+                                <TextMalet style={styles.billingLabel}>Facturar a</TextMalet>
+                                <TextMalet style={styles.billingValue}>
+                                    {invoice.customer_name?.trim() || 'Cliente no especificado'}
+                                </TextMalet>
+                                <TextMalet style={styles.billingStore}>
+                                    {currentStore?.name || 'Tienda'}
+                                </TextMalet>
+                                {(() => {
+                                    const phone = currentStore?.phone;
+                                    const email = currentStore?.email;
+                                    const address = currentStore?.address;
+                                    if (!phone && !email && !address) return null;
+                                    return (
+                                        <View style={styles.issuerLines}>
+                                            {phone ? (
+                                                <TextMalet style={styles.issuerLine}>
+                                                    {phone}
+                                                </TextMalet>
+                                            ) : null}
+                                            {email ? (
+                                                <TextMalet style={styles.issuerLine}>
+                                                    {email}
+                                                </TextMalet>
+                                            ) : null}
+                                            {address ? (
+                                                <TextMalet style={styles.issuerLine}>
+                                                    {address}
+                                                </TextMalet>
+                                            ) : null}
+                                        </View>
+                                    );
+                                })()}
+                            </View>
+
+                            <TextMalet style={styles.amountLine}>
+                                {formatMoney(invoice.total, currency)}
+                                {isPaid && invoice.paid_at
+                                    ? ` pagado el ${formatSaleDate(invoice.paid_at)}`
+                                    : isPending
+                                      ? ' pendiente de pago'
+                                      : ' cancelada'}
+                            </TextMalet>
+
+                            {/* Tabla de conceptos */}
+                            <View style={styles.table}>
+                                <View style={styles.tableHeader}>
+                                    <TextMalet style={[styles.tableHeaderText, styles.colDesc]}>
+                                        Descripción
+                                    </TextMalet>
+                                    <TextMalet style={[styles.tableHeaderText, styles.colCant]}>
+                                        Cant.
+                                    </TextMalet>
+                                    <TextMalet style={[styles.tableHeaderText, styles.colPrice]}>
+                                        Precio unitario
+                                    </TextMalet>
+                                    <TextMalet style={[styles.tableHeaderText, styles.colImporte]}>
+                                        Importe
+                                    </TextMalet>
+                                </View>
+
                                 {invoice.lines.map((line, index) => (
                                     <View
                                         key={`${line.product_id ?? 'concept'}-${index}`}
-                                        style={styles.line}
+                                        style={styles.tableRow}
                                     >
-                                        <View style={{ flex: 1 }}>
-                                            <TextMalet style={styles.lineName} numberOfLines={2}>
+                                        <View style={styles.colDesc}>
+                                            <TextMalet style={styles.cellText}>
                                                 {line.name}
                                             </TextMalet>
-                                            <TextMalet style={styles.lineSub}>
-                                                {line.quantity} × {formatMoney(line.unit_price, currency)}
-                                                {line.item_type === 'service' ? ' · Servicio' : ''}
-                                            </TextMalet>
+                                            {line.item_type === 'service' ? (
+                                                <TextMalet style={styles.cellSub}>Servicio</TextMalet>
+                                            ) : null}
                                         </View>
-                                        <TextMalet style={styles.lineTotal}>
+                                        <TextMalet style={[styles.cellText, styles.colCant]}>
+                                            {line.quantity}
+                                        </TextMalet>
+                                        <TextMalet style={[styles.cellText, styles.colPrice]}>
+                                            {formatMoney(line.unit_price, currency)}
+                                        </TextMalet>
+                                        <TextMalet style={[styles.cellText, styles.colImporte]}>
                                             {formatMoney(line.total, currency)}
                                         </TextMalet>
                                     </View>
                                 ))}
 
-                                <View style={styles.divider} />
+                                {invoice.lines.length === 0 && (
+                                    <TextMalet style={styles.tableEmpty}>
+                                        Esta factura no tiene conceptos registrados.
+                                    </TextMalet>
+                                )}
 
-                                <View style={styles.totalRow}>
-                                    <TextMalet style={styles.totalLabel}>Subtotal</TextMalet>
-                                    <TextMalet style={styles.totalValue}>
-                                        {formatMoney(invoice.subtotal, currency)}
-                                    </TextMalet>
-                                </View>
-                                <View style={styles.totalRow}>
-                                    <TextMalet style={styles.grandLabel}>Total</TextMalet>
-                                    <TextMalet style={styles.grandValue}>
-                                        {formatMoney(invoice.total, currency)}
-                                    </TextMalet>
+                                {/* Totales alineados a la derecha, como en el formato */}
+                                <View style={styles.totalsBlock}>
+                                    <LineRow
+                                        label="Subtotal"
+                                        value={formatMoney(invoice.subtotal, currency)}
+                                    />
+                                    <LineRow
+                                        label="Total"
+                                        value={formatMoney(invoice.total, currency)}
+                                    />
+                                    {isPaid && (
+                                        <LineRow
+                                            label="Pagado"
+                                            value={formatMoney(invoice.total, currency)}
+                                        />
+                                    )}
                                 </View>
                             </View>
 
+                            {/* Notas */}
                             {invoice.notes ? (
-                                <View style={styles.card}>
-                                    <TextMalet style={styles.sectionTitle}>Notas</TextMalet>
-                                    <TextMalet style={styles.notes}>{invoice.notes}</TextMalet>
+                                <View style={styles.notesBlock}>
+                                    <TextMalet style={styles.blockTitle}>Notas</TextMalet>
+                                    <TextMalet style={styles.notesText}>{invoice.notes}</TextMalet>
                                 </View>
                             ) : null}
 
+                            {/* Documentos generados al pagar */}
                             {isPaid && (
-                                <View style={styles.card}>
-                                    <TextMalet style={styles.sectionTitle}>Documentos</TextMalet>
-                                    <TouchableOpacity
-                                        style={styles.docLink}
-                                        onPress={() =>
-                                            invoice.receipt_id &&
-                                            router.push({
-                                                pathname: '/cuaderno/receipt',
-                                                params: { store: storeId, id: invoice.receipt_id },
-                                            } as any)
-                                        }
-                                    >
-                                        <ReceiptText size={16} color="#111" />
-                                        <TextMalet style={styles.docLinkText}>Ver recibo</TextMalet>
-                                    </TouchableOpacity>
+                                <View style={styles.block}>
+                                    <TextMalet style={styles.blockTitle}>Documentos</TextMalet>
+                                    {invoice.receipt_id && (
+                                        <TouchableOpacity
+                                            style={styles.docLink}
+                                            onPress={() =>
+                                                router.push({
+                                                    pathname: '/cuaderno/receipt',
+                                                    params: { store: storeId, id: invoice.receipt_id },
+                                                } as any)
+                                            }
+                                        >
+                                            <ReceiptText size={15} color="#111" />
+                                            <TextMalet style={styles.docLinkText}>
+                                                Ver recibo emitido
+                                            </TextMalet>
+                                        </TouchableOpacity>
+                                    )}
                                     {invoice.sale_id && (
                                         <TouchableOpacity
                                             style={styles.docLink}
@@ -274,63 +403,85 @@ export default function InvoiceDetailScreen() {
                                                 } as any)
                                             }
                                         >
-                                            <ShoppingCart size={16} color="#111" />
-                                            <TextMalet style={styles.docLinkText}>Ver venta</TextMalet>
+                                            <ShoppingCart size={15} color="#111" />
+                                            <TextMalet style={styles.docLinkText}>
+                                                Ver venta asociada
+                                            </TextMalet>
                                         </TouchableOpacity>
                                     )}
                                 </View>
                             )}
+
+                            {/* Acciones del documento (solo si aún no está pagada) */}
+                            {!isPaid && (
+                                <View style={styles.inlineActions}>
+                                    {isPending && (
+                                        <>
+                                            <TouchableOpacity
+                                                style={styles.inlineAction}
+                                                onPress={() =>
+                                                    router.push({
+                                                        pathname: '/cuaderno/invoice-form',
+                                                        params: { store: storeId, id: invoice.id },
+                                                    } as any)
+                                                }
+                                            >
+                                                <Pencil size={14} color="#111" />
+                                                <TextMalet style={styles.inlineActionText}>
+                                                    Editar
+                                                </TextMalet>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={styles.inlineAction}
+                                                onPress={confirmCancel}
+                                            >
+                                                <X size={14} color="#dc2626" />
+                                                <TextMalet
+                                                    style={[
+                                                        styles.inlineActionText,
+                                                        styles.inlineActionDanger,
+                                                    ]}
+                                                >
+                                                    Cancelar
+                                                </TextMalet>
+                                            </TouchableOpacity>
+                                        </>
+                                    )}
+                                    <TouchableOpacity
+                                        style={styles.inlineAction}
+                                        onPress={confirmDelete}
+                                    >
+                                        <Trash2 size={14} color="#dc2626" />
+                                        <TextMalet
+                                            style={[
+                                                styles.inlineActionText,
+                                                styles.inlineActionDanger,
+                                            ]}
+                                        >
+                                            Eliminar
+                                        </TextMalet>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </ScrollView>
 
-                        {/* Acciones */}
+                        {/* Acciones fijas abajo */}
                         <View style={styles.footer}>
                             {isPending && (
                                 <Button
                                     text="Registrar pago"
                                     onPress={() => setPayOpen(true)}
                                     loading={busy}
-                                    style={styles.primary}
+                                    style={styles.saleBtn}
                                 />
                             )}
-
-                            <View style={styles.actionsRow}>
-                                <TouchableOpacity style={styles.action} onPress={sharePdf}>
-                                    <Share2 size={16} color="#111" />
-                                    <TextMalet style={styles.actionText}>Compartir PDF</TextMalet>
-                                </TouchableOpacity>
-
-                                {isPending && (
-                                    <>
-                                        <TouchableOpacity
-                                            style={styles.action}
-                                            onPress={() =>
-                                                router.push({
-                                                    pathname: '/cuaderno/invoice-form',
-                                                    params: { store: storeId, id: invoice.id },
-                                                } as any)
-                                            }
-                                        >
-                                            <Pencil size={16} color="#111" />
-                                            <TextMalet style={styles.actionText}>Editar</TextMalet>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity style={styles.action} onPress={confirmCancel}>
-                                            <X size={16} color="#dc2626" />
-                                            <TextMalet style={[styles.actionText, { color: '#dc2626' }]}>
-                                                Cancelar
-                                            </TextMalet>
-                                        </TouchableOpacity>
-                                    </>
-                                )}
-
-                                {!isPaid && (
-                                    <TouchableOpacity style={styles.action} onPress={confirmDelete}>
-                                        <TextMalet style={[styles.actionText, { color: '#dc2626' }]}>
-                                            Eliminar
-                                        </TextMalet>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
+                            <Button
+                                text="Compartir PDF"
+                                icon={<Share2 size={15} color="#fff" />}
+                                onPress={handleShare}
+                                loading={sharing}
+                                style={styles.saleBtn}
+                            />
                         </View>
                     </>
                 )}
@@ -352,178 +503,267 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'white',
-        paddingHorizontal: 5,
+        paddingHorizontal: 4,
     },
     scrollContent: {
-        paddingBottom: 24,
-        gap: 12,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.08)',
-        borderRadius: 16,
-        padding: 14,
-        gap: 8,
-        backgroundColor: '#fff',
+        paddingBottom: 48,
+        gap: 14,
     },
     docHeader: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 10,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.1)',
+        paddingBottom: 12,
     },
-    numberRow: {
+    docHeaderTexts: {
+        flex: 1,
+        gap: 3,
+    },
+    docTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#111',
+        letterSpacing: -0.4,
+        marginBottom: 2,
+    },
+    docLogo: {
+        width: 38,
+        height: 39,
+    },
+    metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 7,
+        gap: 6,
     },
-    number: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#111',
-        letterSpacing: -0.2,
-    },
-    meta: {
-        fontSize: 11.5,
-        color: 'rgba(0,0,0,0.45)',
-        marginTop: 2,
-    },
-    badge: {
-        paddingHorizontal: 9,
-        paddingVertical: 4,
-        borderRadius: 10,
-    },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
-    },
-    divider: {
-        height: 1,
-        backgroundColor: 'rgba(0,0,0,0.07)',
-        marginVertical: 4,
-    },
-    label: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: 'rgba(0,0,0,0.45)',
-        textTransform: 'uppercase',
-        letterSpacing: 0.6,
-    },
-    customer: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#111',
-    },
-    store: {
+    metaLabel: {
         fontSize: 11.5,
         color: 'rgba(0,0,0,0.45)',
     },
-    sectionTitle: {
-        fontSize: 12,
+    metaValue: {
+        fontSize: 11.5,
+        fontWeight: '600',
+        color: '#111',
+    },
+    metaValueStrong: {
+        fontWeight: '800',
+    },
+    statusBadge: {
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    statusText: {
+        fontSize: 9.5,
         fontWeight: '700',
-        color: 'rgba(0,0,0,0.55)',
         textTransform: 'uppercase',
-        letterSpacing: 0.7,
+        letterSpacing: 0.3,
     },
-    line: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingVertical: 6,
+    billingBlock: {
+        gap: 2,
     },
-    lineName: {
-        fontSize: 13.5,
-        fontWeight: '600',
-        color: '#111',
-    },
-    lineSub: {
-        fontSize: 11,
+    billingLabel: {
+        fontSize: 11.5,
         color: 'rgba(0,0,0,0.45)',
-        marginTop: 2,
     },
-    lineTotal: {
-        fontSize: 13.5,
-        fontWeight: '700',
-        color: '#111',
-    },
-    totalRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    totalLabel: {
-        fontSize: 12.5,
-        color: 'rgba(0,0,0,0.5)',
-    },
-    totalValue: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#111',
-    },
-    grandLabel: {
+    billingValue: {
         fontSize: 14,
         fontWeight: '700',
         color: '#111',
     },
-    grandValue: {
-        fontSize: 17,
+    billingStore: {
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.5)',
+    },
+    issuerLines: {
+        marginTop: 4,
+    },
+    issuerLine: {
+        fontSize: 11.5,
+        color: 'rgba(0,0,0,0.5)',
+        lineHeight: 16,
+    },
+    amountLine: {
+        fontSize: 13.5,
         fontWeight: '700',
         color: '#111',
-        letterSpacing: -0.3,
     },
-    notes: {
+    table: {
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    tableHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#fafafa',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.08)',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+    },
+    tableHeaderText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: 'rgba(0,0,0,0.5)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    tableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+    },
+    cellText: {
+        fontSize: 12,
+        color: '#222',
+    },
+    cellSub: {
+        fontSize: 9.5,
+        fontWeight: '700',
+        color: '#7c3aed',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        marginTop: 1,
+    },
+    colDesc: {
+        flex: 1,
+    },
+    colCant: {
+        width: 34,
+        textAlign: 'center',
+    },
+    colPrice: {
+        width: 84,
+        textAlign: 'right',
+    },
+    colImporte: {
+        width: 84,
+        textAlign: 'right',
+    },
+    tableEmpty: {
+        fontSize: 12,
+        color: '#888',
+        textAlign: 'center',
+        paddingVertical: 14,
+    },
+    totalsBlock: {
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.08)',
+        marginLeft: '34%',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        gap: 6,
+    },
+    lineRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    lineLabel: {
+        fontSize: 11.5,
+        color: 'rgba(0,0,0,0.5)',
+    },
+    lineValue: {
         fontSize: 12.5,
+        fontWeight: '700',
+        color: '#111',
+    },
+    notesBlock: {
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 12,
+        padding: 12,
+        gap: 4,
+    },
+    block: {
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 12,
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+    },
+    blockTitle: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#111',
+        paddingTop: 8,
+        paddingBottom: 4,
+    },
+    notesText: {
+        fontSize: 12,
         color: '#444',
-        lineHeight: 18,
+        lineHeight: 17,
+        paddingBottom: 8,
     },
     docLink: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 9,
-        paddingVertical: 9,
+        gap: 8,
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.07)',
     },
     docLinkText: {
-        fontSize: 13.5,
+        fontSize: 13,
         fontWeight: '600',
         color: '#111',
     },
-    footer: {
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.06)',
-        paddingTop: 10,
-        paddingBottom: 14,
-        gap: 8,
-    },
-    primary: {
-        width: '100%',
-    },
-    actionsRow: {
+    inlineActions: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 16,
-        paddingHorizontal: 2,
+        gap: 18,
+        paddingHorizontal: 4,
+        paddingTop: 2,
     },
-    action: {
+    inlineAction: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        paddingVertical: 6,
+        paddingVertical: 4,
     },
-    actionText: {
+    inlineActionText: {
         fontSize: 12.5,
         fontWeight: '600',
         color: '#111',
     },
+    inlineActionDanger: {
+        color: '#dc2626',
+    },
+    saleBtn: {
+        width: '100%',
+    },
+    footer: {
+        paddingHorizontal: 8,
+        paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#e8e8e8',
+        backgroundColor: 'white',
+        gap: 8,
+    },
     errorBox: {
+        flex: 1,
         alignItems: 'center',
-        marginTop: 60,
-        gap: 12,
+        justifyContent: 'center',
+        gap: 10,
         paddingHorizontal: 24,
     },
     errorTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#333',
+        color: '#1a1a1a',
+    },
+    errorText: {
+        fontSize: 13.5,
+        color: '#888',
+        textAlign: 'center',
+        lineHeight: 19,
     },
 });
