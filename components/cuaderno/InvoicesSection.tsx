@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { FileText, Plus } from 'lucide-react-native';
-import { useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
 import TextMalet from '@/components/TextMalet/TextMalet';
@@ -21,18 +21,24 @@ function statusColor(status: InvoiceStatus): string {
     return INVOICE_STATUS_OPTIONS.find((option) => option.value === status)?.color ?? '#6b7280';
 }
 
-/** Fila de una factura con su estado y total. */
-function InvoiceRow({
+/** Fila de una factura con su estado y total (memoizada para FlashList). */
+const InvoiceRow = memo(function InvoiceRow({
     invoice,
     currency,
-    onPress,
+    storeId,
 }: {
     invoice: Invoice;
     currency: ReturnType<typeof currencyOf>;
-    onPress: () => void;
+    storeId: string;
 }) {
+    const open = () =>
+        router.push({
+            pathname: '/cuaderno/invoice',
+            params: { store: storeId, id: invoice.id },
+        } as any);
+
     return (
-        <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.row} onPress={open} activeOpacity={0.7}>
             <View style={styles.rowIcon}>
                 <FileText size={16} color="#111" />
             </View>
@@ -56,7 +62,7 @@ function InvoiceRow({
             <TextMalet style={styles.rowTotal}>{formatMoney(invoice.total, currency)}</TextMalet>
         </TouchableOpacity>
     );
-}
+});
 
 /**
  * Sección "Facturas": documentos que detallan lo que se cobrará. Se convierten
@@ -153,24 +159,20 @@ export default function InvoicesSection({ storeId }: { storeId: string }) {
         </View>
     );
 
+    const renderItem = useCallback(
+        ({ item }: { item: Invoice }) => (
+            <InvoiceRow invoice={item} currency={currency} storeId={storeId} />
+        ),
+        [currency, storeId],
+    );
+
     return (
         <View style={styles.wrap}>
             <FlashList
                 {...headerScroll}
                 data={invoices}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <InvoiceRow
-                        invoice={item}
-                        currency={currency}
-                        onPress={() =>
-                            router.push({
-                                pathname: '/cuaderno/invoice',
-                                params: { store: storeId, id: item.id },
-                            } as any)
-                        }
-                    />
-                )}
+                renderItem={renderItem}
                 ListHeaderComponent={header}
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
@@ -180,7 +182,7 @@ export default function InvoicesSection({ storeId }: { storeId: string }) {
                     loadInvoices({ refresh: true });
                     loadInvoiceTotals();
                 }}
-                refreshing={invoicesLoading && invoices.length === 0}
+                refreshing={invoicesLoading && invoices.length > 0}
                 ListEmptyComponent={
                     invoicesLoading ? (
                         <ListRowsSkeleton rows={4} />

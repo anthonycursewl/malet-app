@@ -46,6 +46,13 @@ const freshPagination = (take: number): Pagination => ({
 });
 
 /**
+ * Secuencia de la última petición del listado de facturas. Si el usuario cambia
+ * de filtro mientras una página está en vuelo, la respuesta vieja se descarta
+ * (evita mezclar facturas de dos filtros).
+ */
+let invoicesRequestSeq = 0;
+
+/**
  * Filtro por defecto del panel de la tienda: siempre **Hoy**, así el resumen,
  * la gráfica y el listado abren en el día actual.
  */
@@ -520,8 +527,8 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
                 get().loadSummary(),
                 get().loadSeries(),
                 get().loadReceipts({ refresh: true }),
-                get().loadInvoices({ refresh: true }),
-                get().loadInvoiceTotals(),
+                // Las facturas se cargan al abrir su pestaña (lazy): evita una
+                // petición extra al entrar a la tienda.
                 get().loadCustomers({ refresh: true }),
             ]);
             set({ loading: false });
@@ -1039,6 +1046,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
         if (state.invoicesLoading && !refresh) return;
         if (!refresh && state.invoicesPagination.isEnd) return;
 
+        const requestId = ++invoicesRequestSeq;
         set({ invoicesLoading: true });
         try {
             const cursor = refresh ? null : state.invoicesPagination.cursor;
@@ -1048,6 +1056,8 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
                 { take: state.invoicesPagination.take, cursor },
             );
             if (error) throw new Error(error);
+            // Llegó una respuesta de un filtro anterior: se descarta.
+            if (requestId !== invoicesRequestSeq) return;
 
             const data = response?.data ?? [];
             const nextCursor = response?.nextCursor ?? null;
@@ -1063,6 +1073,7 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
                 invoicesLoading: false,
             }));
         } catch (e: any) {
+            if (requestId !== invoicesRequestSeq) return;
             set((s) => ({
                 invoicesLoading: false,
                 error: e?.message ?? 'Error al cargar las facturas',
@@ -1072,7 +1083,11 @@ export const useSalesModuleStore = create<SalesModuleStore>((set, get) => ({
     },
 
     setInvoiceStatus: async (status) => {
-        set({ invoiceStatus: status });
+        // Nuevo filtro ⇒ nueva paginación desde el principio.
+        set({
+            invoiceStatus: status,
+            invoicesPagination: { ...get().invoicesPagination, cursor: null, isEnd: false },
+        });
         await get().loadInvoices({ refresh: true });
     },
 
