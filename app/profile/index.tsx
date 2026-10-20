@@ -166,6 +166,13 @@ export default function ProfileView() {
                 onPress: () => router.push("/cuaderno" as any),
             },
             {
+                id: "gym",
+                icon: "activity" as const,
+                title: "Gimnasio",
+                subtitle: "Rutina y progreso",
+                onPress: () => router.push("/gym" as any),
+            },
+            {
                 id: "updates",
                 icon: "bell" as const,
                 title: "Novedades",

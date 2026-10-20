@@ -1,5 +1,6 @@
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import LastTransactions from "@/components/dashboard/LastTransactions";
+import GymEntryCard from "@/components/gym/GymEntryCard";
 import ModalAccounts from "@/components/Modals/ModalAccounts/ModalAccounts";
 import UpdatesModal from "@/components/Modals/UpdatesModal/UpdatesModal";
 import TextMalet from "@/components/TextMalet/TextMalet";
@@ -915,6 +916,8 @@ export default function Dashboard() {
                             </TouchableOpacity>
 
                             <GoldenTicket onPress={() => router.push('/communities' as any)} />
+
+                            <GymEntryCard />
 
                         </ScrollView>
                     </View>
