@@ -121,9 +121,23 @@ export default function NotesGraphScreen() {
                                 </TextMalet>
                             </View>
                             <View style={styles.legendItem}>
+                                <View
+                                    style={[
+                                        styles.dot,
+                                        {
+                                            borderColor: '#2f8f5b',
+                                            backgroundColor: '#eef7f1',
+                                        },
+                                    ]}
+                                />
+                                <TextMalet style={styles.legendText}>
+                                    Pública
+                                </TextMalet>
+                            </View>
+                            <View style={styles.legendItem}>
                                 <View style={styles.dot} />
                                 <TextMalet style={styles.legendText}>
-                                    Nota
+                                    Privada
                                 </TextMalet>
                             </View>
                         </View>

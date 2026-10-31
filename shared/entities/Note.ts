@@ -5,6 +5,7 @@ export interface NoteSummary {
   excerpt: string;
   word_count: number;
   pinned: boolean;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +17,7 @@ export interface Note {
   title: string;
   content: string;
   pinned: boolean;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -26,6 +28,7 @@ export interface NoteInput {
   title?: string;
   content?: string;
   pinned?: boolean;
+  is_public?: boolean;
 }
 
 /** Respuesta del listado cursor-based. */
@@ -59,6 +62,7 @@ export interface NoteGraphNode {
     id: string;
     title: string;
     pinned: boolean;
+    is_public: boolean;
 }
 
 /** Arista entre dos notas. */

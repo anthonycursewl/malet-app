@@ -1,4 +1,10 @@
-import { LocateFixed, Minus, Plus } from 'lucide-react-native';
+import {
+    Globe,
+    LocateFixed,
+    Lock,
+    Minus,
+    Plus,
+} from 'lucide-react-native';
 import {
     Gesture,
     GestureDetector,
@@ -197,6 +203,22 @@ export default function GraphCanvas({
                     >
                         {selectedNode.title.trim() || 'Sin título'}
                     </TextMalet>
+                    <View style={styles.selectionVisibility}>
+                        {selectedNode.is_public ? (
+                            <Globe size={11} color="#2f8f5b" />
+                        ) : (
+                            <Lock size={11} color="#8a8a8a" />
+                        )}
+                        <TextMalet
+                            style={[
+                                styles.selectionVisibilityText,
+                                selectedNode.is_public &&
+                                    styles.selectionVisibilityPublic,
+                            ]}
+                        >
+                            {selectedNode.is_public ? 'Pública' : 'Privada'}
+                        </TextMalet>
+                    </View>
                     <TextMalet style={styles.selectionHint}>
                         Toca otra vez para abrir
                     </TextMalet>
@@ -266,6 +288,20 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
         color: '#1f1f1f',
+    },
+    selectionVisibility: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        marginTop: 2,
+    },
+    selectionVisibilityText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#8a8a8a',
+    },
+    selectionVisibilityPublic: {
+        color: '#2f8f5b',
     },
     selectionHint: {
         fontSize: 10,

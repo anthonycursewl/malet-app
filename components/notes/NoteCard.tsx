@@ -1,4 +1,11 @@
-import { Archive, ArrowUpRight, FileText, Pin } from 'lucide-react-native';
+import {
+    Archive,
+    ArrowUpRight,
+    FileText,
+    Globe,
+    Lock,
+    Pin,
+} from 'lucide-react-native';
 import { memo } from 'react';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import TextMalet from '@/components/TextMalet/TextMalet';
@@ -58,6 +65,22 @@ const NoteCard = memo(function NoteCard({
                     <TextMalet style={styles.date}>
                         · {formatNoteDate(note.updated_at)}
                     </TextMalet>
+                    <View style={styles.visibilityRow}>
+                        {note.is_public ? (
+                            <Globe size={12} color="#2f8f5b" />
+                        ) : (
+                            <Lock size={12} color="#8a8a8a" />
+                        )}
+                        <TextMalet
+                            style={[
+                                styles.visibilityText,
+                                note.is_public &&
+                                    styles.visibilityTextPublic,
+                            ]}
+                        >
+                            {note.is_public ? 'Pública' : 'Privada'}
+                        </TextMalet>
+                    </View>
                 </View>
 
                 <TouchableOpacity
@@ -181,6 +204,20 @@ const styles = StyleSheet.create({
     date: {
         fontSize: 12.5,
         color: '#536471',
+    },
+    visibilityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        marginLeft: 2,
+    },
+    visibilityText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#8a8a8a',
+    },
+    visibilityTextPublic: {
+        color: '#2f8f5b',
     },
     body: {
         marginTop: 3,

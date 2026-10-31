@@ -221,7 +221,12 @@ export default function KnowledgeGraph({
         return layout.map((node) => {
             const current = currentById.get(node.id);
             return current
-                ? { ...node, title: current.title, pinned: current.pinned }
+                ? {
+                      ...node,
+                      title: current.title,
+                      pinned: current.pinned,
+                      is_public: current.is_public,
+                  }
                 : node;
         });
     }, [layout, currentById]);
@@ -547,14 +552,18 @@ export default function KnowledgeGraph({
                                     ? '#fff7ed'
                                     : isSelected
                                       ? '#e8f1f8'
-                                      : '#fff'
+                                      : node.is_public
+                                        ? '#eef7f1'
+                                        : '#fff'
                             }
                             stroke={
                                 node.pinned
                                     ? '#b45309'
                                     : isSelected
                                       ? '#0b6e99'
-                                      : '#6b6b6b'
+                                      : node.is_public
+                                        ? '#2f8f5b'
+                                        : '#6b6b6b'
                             }
                             strokeWidth={strokeWidth * 1.2}
                         />

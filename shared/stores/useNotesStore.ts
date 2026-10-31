@@ -237,6 +237,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
                   ...n,
                   title: response.title,
                   pinned: response.pinned,
+                  is_public: response.is_public,
                   updated_at: response.updated_at,
               }
             : n

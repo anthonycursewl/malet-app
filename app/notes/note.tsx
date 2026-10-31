@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
-import { BookOpen, Check, Pencil, Pin, Trash2 } from 'lucide-react-native';
+import { BookOpen, Check, Globe, Lock, Pencil, Pin, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
@@ -109,6 +109,8 @@ export default function NoteScreen() {
     const [activeBlock, setActiveBlock] = useState(0);
     const [blockSelection, setBlockSelection] = useState({ start: 0, end: 0 });
     const [pinned, setPinned] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
+    const [visibilityUpdating, setVisibilityUpdating] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -186,6 +188,7 @@ export default function NoteScreen() {
             setBlocks(parsed);
             setActiveBlock(Math.max(parsed.length - 1, 0));
             setPinned(fetched.pinned);
+            setIsPublic(fetched.is_public);
             setLoading(false);
             setMode('view');
         })();
@@ -229,6 +232,7 @@ export default function NoteScreen() {
                     title,
                     content,
                     pinned,
+                    is_public: isPublic,
                 });
                 if (error || !updated) {
                     notify('error', error ?? 'No se pudo guardar la nota.');
@@ -248,6 +252,7 @@ export default function NoteScreen() {
                 title,
                 content,
                 pinned,
+                is_public: isPublic,
             });
             if (error || !created) {
                 notify('error', error ?? 'No se pudo crear la nota.');
@@ -271,7 +276,7 @@ export default function NoteScreen() {
                 }, 0);
             }
         }
-    }, [id, title, content, pinned, updateNote, createNote]);
+    }, [id, title, content, pinned, isPublic, updateNote, createNote]);
 
     useEffect(() => {
         persistRef.current = persist;
@@ -284,7 +289,7 @@ export default function NoteScreen() {
             void persist();
         }, 900);
         return () => clearTimeout(timer);
-    }, [id, mode, dirty, title, content, pinned, persist]);
+    }, [id, mode, dirty, title, content, pinned, isPublic, persist]);
 
     // Refresca enlaces/backlinks al volver de una nota enlazada o al guardar.
     useFocusEffect(
@@ -304,6 +309,7 @@ export default function NoteScreen() {
                 setTitle(refreshed.title);
                 setBlocks(parsed);
                 setPinned(refreshed.pinned);
+                setIsPublic(refreshed.is_public);
                 setActiveBlock((current) =>
                     Math.min(current, Math.max(parsed.length - 1, 0))
                 );
@@ -361,6 +367,39 @@ export default function NoteScreen() {
             setNote((prev) => (prev ? { ...prev, ...updated } : prev));
         }
         notify('success', next ? 'Nota fijada.' : 'Nota desfijada.');
+    };
+
+    /**
+     * La visibilidad se guarda al instante en lectura. En edición se marca
+     * `dirty` y viaja con el autosave/check para no pisar el contenido abierto.
+     */
+    const toggleVisibility = async () => {
+        if (visibilityUpdating) return;
+        const next = !isPublic;
+
+        if (!id || mode === 'edit') {
+            setIsPublic(next);
+            markDirty();
+            return;
+        }
+
+        setVisibilityUpdating(true);
+        setIsPublic(next);
+        const { note: updated, error } = await updateNote(id, {
+            is_public: next,
+        });
+        setVisibilityUpdating(false);
+
+        if (error) {
+            setIsPublic(!next);
+            notify('error', error);
+            return;
+        }
+
+        if (updated) {
+            setNote((prev) => (prev ? { ...prev, ...updated } : prev));
+        }
+        notify('success', next ? 'Nota pública.' : 'Nota privada.');
     };
 
     const confirmDelete = () => {
@@ -705,6 +744,22 @@ export default function NoteScreen() {
     const headerRight =
         mode === 'edit' ? (
             <View style={styles.editHeaderActions}>
+                <TouchableOpacity
+                    style={styles.tutorialAction}
+                    onPress={() => void toggleVisibility()}
+                    activeOpacity={0.6}
+                    accessibilityLabel={
+                        isPublic
+                            ? 'Nota pública, tocar para hacerla privada'
+                            : 'Nota privada, tocar para hacerla pública'
+                    }
+                >
+                    {isPublic ? (
+                        <Globe size={18} color="#2f8f5b" />
+                    ) : (
+                        <Lock size={18} color="#555" />
+                    )}
+                </TouchableOpacity>
                 {canFillTutorial && (
                     <TouchableOpacity
                         style={styles.tutorialAction}
@@ -727,6 +782,23 @@ export default function NoteScreen() {
             </View>
         ) : (
             <View style={styles.actions}>
+                <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => void toggleVisibility()}
+                    disabled={visibilityUpdating}
+                    activeOpacity={0.6}
+                    accessibilityLabel={
+                        isPublic
+                            ? 'Nota pública, tocar para hacerla privada'
+                            : 'Nota privada, tocar para hacerla pública'
+                    }
+                >
+                    {isPublic ? (
+                        <Globe size={18} color="#2f8f5b" />
+                    ) : (
+                        <Lock size={18} color="#555" />
+                    )}
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={togglePin}>
                     <Pin
                         size={18}
@@ -786,6 +858,36 @@ export default function NoteScreen() {
                             {formatNoteDate(note.updated_at)} · {noteWordCount(content)}{' '}
                             palabras
                         </TextMalet>
+                        <TouchableOpacity
+                            style={[
+                                styles.visibilityPill,
+                                isPublic && styles.visibilityPillPublic,
+                            ]}
+                            onPress={() => void toggleVisibility()}
+                            disabled={visibilityUpdating}
+                            activeOpacity={0.75}
+                            accessibilityLabel={
+                                isPublic
+                                    ? 'Nota pública, tocar para hacerla privada'
+                                    : 'Nota privada, tocar para hacerla pública'
+                            }
+                        >
+                            {isPublic ? (
+                                <Globe size={13} color="#2f8f5b" />
+                            ) : (
+                                <Lock size={13} color="#6b6b6b" />
+                            )}
+                            <TextMalet
+                                style={[
+                                    styles.visibilityPillText,
+                                    isPublic && styles.visibilityPillTextPublic,
+                                ]}
+                            >
+                                {isPublic
+                                    ? 'Pública · visible en la web'
+                                    : 'Privada · solo tú puedes verla'}
+                            </TextMalet>
+                        </TouchableOpacity>
                         <View style={styles.rule} />
 
                         {content.trim() ? (
@@ -1066,6 +1168,28 @@ const styles = StyleSheet.create({
         fontSize: 11.5,
         color: '#9a9a9a',
         marginTop: 6,
+    },
+    visibilityPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 5,
+        marginTop: 8,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 12,
+        backgroundColor: '#f4f4f3',
+    },
+    visibilityPillPublic: {
+        backgroundColor: '#eef7f1',
+    },
+    visibilityPillText: {
+        fontSize: 11.5,
+        fontWeight: '600',
+        color: '#6b6b6b',
+    },
+    visibilityPillTextPublic: {
+        color: '#2f8f5b',
     },
     rule: {
         height: 1,
