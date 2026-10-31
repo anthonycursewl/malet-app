@@ -2,20 +2,23 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { BookOpen, Plus, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
 import { InputField } from '@/components/AddWallet/InputField';
-import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
+import LayoutAuthenticated, {
+    LAYOUT_HORIZONTAL_PADDING,
+} from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { ListRowsSkeleton } from '@/components/cuaderno/Skeletons';
-import { notify } from '@/components/cuaderno/format';
+import { notify, notifyUndo } from '@/components/cuaderno/format';
 import NoteCard from '@/components/notes/NoteCard';
 import NotesHeader from '@/components/notes/NotesHeader';
 import {
     TUTORIAL_NOTE_CONTENT,
     TUTORIAL_NOTE_TITLE,
 } from '@/components/notes/tutorialNote';
-import { NoteSummary } from '@/shared/entities/Note';
+import { noteTitle, NoteSummary } from '@/shared/entities/Note';
+import { useAuthStore } from '@/shared/stores/useAuthStore';
 import { useNotesStore } from '@/shared/stores/useNotesStore';
 
 /** Listado de notas con búsqueda, paginación cursor y acceso rápido al editor. */
@@ -28,6 +31,10 @@ export default function NotesListScreen() {
     const setSearch = useNotesStore((s) => s.setSearch);
     const clearNotesError = useNotesStore((s) => s.clearNotesError);
     const createNote = useNotesStore((s) => s.createNote);
+    const togglePin = useNotesStore((s) => s.togglePin);
+    const deleteNote = useNotesStore((s) => s.deleteNote);
+    const restoreNote = useNotesStore((s) => s.restoreNote);
+    const author = useAuthStore((s) => s.user);
 
     const [searchText, setSearchText] = useState(search);
     const [creatingTutorial, setCreatingTutorial] = useState(false);
@@ -57,6 +64,41 @@ export default function NotesListScreen() {
     const openNote = useCallback((note: NoteSummary) => {
         router.push({ pathname: '/notes/note', params: { id: note.id } } as any);
     }, []);
+
+    const handleTogglePin = useCallback(
+        async (note: NoteSummary) => {
+            const error = await togglePin(note);
+            if (error) notify('error', error);
+        },
+        [togglePin]
+    );
+
+    const handleArchive = useCallback(
+        (note: NoteSummary) => {
+            Alert.alert(
+                'Archivar nota',
+                `¿Quieres archivar «${noteTitle(note)}»? Podrás deshacerlo.`,
+                [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                        text: 'Archivar',
+                        style: 'destructive',
+                        onPress: async () => {
+                            const error = await deleteNote(note.id);
+                            if (error) {
+                                notify('error', error);
+                                return;
+                            }
+                            notifyUndo('Nota archivada.', () => {
+                                void restoreNote(note.id);
+                            });
+                        },
+                    },
+                ]
+            );
+        },
+        [deleteNote, restoreNote]
+    );
 
     /** Crea la nota tutorial una vez; si ya existe, la abre. */
     const openTutorial = async () => {
@@ -89,9 +131,15 @@ export default function NotesListScreen() {
 
     const renderItem = useCallback(
         ({ item }: { item: NoteSummary }) => (
-            <NoteCard note={item} onPress={openNote} />
+            <NoteCard
+                note={item}
+                author={author}
+                onOpen={openNote}
+                onTogglePin={handleTogglePin}
+                onArchive={handleArchive}
+            />
         ),
-        [openNote]
+        [author, openNote, handleTogglePin, handleArchive]
     );
 
     const header = (
@@ -136,6 +184,7 @@ export default function NotesListScreen() {
                 />
 
                 <FlashList
+                    style={styles.list}
                     data={notes}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
@@ -198,9 +247,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'white',
-        paddingHorizontal: 5,
+    },
+    list: {
+        flex: 1,
+        // Compensa el padding horizontal de LayoutAuthenticated: el feed
+        // ocupa todo el ancho y el padding queda dentro de cada post.
+        marginHorizontal: -LAYOUT_HORIZONTAL_PADDING,
     },
     headerBlock: {
+        paddingHorizontal: 12,
         paddingBottom: 10,
     },
     tutorialButton: {

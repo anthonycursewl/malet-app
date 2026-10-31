@@ -3,6 +3,7 @@ export interface NoteSummary {
   id: string;
   title: string;
   excerpt: string;
+  word_count: number;
   pinned: boolean;
   created_at: string;
   updated_at: string;
