@@ -1,5 +1,6 @@
 import {
     Archive,
+    ArrowDown,
     ArrowUpRight,
     BadgeCheck,
     Bold,
@@ -8,6 +9,7 @@ import {
     ChevronLeft,
     CircleHelp,
     Code as CodeIcon,
+    Copy,
     FileText,
     Heading1,
     Heading2,
@@ -244,6 +246,11 @@ export default function NotesHelpScreen() {
                             Abre la nota en modo lectura. También puedes tocar
                             el cuerpo del post.
                         </Item>
+                        <Item icon={ArrowDown} title="Cargar más notas">
+                            Al llegar al final del feed se cargan las
+                            siguientes notas automáticamente. Mientras llegan
+                            verás un skeleton con la forma de los posts.
+                        </Item>
                     </Section>
 
                     <Section title="Vista de una nota">
@@ -263,6 +270,10 @@ export default function NotesHelpScreen() {
                         <Item icon={BookOpen} title="Cargar tutorial">
                             En una nota nueva y vacía aparece este icono de
                             libro: rellena el editor con la guía de ejemplo.
+                        </Item>
+                        <Item icon={Copy} title="Copiar código">
+                            En la vista de lectura, los bloques de código
+                            tienen un botón para copiar su contenido.
                         </Item>
                         <Item icon={ChevronLeft} title="Volver">
                             La flecha de la cabecera regresa a la pantalla
