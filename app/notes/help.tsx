@@ -1,3 +1,4 @@
+import { FlashList } from '@shopify/flash-list';
 import {
     Archive,
     ArrowDown,
@@ -31,51 +32,477 @@ import {
     RefreshCw,
     Search,
     Trash2,
-    LucideIcon,
 } from 'lucide-react-native';
-import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import type { LucideIcon } from 'lucide-react-native';
+import { useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import NotesHeader from '@/components/notes/NotesHeader';
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+type HelpRow =
+    | { kind: 'hero'; key: string }
+    | { kind: 'section'; key: string; title: string }
+    | {
+          kind: 'item';
+          key: string;
+          icon: LucideIcon;
+          title: string;
+          body: string;
+      }
+    | { kind: 'footer'; key: string; text: string };
+
+/**
+ * Filas planas para que FlashList monte solo lo visible. El contenido es texto
+ * con tramos entre backticks: así la pantalla no crea todo el árbol de una vez.
+ */
+const HELP_ROWS: HelpRow[] = [
+    { kind: 'hero', key: 'hero' },
+
+    { kind: 'section', key: 'sec-start', title: 'Primeros pasos' },
+    {
+        kind: 'item',
+        key: 'create',
+        icon: Plus,
+        title: 'Crear una nota',
+        body: 'Toca el botón flotante `+` de la esquina inferior derecha. También puedes tocar el botón `Tutorial` para generar una nota de ejemplo.',
+    },
+    {
+        kind: 'item',
+        key: 'blocks',
+        icon: Pencil,
+        title: 'Escribir por bloques',
+        body: 'La línea actual se edita como texto plano. Al pulsar `Enter` ese bloque se renderiza con su estilo final. Toca un bloque ya renderizado para volver a editarlo.',
+    },
+    {
+        kind: 'item',
+        key: 'save',
+        icon: Check,
+        title: 'Guardar',
+        body: 'Las notas existentes se guardan solas (~1 s). El check de la cabecera guarda al instante y vuelve a la vista de lectura. En una nota nueva, el check la crea.',
+    },
+    {
+        kind: 'item',
+        key: 'search',
+        icon: Search,
+        title: 'Buscar',
+        body: 'El buscador filtra tus notas por título y contenido. Mientras escribes, la lista se actualiza sola.',
+    },
+
+    { kind: 'section', key: 'sec-header', title: 'Cabecera de Notas' },
+    {
+        kind: 'item',
+        key: 'help',
+        icon: CircleHelp,
+        title: 'Ayuda',
+        body: 'Abre esta guía desde la cabecera del listado de Notas.',
+    },
+    {
+        kind: 'item',
+        key: 'map-entry',
+        icon: Network,
+        title: 'Mapa de notas',
+        body: 'Abre el mapa global con tus notas y enlaces.',
+    },
+    {
+        kind: 'item',
+        key: 'tutorial',
+        icon: BookOpen,
+        title: 'Tutorial',
+        body: 'Crea la nota de tutorial si no existe; si ya existe, la abre directamente.',
+    },
+
+    { kind: 'section', key: 'sec-format', title: 'Barra de formato (abajo)' },
+    {
+        kind: 'item',
+        key: 'h1',
+        icon: Heading1,
+        title: 'Título 1',
+        body: 'Convierte el bloque actual en un título grande (`# `).',
+    },
+    {
+        kind: 'item',
+        key: 'h2',
+        icon: Heading2,
+        title: 'Título 2',
+        body: 'Convierte el bloque actual en un subtítulo (`## `).',
+    },
+    {
+        kind: 'item',
+        key: 'bold',
+        icon: Bold,
+        title: 'Negrita',
+        body: 'Envuelve el texto seleccionado con `**texto**`.',
+    },
+    {
+        kind: 'item',
+        key: 'italic',
+        icon: Italic,
+        title: 'Cursiva',
+        body: 'Envuelve el texto seleccionado con `_texto_`.',
+    },
+    {
+        kind: 'item',
+        key: 'list',
+        icon: List,
+        title: 'Lista',
+        body: 'Convierte el bloque en una lista con viñetas (`- `).',
+    },
+    {
+        kind: 'item',
+        key: 'checklist',
+        icon: ListChecks,
+        title: 'Checklist',
+        body: 'Convierte el bloque en una tarea (`- [ ] `). Pulsa `Enter` y la lista continúa sola.',
+    },
+    {
+        kind: 'item',
+        key: 'quote',
+        icon: Quote,
+        title: 'Cita',
+        body: 'Convierte el bloque en una cita (`> `).',
+    },
+    {
+        kind: 'item',
+        key: 'code',
+        icon: CodeIcon,
+        title: 'Código',
+        body: 'Envuelve el bloque en un bloque de código. En la vista de lectura se muestra con resaltado de sintaxis, números de línea y botón para copiar.',
+    },
+    {
+        kind: 'item',
+        key: 'link',
+        icon: Link,
+        title: 'Enlace web',
+        body: 'Inserta un enlace Markdown normal: `[texto](https://...)`.',
+    },
+    {
+        kind: 'item',
+        key: 'link-note',
+        icon: Link2,
+        title: 'Enlazar nota',
+        body: 'Abre el buscador para insertar un wiki-link a otra nota: `[[Título]]`.',
+    },
+    {
+        kind: 'item',
+        key: 'divider',
+        icon: Minus,
+        title: 'Divisor',
+        body: 'Inserta una línea separadora (`---`) y deja un bloque nuevo debajo.',
+    },
+
+    { kind: 'section', key: 'sec-wiki', title: 'Wiki-links: conecta tus notas' },
+    {
+        kind: 'item',
+        key: 'wiki-link',
+        icon: Link2,
+        title: 'Enlace a otra nota',
+        body: 'Escribe `[[` y elige una nota; también puedes usar el botón de enlazar de la barra inferior. El enlace se guarda como `[[Título]]`.',
+    },
+    {
+        kind: 'item',
+        key: 'wiki-alias',
+        icon: Link2,
+        title: 'Texto visible distinto',
+        body: 'Usa `[[Título|texto visible]]` para que el enlace muestre otro texto.',
+    },
+    {
+        kind: 'item',
+        key: 'wiki-pending',
+        icon: Plus,
+        title: 'Enlace pendiente',
+        body: 'Si la nota no existe, el enlace se ve gris. Tócalo para crear la nota con ese título.',
+    },
+    {
+        kind: 'item',
+        key: 'wiki-backlinks',
+        icon: Network,
+        title: 'Backlinks y mapa local',
+        body: 'Al final de cada nota verás `Enlaces`, `Mencionada en` y un `Mapa local` con sus conexiones.',
+    },
+    {
+        kind: 'item',
+        key: 'wiki-rename',
+        icon: Pencil,
+        title: 'Renombrar',
+        body: 'Si cambias el título de una nota, los wiki-links de otras notas se actualizan automáticamente.',
+    },
+    {
+        kind: 'item',
+        key: 'wiki-code',
+        icon: CodeIcon,
+        title: 'Ojo con el código',
+        body: 'No uses `[[...]]` dentro de bloques de código: ahí se trata como texto literal.',
+    },
+
+    { kind: 'section', key: 'sec-feed', title: 'Feed de notas (estilo tweet)' },
+    {
+        kind: 'item',
+        key: 'feed-author',
+        icon: BadgeCheck,
+        title: 'Foto, nombre y verificado',
+        body: 'Cada post muestra tu foto de perfil, tu nombre, usuario, la fecha y el badge de verificación si tu cuenta lo tiene.',
+    },
+    {
+        kind: 'item',
+        key: 'feed-pin',
+        icon: Pin,
+        title: 'Fijar',
+        body: 'Mantiene la nota arriba del feed. El icono se pone ámbar cuando está fijada.',
+    },
+    {
+        kind: 'item',
+        key: 'feed-words',
+        icon: FileText,
+        title: 'Conteo de palabras',
+        body: 'El número junto al icono de documento indica cuántas palabras tiene la nota.',
+    },
+    {
+        kind: 'item',
+        key: 'feed-archive',
+        icon: Archive,
+        title: 'Archivar',
+        body: 'Oculta la nota del feed (no la borra). Aparece un aviso con `Deshacer` por si te equivocas.',
+    },
+    {
+        kind: 'item',
+        key: 'feed-open',
+        icon: ArrowUpRight,
+        title: 'Abrir',
+        body: 'Abre la nota en modo lectura. También puedes tocar el cuerpo del post.',
+    },
+    {
+        kind: 'item',
+        key: 'feed-more',
+        icon: ArrowDown,
+        title: 'Cargar más notas',
+        body: 'Al llegar al final del feed se cargan las siguientes notas automáticamente. Mientras llegan verás un skeleton con la forma de los posts.',
+    },
+
+    { kind: 'section', key: 'sec-note', title: 'Vista de una nota' },
+    {
+        kind: 'item',
+        key: 'note-pin',
+        icon: Pin,
+        title: 'Fijar / desfijar',
+        body: 'Las notas fijadas aparecen primero en el feed.',
+    },
+    {
+        kind: 'item',
+        key: 'note-edit',
+        icon: Pencil,
+        title: 'Editar',
+        body: 'Entra al editor por bloques. Para volver a lectura, usa el check.',
+    },
+    {
+        kind: 'item',
+        key: 'note-delete',
+        icon: Trash2,
+        title: 'Eliminar',
+        body: 'Borra la nota. Puedes deshacerlo desde el aviso.',
+    },
+    {
+        kind: 'item',
+        key: 'note-save',
+        icon: Check,
+        title: 'Guardar y volver',
+        body: 'Fuerza el guardado y regresa a la vista de lectura.',
+    },
+    {
+        kind: 'item',
+        key: 'note-tutorial',
+        icon: BookOpen,
+        title: 'Cargar tutorial',
+        body: 'En una nota nueva y vacía aparece este icono de libro: rellena el editor con la guía de ejemplo.',
+    },
+    {
+        kind: 'item',
+        key: 'note-copy',
+        icon: Copy,
+        title: 'Copiar código',
+        body: 'En la vista de lectura, los bloques de código tienen un botón para copiar su contenido.',
+    },
+    {
+        kind: 'item',
+        key: 'note-back',
+        icon: ChevronLeft,
+        title: 'Volver',
+        body: 'La flecha de la cabecera regresa a la pantalla anterior; si no hay historial, va al inicio.',
+    },
+
+    { kind: 'section', key: 'sec-map', title: 'Mapa de conocimiento' },
+    {
+        kind: 'item',
+        key: 'map-open',
+        icon: Network,
+        title: 'Abrir el mapa',
+        body: 'El icono de red en la cabecera de Notas abre el mapa global de tus notas y enlaces.',
+    },
+    {
+        kind: 'item',
+        key: 'map-move',
+        icon: Move,
+        title: 'Arrastrar y zoom',
+        body: 'Arrastra con un dedo para moverte. Pellizca con dos dedos para acercar o alejar.',
+    },
+    {
+        kind: 'item',
+        key: 'map-in',
+        icon: Plus,
+        title: 'Acercar',
+        body: 'El botón `+` del mapa aumenta el zoom. Al acercarte se muestran solo los nodos visibles.',
+    },
+    {
+        kind: 'item',
+        key: 'map-out',
+        icon: Minus,
+        title: 'Alejar',
+        body: 'El botón `−` reduce el zoom y vuelve a la vista general.',
+    },
+    {
+        kind: 'item',
+        key: 'map-center',
+        icon: LocateFixed,
+        title: 'Centrar',
+        body: 'Restablece el zoom y la posición inicial del mapa.',
+    },
+    {
+        kind: 'item',
+        key: 'map-select',
+        icon: MousePointer2,
+        title: 'Seleccionar un nodo',
+        body: 'Toca un nodo para resaltar sus conexiones y ver sus vecinos. Tócalo otra vez para abrir la nota.',
+    },
+    {
+        kind: 'item',
+        key: 'map-refresh',
+        icon: RefreshCw,
+        title: 'Actualizar',
+        body: 'El icono de recarga vuelve a leer las notas y enlaces por si cambiaste algo en otra pantalla.',
+    },
+
+    { kind: 'section', key: 'sec-best', title: 'Buenas prácticas' },
+    {
+        kind: 'item',
+        key: 'best-idea',
+        icon: Lightbulb,
+        title: 'Una idea por nota',
+        body: 'Notas cortas y bien enlazadas son más fáciles de encontrar y de visualizar en el mapa.',
+    },
+    {
+        kind: 'item',
+        key: 'best-pin',
+        icon: Pin,
+        title: 'Fija lo importante',
+        body: 'Usa el pin para tus índices, proyectos activos o notas de referencia.',
+    },
+    {
+        kind: 'item',
+        key: 'best-link',
+        icon: Link2,
+        title: 'Enlaza en vez de duplicar',
+        body: 'Si dos notas hablan de lo mismo, enlázalas. El mapa refleja esas relaciones y los backlinks te avisan.',
+    },
+    {
+        kind: 'item',
+        key: 'best-checklist',
+        icon: ListChecks,
+        title: 'Usa checklists',
+        body: 'Para tareas y pasos pendientes. Se continúan solas al pulsar `Enter`.',
+    },
+
+    {
+        kind: 'footer',
+        key: 'footer',
+        text: 'Los títulos son únicos por usuario: dos personas pueden tener la misma nota, pero dentro de tu cuenta no se repiten.',
+    },
+];
+
+/** Texto con tramos `así` convertidos en código en línea. */
+function RichText({ text }: { text: string }) {
+    const parts = text.split('`');
+
     return (
-        <View style={styles.section}>
-            <TextMalet style={styles.sectionTitle}>{title}</TextMalet>
-            <View style={styles.card}>{children}</View>
+        <TextMalet style={styles.itemText}>
+            {parts.map((part, index) =>
+                index % 2 === 1 ? (
+                    <TextMalet key={index} style={styles.code}>
+                        {part}
+                    </TextMalet>
+                ) : (
+                    part
+                )
+            )}
+        </TextMalet>
+    );
+}
+
+function Hero() {
+    return (
+        <View style={styles.hero}>
+            <BookOpen size={24} color="#111" />
+            <View style={styles.heroTexts}>
+                <TextMalet style={styles.heroTitle}>
+                    Tu cerebro de notas
+                </TextMalet>
+                <TextMalet style={styles.heroText}>
+                    Notas es una libreta Markdown con estilo de feed: escribe
+                    por bloques, conecta notas con wiki-links y explora todo
+                    como un mapa de conocimiento.
+                </TextMalet>
+            </View>
         </View>
     );
 }
 
-function Item({
+function HelpItem({
     icon: Icon,
     title,
-    children,
+    body,
 }: {
     icon: LucideIcon;
     title: string;
-    children: ReactNode;
+    body: string;
 }) {
     return (
         <View style={styles.item}>
-            <View style={styles.iconWrap}>
-                <Icon size={16} color="#37352f" />
+            <View style={styles.itemIcon}>
+                <Icon size={18} color="#4a4a4a" />
             </View>
             <View style={styles.itemTexts}>
                 <TextMalet style={styles.itemTitle}>{title}</TextMalet>
-                <TextMalet style={styles.itemText}>{children}</TextMalet>
+                <RichText text={body} />
             </View>
         </View>
     );
 }
 
-function Code({ children }: { children: string }) {
-    return <TextMalet style={styles.code}>{children}</TextMalet>;
-}
-
-/** Guía completa de Notas: qué es, cómo usarla y qué hace cada botón. */
+/** Guía de Notas: virtualizada para abrir al instante. */
 export default function NotesHelpScreen() {
+    const renderItem = useCallback(
+        ({ item }: { item: HelpRow }) => {
+            if (item.kind === 'hero') return <Hero />;
+            if (item.kind === 'section') {
+                return (
+                    <TextMalet style={styles.sectionTitle}>
+                        {item.title}
+                    </TextMalet>
+                );
+            }
+            if (item.kind === 'item') {
+                return (
+                    <HelpItem
+                        icon={item.icon}
+                        title={item.title}
+                        body={item.body}
+                    />
+                );
+            }
+            return <TextMalet style={styles.footer}>{item.text}</TextMalet>;
+        },
+        []
+    );
+
     return (
         <LayoutAuthenticated>
             <View style={styles.container}>
@@ -84,258 +511,18 @@ export default function NotesHelpScreen() {
                     subtitle="Guía rápida y significado de cada botón"
                 />
 
-                <ScrollView
+                <FlashList
+                    style={styles.list}
+                    data={HELP_ROWS}
+                    renderItem={renderItem}
+                    keyExtractor={(item) => item.key}
+                    getItemType={(item) => item.kind}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
-                >
-                    <View style={styles.hero}>
-                        <View style={styles.heroIcon}>
-                            <BookOpen size={22} color="#111" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <TextMalet style={styles.heroTitle}>
-                                Tu cerebro de notas
-                            </TextMalet>
-                            <TextMalet style={styles.heroText}>
-                                Notas es una libreta Markdown con estilo de
-                                feed: escribe por bloques, conecta notas con
-                                wiki-links y explora todo como un mapa de
-                                conocimiento.
-                            </TextMalet>
-                        </View>
-                    </View>
-
-                    <Section title="Primeros pasos">
-                        <Item icon={Plus} title="Crear una nota">
-                            Toca el botón flotante <Code>+</Code> de la esquina
-                            inferior derecha. También puedes tocar el botón{' '}
-                            <Code>Tutorial</Code> para generar una nota de
-                            ejemplo.
-                        </Item>
-                        <Item icon={Pencil} title="Escribir por bloques">
-                            La línea actual se edita como texto plano. Al
-                            pulsar <Code>Enter</Code> ese bloque se renderiza
-                            con su estilo final. Toca un bloque ya renderizado
-                            para volver a editarlo.
-                        </Item>
-                        <Item icon={Check} title="Guardar">
-                            Las notas existentes se guardan solas (~1 s). El
-                            check de la cabecera guarda al instante y vuelve a
-                            la vista de lectura. En una nota nueva, el check la
-                            crea.
-                        </Item>
-                        <Item icon={Search} title="Buscar">
-                            El buscador filtra tus notas por título y contenido.
-                            Mientras escribes, la lista se actualiza sola.
-                        </Item>
-                    </Section>
-
-                    <Section title="Cabecera de Notas">
-                        <Item icon={CircleHelp} title="Ayuda">
-                            Abre esta guía desde la cabecera del listado de
-                            Notas.
-                        </Item>
-                        <Item icon={Network} title="Mapa de notas">
-                            Abre el mapa global con tus notas y enlaces.
-                        </Item>
-                        <Item icon={BookOpen} title="Tutorial">
-                            Crea la nota de tutorial si no existe; si ya
-                            existe, la abre directamente.
-                        </Item>
-                    </Section>
-
-                    <Section title="Barra de formato (abajo)">
-                        <Item icon={Heading1} title="Título 1">
-                            Convierte el bloque actual en un título grande
-                            (<Code># </Code>).
-                        </Item>
-                        <Item icon={Heading2} title="Título 2">
-                            Convierte el bloque actual en un subtítulo
-                            (<Code>## </Code>).
-                        </Item>
-                        <Item icon={Bold} title="Negrita">
-                            Envuelve el texto seleccionado con{' '}
-                            <Code>**texto**</Code>.
-                        </Item>
-                        <Item icon={Italic} title="Cursiva">
-                            Envuelve el texto seleccionado con{' '}
-                            <Code>_texto_</Code>.
-                        </Item>
-                        <Item icon={List} title="Lista">
-                            Convierte el bloque en una lista con viñetas
-                            (<Code>- </Code>).
-                        </Item>
-                        <Item icon={ListChecks} title="Checklist">
-                            Convierte el bloque en una tarea (
-                            <Code>- [ ] </Code>). Pulsa Enter y la lista
-                            continúa sola.
-                        </Item>
-                        <Item icon={Quote} title="Cita">
-                            Convierte el bloque en una cita (<Code>&gt; </Code>
-                            ).
-                        </Item>
-                        <Item icon={CodeIcon} title="Código">
-                            Envuelve el bloque en un bloque de código. En la
-                            vista de lectura se muestra con resaltado de
-                            sintaxis, números de línea y botón para copiar.
-                        </Item>
-                        <Item icon={Link} title="Enlace web">
-                            Inserta un enlace Markdown normal:{' '}
-                            <Code>[texto](https://...)</Code>.
-                        </Item>
-                        <Item icon={Link2} title="Enlazar nota">
-                            Abre el buscador para insertar un wiki-link a otra
-                            nota: <Code>[[Título]]</Code>.
-                        </Item>
-                        <Item icon={Minus} title="Divisor">
-                            Inserta una línea separadora (<Code>---</Code>) y
-                            deja un bloque nuevo debajo.
-                        </Item>
-                    </Section>
-
-                    <Section title="Wiki-links: conecta tus notas">
-                        <Item icon={Link2} title="Enlace a otra nota">
-                            Escribe <Code>[[</Code> y elige una nota; también
-                            puedes usar el botón de enlazar de la barra
-                            inferior. El enlace se guarda como{' '}
-                            <Code>[[Título]]</Code>.
-                        </Item>
-                        <Item icon={Link2} title="Texto visible distinto">
-                            Usa <Code>[[Título|texto visible]]</Code> para que
-                            el enlace muestre otro texto.
-                        </Item>
-                        <Item icon={Plus} title="Enlace pendiente">
-                            Si la nota no existe, el enlace se ve gris. Tócalo
-                            para crear la nota con ese título.
-                        </Item>
-                        <Item icon={Network} title="Backlinks y mapa local">
-                            Al final de cada nota verás <Code>Enlaces</Code>,
-                            <Code>Mencionada en</Code> y un{' '}
-                            <Code>Mapa local</Code> con sus conexiones.
-                        </Item>
-                        <Item icon={Pencil} title="Renombrar">
-                            Si cambias el título de una nota, los wiki-links de
-                            otras notas se actualizan automáticamente.
-                        </Item>
-                        <Item icon={CodeIcon} title="Ojo con el código">
-                            No uses <Code>[[...]]</Code> dentro de bloques de
-                            código: ahí se trata como texto literal.
-                        </Item>
-                    </Section>
-
-                    <Section title="Feed de notas (estilo tweet)">
-                        <Item icon={BadgeCheck} title="Foto, nombre y verificado">
-                            Cada post muestra tu foto de perfil, tu nombre,
-                            usuario, la fecha y el badge de verificación si tu
-                            cuenta lo tiene.
-                        </Item>
-                        <Item icon={Pin} title="Fijar">
-                            Mantiene la nota arriba del feed. El icono se pone
-                            ámbar cuando está fijada.
-                        </Item>
-                        <Item icon={FileText} title="Conteo de palabras">
-                            El número junto al icono de documento indica
-                            cuántas palabras tiene la nota.
-                        </Item>
-                        <Item icon={Archive} title="Archivar">
-                            Oculta la nota del feed (no la borra). Aparece un
-                            aviso con <Code>Deshacer</Code> por si te
-                            equivocas.
-                        </Item>
-                        <Item icon={ArrowUpRight} title="Abrir">
-                            Abre la nota en modo lectura. También puedes tocar
-                            el cuerpo del post.
-                        </Item>
-                        <Item icon={ArrowDown} title="Cargar más notas">
-                            Al llegar al final del feed se cargan las
-                            siguientes notas automáticamente. Mientras llegan
-                            verás un skeleton con la forma de los posts.
-                        </Item>
-                    </Section>
-
-                    <Section title="Vista de una nota">
-                        <Item icon={Pin} title="Fijar / desfijar">
-                            Las notas fijadas aparecen primero en el feed.
-                        </Item>
-                        <Item icon={Pencil} title="Editar">
-                            Entra al editor por bloques. Para volver a lectura,
-                            usa el check.
-                        </Item>
-                        <Item icon={Trash2} title="Eliminar">
-                            Borra la nota. Puedes deshacerlo desde el aviso.
-                        </Item>
-                        <Item icon={Check} title="Guardar y volver">
-                            Fuerza el guardado y regresa a la vista de lectura.
-                        </Item>
-                        <Item icon={BookOpen} title="Cargar tutorial">
-                            En una nota nueva y vacía aparece este icono de
-                            libro: rellena el editor con la guía de ejemplo.
-                        </Item>
-                        <Item icon={Copy} title="Copiar código">
-                            En la vista de lectura, los bloques de código
-                            tienen un botón para copiar su contenido.
-                        </Item>
-                        <Item icon={ChevronLeft} title="Volver">
-                            La flecha de la cabecera regresa a la pantalla
-                            anterior; si no hay historial, va al inicio.
-                        </Item>
-                    </Section>
-
-                    <Section title="Mapa de conocimiento">
-                        <Item icon={Network} title="Abrir el mapa">
-                            El icono de red en la cabecera de Notas abre el
-                            mapa global de tus notas y enlaces.
-                        </Item>
-                        <Item icon={Move} title="Arrastrar y zoom">
-                            Arrastra con un dedo para moverte. Pellizca con dos
-                            dedos para acercar o alejar.
-                        </Item>
-                        <Item icon={Plus} title="Acercar">
-                            El botón <Code>+</Code> del mapa aumenta el zoom.
-                            Al acercarte se muestran solo los nodos visibles.
-                        </Item>
-                        <Item icon={Minus} title="Alejar">
-                            El botón <Code>−</Code> reduce el zoom y vuelve a la
-                            vista general.
-                        </Item>
-                        <Item icon={LocateFixed} title="Centrar">
-                            Restablece el zoom y la posición inicial del mapa.
-                        </Item>
-                        <Item icon={MousePointer2} title="Seleccionar un nodo">
-                            Toca un nodo para resaltar sus conexiones y ver sus
-                            vecinos. Tócalo otra vez para abrir la nota.
-                        </Item>
-                        <Item icon={RefreshCw} title="Actualizar">
-                            El icono de recarga vuelve a leer las notas y
-                            enlaces por si cambiaste algo en otra pantalla.
-                        </Item>
-                    </Section>
-
-                    <Section title="Buenas prácticas">
-                        <Item icon={Lightbulb} title="Una idea por nota">
-                            Notas cortas y bien enlazadas son más fáciles de
-                            encontrar y de visualizar en el mapa.
-                        </Item>
-                        <Item icon={Pin} title="Fija lo importante">
-                            Usa el pin para tus índices, proyectos activos o
-                            notas de referencia.
-                        </Item>
-                        <Item icon={Link2} title="Enlaza en vez de duplicar">
-                            Si dos notas hablan de lo mismo, enlázalas. El mapa
-                            refleja esas relaciones y los backlinks te avisan.
-                        </Item>
-                        <Item icon={ListChecks} title="Usa checklists">
-                            Para tareas y pasos pendientes. Se continúan solas
-                            al pulsar Enter.
-                        </Item>
-                    </Section>
-
-                    <TextMalet style={styles.footer}>
-                        Los títulos son únicos por usuario: dos personas pueden
-                        tener la misma nota, pero dentro de tu cuenta no se
-                        repiten.
-                    </TextMalet>
-                </ScrollView>
+                    drawDistance={320}
+                    maxItemsInRecyclePool={18}
+                    overrideProps={{ initialDrawBatchSize: 8 }}
+                />
             </View>
         </LayoutAuthenticated>
     );
@@ -346,71 +533,54 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
+    list: {
+        flex: 1,
+    },
     content: {
-        paddingHorizontal: 12,
-        paddingTop: 8,
-        paddingBottom: 48,
-        gap: 18,
+        paddingHorizontal: 16,
+        paddingTop: 6,
+        paddingBottom: 56,
     },
     hero: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         gap: 12,
-        borderWidth: 1,
-        borderColor: '#ececeb',
-        borderRadius: 16,
-        padding: 14,
-        backgroundColor: '#fff',
+        paddingTop: 4,
+        paddingBottom: 8,
     },
-    heroIcon: {
-        width: 42,
-        height: 42,
-        borderRadius: 12,
-        backgroundColor: '#f7f6f3',
-        alignItems: 'center',
-        justifyContent: 'center',
+    heroTexts: {
+        flex: 1,
+        gap: 3,
     },
     heroTitle: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1f1f1f',
-        marginBottom: 3,
     },
     heroText: {
-        fontSize: 12.5,
-        lineHeight: 18,
-        color: '#6b6b6b',
-    },
-    section: {
-        gap: 8,
+        fontSize: 13,
+        lineHeight: 19,
+        color: '#666',
     },
     sectionTitle: {
-        fontSize: 11.5,
+        marginTop: 20,
+        marginBottom: 4,
+        fontSize: 11,
         fontWeight: '700',
         color: 'rgba(0,0,0,0.45)',
         textTransform: 'uppercase',
         letterSpacing: 0.7,
-        paddingHorizontal: 2,
-    },
-    card: {
-        borderWidth: 1,
-        borderColor: '#ececeb',
-        borderRadius: 14,
-        padding: 14,
-        gap: 14,
-        backgroundColor: '#fff',
     },
     item: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 10,
+        paddingVertical: 7,
     },
-    iconWrap: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: '#f7f6f3',
+    itemIcon: {
+        width: 20,
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingTop: 1,
     },
     itemTexts: {
         flex: 1,
@@ -422,9 +592,9 @@ const styles = StyleSheet.create({
         color: '#1f1f1f',
     },
     itemText: {
-        fontSize: 12.5,
-        lineHeight: 18,
-        color: '#6b6b6b',
+        fontSize: 13,
+        lineHeight: 19,
+        color: '#5f5f5f',
     },
     code: {
         fontSize: 11.5,
@@ -435,9 +605,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 3,
     },
     footer: {
+        marginTop: 24,
         fontSize: 11.5,
         color: '#9a9a9a',
         lineHeight: 16,
-        paddingHorizontal: 4,
     },
 });

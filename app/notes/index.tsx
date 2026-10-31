@@ -47,6 +47,11 @@ export default function NotesListScreen() {
         }, [loadNotes])
     );
 
+    // Carga la ruta de ayuda en segundo plano para que el tap sea inmediato.
+    useEffect(() => {
+        router.prefetch('/notes/help' as any);
+    }, []);
+
     // Búsqueda con debounce para no pedir en cada tecla.
     useEffect(() => {
         const timer = setTimeout(() => {
