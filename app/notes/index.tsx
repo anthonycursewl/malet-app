@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { BookOpen, Network, Plus, Search } from 'lucide-react-native';
+import { BookOpen, Brain, Network, Plus, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
@@ -13,6 +13,7 @@ import NoteFeedSkeleton from '@/components/notes/NoteFeedSkeleton';
 import { notify, notifyUndo } from '@/components/cuaderno/format';
 import NoteCard from '@/components/notes/NoteCard';
 import NotesHeader from '@/components/notes/NotesHeader';
+import { MINI_BRAIN_NOTES } from '@/components/notes/miniBrain';
 import {
     TUTORIAL_NOTE_CONTENT,
     TUTORIAL_NOTE_TITLE,
@@ -38,6 +39,7 @@ export default function NotesListScreen() {
 
     const [searchText, setSearchText] = useState(search);
     const [creatingTutorial, setCreatingTutorial] = useState(false);
+    const [seedingBrain, setSeedingBrain] = useState(false);
 
     // Al volver del editor, la lista se refresca (título/extracto/orden).
     useFocusEffect(
@@ -142,6 +144,41 @@ export default function NotesListScreen() {
         [author, openNote, handleTogglePin, handleArchive]
     );
 
+    /** Solo dev: crea las notas del mini cerebro y abre el mapa. */
+    const seedMiniBrain = async () => {
+        if (seedingBrain) return;
+
+        setSeedingBrain(true);
+        let created = 0;
+        let skipped = 0;
+
+        for (const seed of MINI_BRAIN_NOTES) {
+            const { error } = await createNote(seed);
+            if (!error) {
+                created += 1;
+            } else if (error.toLowerCase().includes('existe')) {
+                skipped += 1;
+            }
+        }
+
+        setSeedingBrain(false);
+
+        if (created > 0) {
+            notify(
+                'success',
+                `Mini cerebro: ${created} notas creadas${
+                    skipped ? `, ${skipped} ya existían` : ''
+                }.`
+            );
+        } else if (skipped > 0) {
+            notify('info', 'El mini cerebro ya existe.');
+        } else {
+            notify('error', 'No se pudo crear el mini cerebro.');
+        }
+
+        router.push('/notes/graph' as any);
+    };
+
     const header = (
         <View style={styles.headerBlock}>
             <InputField
@@ -152,6 +189,24 @@ export default function NotesListScreen() {
                 icon={<Search size={16} color="#666" />}
                 autoCapitalize="none"
             />
+
+            {__DEV__ && (
+                <TouchableOpacity
+                    style={styles.devButton}
+                    onPress={() => void seedMiniBrain()}
+                    disabled={seedingBrain}
+                    activeOpacity={0.75}
+                >
+                    {seedingBrain ? (
+                        <ActivityIndicator size="small" color="#7c3aed" />
+                    ) : (
+                        <Brain size={15} color="#7c3aed" />
+                    )}
+                    <TextMalet style={styles.devText}>
+                        Crear mini cerebro (dev)
+                    </TextMalet>
+                </TouchableOpacity>
+            )}
         </View>
     );
 
@@ -270,6 +325,24 @@ const styles = StyleSheet.create({
     headerBlock: {
         paddingHorizontal: 12,
         paddingBottom: 10,
+    },
+    devButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        alignSelf: 'flex-start',
+        marginTop: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 14,
+        backgroundColor: '#f5f3ff',
+        borderWidth: 1,
+        borderColor: '#ddd6fe',
+    },
+    devText: {
+        fontSize: 11.5,
+        fontWeight: '600',
+        color: '#6d28d9',
     },
     tutorialButton: {
         flexDirection: 'row',
