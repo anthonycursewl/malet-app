@@ -15,6 +15,7 @@ import {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
+import type { ComponentType } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -28,7 +29,7 @@ import TextMalet from '@/components/TextMalet/TextMalet';
 import KnowledgeGraph, {
     graphStructureKey,
 } from './KnowledgeGraph';
-import SkiaGraph, { ScreenNode } from './graph/SkiaGraph';
+import type { ScreenNode, SkiaGraphProps } from './graph/SkiaGraph';
 import { useGraphLayout } from './graph/useGraphLayout';
 import { nodeScreenRadius } from './graph/graphMath';
 import { NoteGraph } from '@/shared/entities/Note';
@@ -48,7 +49,35 @@ interface Viewport {
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
-const USE_SKIA_GRAPH = Platform.OS !== 'web';
+type SkiaGraphComponentType = ComponentType<SkiaGraphProps>;
+
+/**
+ * Skia no está incluido en todos los binarios de Expo Go/development builds.
+ * Se carga de forma protegida; si el módulo nativo no existe, se usa el SVG.
+ */
+let SkiaGraphComponent: SkiaGraphComponentType | null = null;
+if (Platform.OS !== 'web') {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const skia = require('@shopify/react-native-skia');
+        if (skia?.Canvas) {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const module = require('./graph/SkiaGraph');
+            SkiaGraphComponent =
+                module.default as SkiaGraphComponentType;
+        }
+    } catch (error) {
+        if (__DEV__) {
+            console.warn(
+                '[notes/graph] Skia no está disponible en este binario; usando SVG.',
+                error
+            );
+        }
+    }
+}
+
+const USE_SKIA_GRAPH =
+    Platform.OS !== 'web' && SkiaGraphComponent !== null;
 
 /**
  * Lienzo del mapa. En nativo dibuja con Skia (GPU); en web conserva el
@@ -259,9 +288,9 @@ export default function GraphCanvas({
             <GestureHandlerRootView style={StyleSheet.absoluteFill}>
                 <GestureDetector gesture={composed}>
                     <View style={StyleSheet.absoluteFill}>
-                        {USE_SKIA_GRAPH ? (
+                        {USE_SKIA_GRAPH && SkiaGraphComponent ? (
                             graphLayout ? (
-                                <SkiaGraph
+                                <SkiaGraphComponent
                                     nodes={screenNodes}
                                     edges={graphLayout.edges}
                                     width={width}

@@ -20,7 +20,7 @@ export interface ScreenNode extends LayoutNode {
     baseY: number;
 }
 
-interface SkiaGraphProps {
+export interface SkiaGraphProps {
     nodes: ScreenNode[];
     edges: NoteGraphEdge[];
     width: number;
