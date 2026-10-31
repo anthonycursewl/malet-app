@@ -13,7 +13,9 @@ import { NoteGraph, NoteGraphNode } from '@/shared/entities/Note';
 
 interface KnowledgeGraphProps {
     graph: NoteGraph;
-    zoomLevel: number;
+    viewport: { scale: number; x: number; y: number };
+    viewportWidth: number;
+    viewportHeight: number;
     selectedId: string | null;
     onSelect: (id: string) => void;
 }
@@ -96,7 +98,9 @@ const nodeRadius = (node: SimNode, layoutSize: number): number =>
  */
 export default function KnowledgeGraph({
     graph,
-    zoomLevel,
+    viewport,
+    viewportWidth,
+    viewportHeight,
     selectedId,
     onSelect,
 }: KnowledgeGraphProps) {
@@ -238,9 +242,63 @@ export default function KnowledgeGraph({
         return set;
     }, [graph.edges, selectedId]);
 
+    const overview = viewport.scale <= 1.15;
+
     /**
-     * Nivel de detalle: presupuesto bajo en vista general y más alto al hacer
-     * zoom. Se eligen nodos por zonas para cubrir todo el mapa.
+     * Rectángulo del layout visible en pantalla. Se invierte la transformación
+     * (centro + escala + traslación) para hacer culling como un canvas.
+     */
+    const visibleRect = useMemo(() => {
+        if (!viewportWidth || !viewportHeight) return null;
+
+        const fit =
+            Math.min(viewportWidth, viewportHeight) / layoutSize;
+        const offsetX = (viewportWidth - layoutSize * fit) / 2;
+        const offsetY = (viewportHeight - layoutSize * fit) / 2;
+        const centerX = viewportWidth / 2;
+        const centerY = viewportHeight / 2;
+        const scale = Math.max(0.0001, viewport.scale);
+
+        const inverse = (screenX: number, screenY: number) => ({
+            x:
+                (centerX +
+                    (screenX - viewport.x - centerX) / scale -
+                    offsetX) /
+                fit,
+            y:
+                (centerY +
+                    (screenY - viewport.y - centerY) / scale -
+                    offsetY) /
+                fit,
+        });
+
+        const topLeft = inverse(0, 0);
+        const bottomRight = inverse(viewportWidth, viewportHeight);
+        const margin = layoutSize * 0.12;
+
+        return {
+            minX:
+                Math.max(0, Math.min(topLeft.x, bottomRight.x) - margin),
+            minY:
+                Math.max(0, Math.min(topLeft.y, bottomRight.y) - margin),
+            maxX:
+                Math.min(
+                    layoutSize,
+                    Math.max(topLeft.x, bottomRight.x) + margin
+                ),
+            maxY:
+                Math.min(
+                    layoutSize,
+                    Math.max(topLeft.y, bottomRight.y) + margin
+                ),
+        };
+    }, [viewport, viewportWidth, viewportHeight, layoutSize]);
+
+    /**
+     * En vista general se muestrea el mapa (no se pueden mostrar 300 nodos
+     * legibles a la vez). Al hacer zoom se hace **culling por viewport**:
+     * solo se renderizan los nodos visibles, y cuanto más zoom, menos nodos
+     * entran en pantalla.
      */
     const lod = useMemo(() => {
         const selectedNode = selectedId
@@ -257,72 +315,98 @@ export default function KnowledgeGraph({
               ]
             : [];
         const priorityIds = new Set(priorityNodes.map((node) => node.id));
-
-        const rest = nodes.filter((node) => !priorityIds.has(node.id));
-        const budget =
-            zoomLevel < 1.4
-                ? 45
-                : zoomLevel < 2.2
-                  ? 100
-                  : zoomLevel < 2.8
-                    ? 220
-                    : 520;
-
-        const mandatory = rest.filter(
-            (node) => node.pinned || node.degree >= 10
-        );
-        const mandatoryIds = new Set(
-            mandatory.map((node) => node.id)
+        const candidates = nodes.filter(
+            (node) => !priorityIds.has(node.id)
         );
 
-        const zoneSize = layoutSize / ZONES;
-        const groups: SimNode[][] = Array.from(
-            { length: ZONES * ZONES },
-            () => []
-        );
+        let restNodes: SimNode[] = [];
 
-        for (const node of rest) {
-            if (mandatoryIds.has(node.id)) continue;
-            const column = Math.min(
-                ZONES - 1,
-                Math.max(0, Math.floor(node.x / zoneSize))
+        if (overview) {
+            const budget = 45;
+            const mandatory = candidates.filter(
+                (node) => node.pinned || node.degree >= 10
             );
-            const row = Math.min(
-                ZONES - 1,
-                Math.max(0, Math.floor(node.y / zoneSize))
+            const mandatoryIds = new Set(
+                mandatory.map((node) => node.id)
             );
-            groups[row * ZONES + column].push(node);
-        }
 
-        for (const group of groups) {
-            group.sort((a, b) => b.degree - a.degree);
-        }
+            const zoneSize = layoutSize / ZONES;
+            const groups: SimNode[][] = Array.from(
+                { length: ZONES * ZONES },
+                () => []
+            );
 
-        const picked: SimNode[] = [...mandatory];
-        let round = 0;
-
-        while (picked.length < budget) {
-            let added = false;
-            for (const group of groups) {
-                if (picked.length >= budget) break;
-                const node = group[round];
-                if (node) {
-                    picked.push(node);
-                    added = true;
-                }
+            for (const node of candidates) {
+                if (mandatoryIds.has(node.id)) continue;
+                const column = Math.min(
+                    ZONES - 1,
+                    Math.max(0, Math.floor(node.x / zoneSize))
+                );
+                const row = Math.min(
+                    ZONES - 1,
+                    Math.max(0, Math.floor(node.y / zoneSize))
+                );
+                groups[row * ZONES + column].push(node);
             }
-            if (!added) break;
-            round += 1;
+
+            for (const group of groups) {
+                group.sort((a, b) => b.degree - a.degree);
+            }
+
+            const picked: SimNode[] = [...mandatory];
+            let round = 0;
+
+            while (picked.length < budget) {
+                let added = false;
+                for (const group of groups) {
+                    if (picked.length >= budget) break;
+                    const node = group[round];
+                    if (node) {
+                        picked.push(node);
+                        added = true;
+                    }
+                }
+                if (!added) break;
+                round += 1;
+            }
+
+            restNodes = picked;
+        } else if (visibleRect) {
+            const centerX = (visibleRect.minX + visibleRect.maxX) / 2;
+            const centerY = (visibleRect.minY + visibleRect.maxY) / 2;
+            const cap = 140;
+
+            const inside = candidates.filter(
+                (node) =>
+                    node.x >= visibleRect.minX &&
+                    node.x <= visibleRect.maxX &&
+                    node.y >= visibleRect.minY &&
+                    node.y <= visibleRect.maxY
+            );
+
+            if (inside.length > cap) {
+                inside.sort((a, b) => {
+                    const da =
+                        (a.x - centerX) ** 2 + (a.y - centerY) ** 2;
+                    const db =
+                        (b.x - centerX) ** 2 + (b.y - centerY) ** 2;
+                    return da - db;
+                });
+                restNodes = inside.slice(0, cap);
+            } else {
+                restNodes = inside;
+            }
         }
 
-        return { priorityNodes, restNodes: picked };
+        return { priorityNodes, restNodes };
     }, [
         nodes,
         nodeById,
         layoutSize,
-        zoomLevel,
         selectedId,
         neighbors,
+        overview,
+        visibleRect,
     ]);
 
     const [renderCount, setRenderCount] = useState(CHUNK_SIZE);
@@ -360,7 +444,15 @@ export default function KnowledgeGraph({
     const edgePath = (onlySelected = false) => {
         const parts: string[] = [];
         for (const edge of graph.edges) {
-            if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target)) {
+            const sourceVisible = visibleIds.has(edge.source);
+            const targetVisible = visibleIds.has(edge.target);
+            // En vista general solo aristas entre nodos visibles; al hacer
+            // zoom mostramos también las que salen del viewport.
+            if (
+                overview
+                    ? !(sourceVisible && targetVisible)
+                    : !sourceVisible && !targetVisible
+            ) {
                 continue;
             }
             if (
@@ -421,11 +513,14 @@ export default function KnowledgeGraph({
                 const isSelected = node.id === selectedId;
                 const isNeighbor = neighbors.has(node.id);
                 const dimmed = !!selectedId && !isSelected && !isNeighbor;
+                const showLabelsForVisible =
+                    !overview && visibleNodes.length <= 60;
                 const showLabel =
                     isSelected ||
                     isNeighbor ||
                     node.pinned ||
                     node.degree >= 8 ||
+                    showLabelsForVisible ||
                     (!manyNodes && node.degree >= 2);
 
                 return (

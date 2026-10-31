@@ -26,6 +26,12 @@ interface GraphCanvasProps {
     onOpen: (id: string) => void;
 }
 
+interface Viewport {
+    scale: number;
+    x: number;
+    y: number;
+}
+
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 
@@ -40,7 +46,11 @@ export default function GraphCanvas({
     onOpen,
 }: GraphCanvasProps) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [zoomLevel, setZoomLevel] = useState(1);
+    const [viewport, setViewport] = useState<Viewport>({
+        scale: 1,
+        x: 0,
+        y: 0,
+    });
     const structureKey = useMemo(() => graphStructureKey(graph), [graph]);
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
@@ -58,7 +68,11 @@ export default function GraphCanvas({
         })
         .onEnd(() => {
             savedScale.value = scale.value;
-            runOnJS(setZoomLevel)(scale.value);
+            runOnJS(setViewport)({
+                scale: scale.value,
+                x: translateX.value,
+                y: translateY.value,
+            });
         });
 
     const pan = Gesture.Pan()
@@ -69,6 +83,11 @@ export default function GraphCanvas({
         .onEnd(() => {
             savedX.value = translateX.value;
             savedY.value = translateY.value;
+            runOnJS(setViewport)({
+                scale: scale.value,
+                x: translateX.value,
+                y: translateY.value,
+            });
         });
 
     const composed = Gesture.Simultaneous(pinch, pan);
@@ -88,7 +107,11 @@ export default function GraphCanvas({
         );
         scale.set(withTiming(next, { duration: 180 }));
         savedScale.set(next);
-        setZoomLevel(next);
+        setViewport({
+            scale: next,
+            x: translateX.get(),
+            y: translateY.get(),
+        });
     };
 
     const reset = () => {
@@ -98,7 +121,7 @@ export default function GraphCanvas({
         savedX.set(0);
         savedY.set(0);
         savedScale.set(1);
-        setZoomLevel(1);
+        setViewport({ scale: 1, x: 0, y: 0 });
         setSelectedId(null);
     };
 
@@ -154,7 +177,9 @@ export default function GraphCanvas({
                         <KnowledgeGraph
                             key={structureKey}
                             graph={graph}
-                            zoomLevel={zoomLevel}
+                            viewport={viewport}
+                            viewportWidth={width}
+                            viewportHeight={height}
                             selectedId={selectedId}
                             onSelect={handleSelect}
                         />
