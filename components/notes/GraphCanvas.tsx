@@ -10,11 +10,13 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 import TextMalet from '@/components/TextMalet/TextMalet';
-import KnowledgeGraph from './KnowledgeGraph';
+import KnowledgeGraph, {
+    graphStructureKey,
+} from './KnowledgeGraph';
 import { NoteGraph } from '@/shared/entities/Note';
 
 interface GraphCanvasProps {
@@ -39,6 +41,7 @@ export default function GraphCanvas({
 }: GraphCanvasProps) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [zoomLevel, setZoomLevel] = useState(1);
+    const structureKey = useMemo(() => graphStructureKey(graph), [graph]);
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
     const translateX = useSharedValue(0);
@@ -149,6 +152,7 @@ export default function GraphCanvas({
                         style={[StyleSheet.absoluteFill, animatedStyle]}
                     >
                         <KnowledgeGraph
+                            key={structureKey}
                             graph={graph}
                             zoomLevel={zoomLevel}
                             selectedId={selectedId}

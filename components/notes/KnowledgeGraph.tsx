@@ -6,7 +6,9 @@ import {
     forceSimulation,
 } from 'd3-force';
 import { useEffect, useMemo, useState } from 'react';
-import Svg, { Circle, G, Line, Text as SvgText } from 'react-native-svg';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
+import TextMalet from '@/components/TextMalet/TextMalet';
 import { NoteGraph, NoteGraphNode } from '@/shared/entities/Note';
 
 interface KnowledgeGraphProps {
@@ -22,14 +24,62 @@ type SimNode = NoteGraphNode & {
     degree: number;
 };
 
-type SimLink = { source: SimNode | string; target: SimNode | string };
+type Position = { x: number; y: number; degree: number };
 
 /** Lienzo virtual según cantidad de nodos: más espacio = menos solapamiento. */
 export const graphLayoutSize = (count: number): number =>
     count <= 20 ? 600 : count <= 80 ? 1200 : 2400;
 
+/** Firma de la estructura (nodos + aristas) para cachear el layout. */
+export function graphStructureKey(graph: NoteGraph): string {
+    let hash = 5381;
+    const add = (value: string) => {
+        for (let index = 0; index < value.length; index += 1) {
+            hash = ((hash << 5) + hash + value.charCodeAt(index)) | 0;
+        }
+    };
+
+    [...graph.nodes]
+        .map((node) => node.id)
+        .sort()
+        .forEach(add);
+    [...graph.edges]
+        .map((edge) => `${edge.source}>${edge.target}`)
+        .sort()
+        .forEach(add);
+
+    return `${graph.nodes.length}:${graph.edges.length}:${hash >>> 0}`;
+}
+
+const LAYOUT_CACHE_MAX = 3;
+const layoutCache = new Map<string, Map<string, Position>>();
+
+const cachePositions = (key: string, positions: Map<string, Position>) => {
+    if (layoutCache.size >= LAYOUT_CACHE_MAX) {
+        const oldest = layoutCache.keys().next().value;
+        if (oldest) layoutCache.delete(oldest);
+    }
+    layoutCache.set(key, positions);
+};
+
+const buildCachedLayout = (
+    graph: NoteGraph,
+    key: string
+): SimNode[] | null => {
+    const positions = layoutCache.get(key);
+    if (!positions) return null;
+
+    const nodes: SimNode[] = [];
+    for (const node of graph.nodes) {
+        const position = positions.get(node.id);
+        if (!position) return null;
+        nodes.push({ ...node, ...position });
+    }
+    return nodes;
+};
+
 const ZONES = 6;
-const CHUNK_SIZE = 60;
+const CHUNK_SIZE = 80;
 
 const truncate = (title: string, max = 20): string => {
     const clean = title.trim() || 'Sin título';
@@ -40,20 +90,9 @@ const nodeRadius = (node: SimNode, layoutSize: number): number =>
     layoutSize / 90 +
     Math.min(layoutSize / 120, node.degree * (layoutSize / 600));
 
-const linkIds = (link: SimLink): [string, string] => {
-    const source =
-        typeof link.source === 'string' ? link.source : link.source.id;
-    const target =
-        typeof link.target === 'string' ? link.target : link.target.id;
-    return [source, target];
-};
-
 /**
- * Grafo con layout de fuerzas y render procedural:
- * - nivel de detalle según zoom,
- * - muestreo por zonas para cubrir todo el mapa,
- * - nodos por chunks (no bloquea el frame),
- * - selección + vecinos siempre visibles.
+ * Grafo con layout por frames (no bloquea el render), caché por estructura,
+ * aristas en un solo Path y render por chunks con nivel de detalle por zoom.
  */
 export default function KnowledgeGraph({
     graph,
@@ -62,8 +101,17 @@ export default function KnowledgeGraph({
     onSelect,
 }: KnowledgeGraphProps) {
     const layoutSize = graphLayoutSize(graph.nodes.length);
+    const structureKey = useMemo(() => graphStructureKey(graph), [graph]);
+    const [layout, setLayout] = useState<SimNode[] | null>(() =>
+        buildCachedLayout(graph, structureKey)
+    );
 
-    const layout = useMemo(() => {
+    useEffect(() => {
+        if (layout) return;
+
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
         const degree = new Map<string, number>();
         for (const edge of graph.edges) {
             degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
@@ -85,7 +133,7 @@ export default function KnowledgeGraph({
             };
         });
 
-        const links: SimLink[] = graph.edges.map((edge) => ({
+        const links = graph.edges.map((edge) => ({
             source: edge.source,
             target: edge.target,
         }));
@@ -112,23 +160,71 @@ export default function KnowledgeGraph({
             )
             .stop();
 
-        // Menos ticks en grafos grandes para no bloquear la apertura.
-        const ticks = graph.nodes.length > 100 ? 260 : 300;
-        for (let index = 0; index < ticks; index += 1) {
-            simulation.tick();
-        }
+        const maxTicks = graph.nodes.length > 100 ? 220 : 300;
+        let tick = 0;
 
-        nodes.forEach((node) => {
-            node.x = Math.max(30, Math.min(layoutSize - 30, node.x));
-            node.y = Math.max(30, Math.min(layoutSize - 30, node.y));
+        // Ticks en lotes pequeños: la UI respira mientras se calcula.
+        const step = () => {
+            if (cancelled) return;
+
+            for (
+                let index = 0;
+                index < 8 && tick < maxTicks;
+                index += 1
+            ) {
+                simulation.tick();
+                tick += 1;
+            }
+
+            if (tick < maxTicks) {
+                timer = setTimeout(step, 0);
+                return;
+            }
+
+            nodes.forEach((node) => {
+                node.x = Math.max(30, Math.min(layoutSize - 30, node.x));
+                node.y = Math.max(30, Math.min(layoutSize - 30, node.y));
+            });
+
+            const positions = new Map<string, Position>(
+                nodes.map((node) => [
+                    node.id,
+                    { x: node.x, y: node.y, degree: node.degree },
+                ])
+            );
+            cachePositions(structureKey, positions);
+            setLayout(nodes.map((node) => ({ ...node })));
+        };
+
+        timer = setTimeout(step, 0);
+
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            simulation.stop();
+        };
+    }, [graph, structureKey, layoutSize, layout]);
+
+    const currentById = useMemo(
+        () => new Map(graph.nodes.map((node) => [node.id, node])),
+        [graph.nodes]
+    );
+
+    // Posiciones del layout + títulos/pinned actuales (por si cambian sin
+    // cambiar la estructura).
+    const nodes = useMemo<SimNode[]>(() => {
+        if (!layout) return [];
+        return layout.map((node) => {
+            const current = currentById.get(node.id);
+            return current
+                ? { ...node, title: current.title, pinned: current.pinned }
+                : node;
         });
-
-        return { nodes, links };
-    }, [graph, layoutSize]);
+    }, [layout, currentById]);
 
     const nodeById = useMemo(
-        () => new Map(layout.nodes.map((node) => [node.id, node])),
-        [layout.nodes]
+        () => new Map(nodes.map((node) => [node.id, node])),
+        [nodes]
     );
 
     const neighbors = useMemo(() => {
@@ -143,12 +239,10 @@ export default function KnowledgeGraph({
     }, [graph.edges, selectedId]);
 
     /**
-     * Nivel de detalle: a más zoom, más nodos. Los nodos se eligen por zonas
-     * (para que no se concentren en un solo cluster) y los hubs van primero.
+     * Nivel de detalle: presupuesto bajo en vista general y más alto al hacer
+     * zoom. Se eligen nodos por zonas para cubrir todo el mapa.
      */
     const lod = useMemo(() => {
-        // Vecinos directos del nodo seleccionado (máximo 40 para no reventar
-        // el render cuando el nodo es un hub con cientos de conexiones).
         const selectedNode = selectedId
             ? nodeById.get(selectedId)
             : undefined;
@@ -164,12 +258,15 @@ export default function KnowledgeGraph({
             : [];
         const priorityIds = new Set(priorityNodes.map((node) => node.id));
 
-        const rest = layout.nodes.filter(
-            (node) => !priorityIds.has(node.id)
-        );
-
+        const rest = nodes.filter((node) => !priorityIds.has(node.id));
         const budget =
-            zoomLevel < 1.4 ? 90 : zoomLevel < 2.2 ? 180 : 520;
+            zoomLevel < 1.4
+                ? 45
+                : zoomLevel < 2.2
+                  ? 100
+                  : zoomLevel < 2.8
+                    ? 220
+                    : 520;
 
         const mandatory = rest.filter(
             (node) => node.pinned || node.degree >= 10
@@ -218,19 +315,18 @@ export default function KnowledgeGraph({
             round += 1;
         }
 
-        return { priorityNodes, restNodes: picked, budget };
+        return { priorityNodes, restNodes: picked };
     }, [
-        layout.nodes,
+        nodes,
+        nodeById,
         layoutSize,
         zoomLevel,
         selectedId,
         neighbors,
-        nodeById,
     ]);
 
     const [renderCount, setRenderCount] = useState(CHUNK_SIZE);
 
-    // Carga progresiva: agrega un chunk cada frame hasta completar el LOD.
     useEffect(() => {
         if (renderCount >= lod.restNodes.length) return;
 
@@ -243,18 +339,53 @@ export default function KnowledgeGraph({
         return () => clearTimeout(timer);
     }, [renderCount, lod.restNodes.length]);
 
+    if (!layout) {
+        return (
+            <View style={styles.loading}>
+                <ActivityIndicator size="small" color="#6b6b6b" />
+                <TextMalet style={styles.loadingText}>
+                    Calculando mapa…
+                </TextMalet>
+            </View>
+        );
+    }
+
     const visibleRest = lod.restNodes.slice(
         0,
         Math.min(renderCount, lod.restNodes.length)
     );
     const visibleNodes = [...lod.priorityNodes, ...visibleRest];
     const visibleIds = new Set(visibleNodes.map((node) => node.id));
-    const visibleLinks = layout.links.filter((link) => {
-        const [source, target] = linkIds(link);
-        return visibleIds.has(source) && visibleIds.has(target);
-    });
 
-    const manyNodes = layout.nodes.length > 60;
+    const edgePath = (onlySelected = false) => {
+        const parts: string[] = [];
+        for (const edge of graph.edges) {
+            if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target)) {
+                continue;
+            }
+            if (
+                onlySelected &&
+                edge.source !== selectedId &&
+                edge.target !== selectedId
+            ) {
+                continue;
+            }
+
+            const source = nodeById.get(edge.source);
+            const target = nodeById.get(edge.target);
+            if (!source || !target) continue;
+
+            parts.push(
+                `M${source.x.toFixed(1)} ${source.y.toFixed(1)}L${target.x.toFixed(1)} ${target.y.toFixed(1)}`
+            );
+        }
+        return parts.join('');
+    };
+
+    const allEdges = edgePath();
+    const selectedEdges = selectedId ? edgePath(true) : '';
+
+    const manyNodes = nodes.length > 60;
     const edgeWidth = Math.max(1, layoutSize / 600);
     const selectedEdgeWidth = Math.max(2, layoutSize / 300);
     const labelSize = Math.max(9, layoutSize / 70);
@@ -267,37 +398,23 @@ export default function KnowledgeGraph({
             viewBox={`0 0 ${layoutSize} ${layoutSize}`}
             preserveAspectRatio="xMidYMid meet"
         >
-            {visibleLinks.map((link, index) => {
-                const [sourceId, targetId] = linkIds(link);
-                const source = nodeById.get(sourceId);
-                const target = nodeById.get(targetId);
-                if (!source || !target) return null;
-
-                const connected =
-                    !!selectedId &&
-                    (sourceId === selectedId || targetId === selectedId);
-
-                return (
-                    <Line
-                        key={`edge-${index}`}
-                        x1={source.x}
-                        y1={source.y}
-                        x2={target.x}
-                        y2={target.y}
-                        stroke={
-                            selectedId
-                                ? connected
-                                    ? '#0b6e99'
-                                    : '#ededed'
-                                : '#dcdcdc'
-                        }
-                        strokeWidth={
-                            connected ? selectedEdgeWidth : edgeWidth
-                        }
-                        opacity={selectedId && !connected ? 0.25 : 0.8}
-                    />
-                );
-            })}
+            {allEdges.length > 0 && (
+                <Path
+                    d={allEdges}
+                    stroke={selectedId ? '#ededed' : '#dcdcdc'}
+                    strokeWidth={edgeWidth}
+                    fill="none"
+                    opacity={selectedId ? 0.45 : 0.8}
+                />
+            )}
+            {selectedEdges.length > 0 && (
+                <Path
+                    d={selectedEdges}
+                    stroke="#0b6e99"
+                    strokeWidth={selectedEdgeWidth}
+                    fill="none"
+                />
+            )}
 
             {visibleNodes.map((node) => {
                 const radius = nodeRadius(node, layoutSize);
@@ -308,15 +425,14 @@ export default function KnowledgeGraph({
                     isSelected ||
                     isNeighbor ||
                     node.pinned ||
-                    node.degree >= 6 ||
-                    (!manyNodes && node.degree >= 2) ||
-                    (zoomLevel >= 2 && node.degree >= 3);
+                    node.degree >= 8 ||
+                    (!manyNodes && node.degree >= 2);
 
                 return (
                     <G
                         key={node.id}
                         onPress={() => onSelect(node.id)}
-                        opacity={dimmed ? 0.25 : 1}
+                        opacity={dimmed ? 0.3 : 1}
                     >
                         {isSelected && (
                             <Circle
@@ -365,3 +481,16 @@ export default function KnowledgeGraph({
         </Svg>
     );
 }
+
+const styles = StyleSheet.create({
+    loading: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    loadingText: {
+        fontSize: 12,
+        color: '#8a8a8a',
+    },
+});
