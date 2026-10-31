@@ -3,7 +3,7 @@ import NetInfo from "@react-native-community/netinfo";
 import { create } from "zustand";
 import { MALET_API_URL } from "../config/malet.config";
 import { UserPrimitives } from "../entities/User";
-import { secureFetch } from "../http/secureFetch";
+import { secureFetch, setAuthTokenCache } from "../http/secureFetch";
 import { dataCache, CACHE_KEYS } from "../offline/dataCache";
 import { BiometricService } from "../services/auth/biometric.service";
 import { useAccountStore } from "./useAccountStore";
@@ -46,7 +46,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     error: null,
     setError: (error: string | null) => set({ error }),
     token: null,
-    setToken: (token: string | null) => set({ token }),
+    setToken: (token: string | null) => {
+        setAuthTokenCache(token);
+        set({ token });
+    },
     user: {
         id: '',
         name: '',
@@ -161,6 +164,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         }
 
         await AsyncStorage.removeItem('token');
+        setAuthTokenCache(null);
         await BiometricService.clearStoredToken();
         set({
             user: {
@@ -253,6 +257,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
                 if (cachedUser) {
                     set({ user: cachedUser });
                 }
+                setAuthTokenCache(token);
                 set({
                     token,
                     error: null,
@@ -276,6 +281,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
         if (error || !response) {
             await AsyncStorage.removeItem('token');
+            setAuthTokenCache(null);
             set({
                 token: null,
                 error: error ?? 'Error al verificar sesión'
@@ -283,6 +289,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
+        setAuthTokenCache(token);
         set({
             token,
             error: null,

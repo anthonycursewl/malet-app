@@ -10,6 +10,33 @@ import {
     parseResponse
 } from './HttpError';
 
+/**
+ * El token se lee de AsyncStorage una sola vez por sesión. Login/logout deben
+ * llamar a `setAuthTokenCache` para mantenerlo sincronizado.
+ */
+let tokenCache: string | null | undefined;
+let tokenRead: Promise<string | null> | null = null;
+
+const readAuthToken = async (): Promise<string | null> => {
+    if (tokenCache !== undefined) return tokenCache;
+    if (!tokenRead) {
+        tokenRead = AsyncStorage.getItem('token')
+            .then((token) => {
+                tokenCache = token ?? null;
+                return tokenCache;
+            })
+            .finally(() => {
+                tokenRead = null;
+            });
+    }
+    return tokenRead;
+};
+
+export const setAuthTokenCache = (token: string | null): void => {
+    tokenCache = token;
+    tokenRead = null;
+};
+
 export interface SecureFetchOptions<T = unknown> {
     url: string;
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -48,7 +75,7 @@ export const secureFetch = async <T = unknown>(
             setLoading(true);
         }
 
-        const token = await AsyncStorage.getItem('token');
+        const token = await readAuthToken();
 
         const defaultHeaders: Record<string, string> = {
             'Authorization': `Bearer ${token || ''}`,
@@ -115,7 +142,7 @@ export const secureFetchOrThrow = async <T = unknown>(
 ): Promise<T> => {
     const { url, method, headers, body, config, expectArray = false } = options;
 
-    const token = await AsyncStorage.getItem('token');
+    const token = await readAuthToken();
 
     const defaultHeaders: Record<string, string> = {
         'Authorization': `Bearer ${token || ''}`,
