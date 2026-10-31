@@ -19,11 +19,11 @@ interface VerificationBadgeProps {
  * Único componente encargado de renderizar el badge de verificación.
  *
  * Reglas centralizadas:
- * - Se renderiza SOLO si `user.verified` es truthy.
- * - Usa el color/nombre correcto de cada tipo de verificación (main, business,
- *   ai, org) con búsqueda exacta + case-insensitive.
- * - Si el backend no envía `verification_type` o el tipo es desconocido,
- *   aplica un color genérico en lugar de no renderizar nada.
+ * - Se renderiza SOLO si `user.verified` es truthy y hay un tipo de
+ *   verificación conocido (main, business, ai, org).
+ * - Un tipo ausente o desconocido no pinta nada: evita badges genéricos o
+ *   falsos positivos por datos viejos.
+ * - La búsqueda del tipo tolera mayúsculas/minúsculas y espacios.
  */
 const VerificationBadge = memo(({ user, size = 20, onPress }: VerificationBadgeProps) => {
     const verification = getUserVerification(user);

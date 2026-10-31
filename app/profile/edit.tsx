@@ -4,6 +4,7 @@ import TextMalet from "@/components/TextMalet/TextMalet";
 import { dataCache, CACHE_KEYS } from "@/shared/offline/dataCache";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useProfileStore } from "@/shared/stores/useProfileStore";
+import { normalizeUserVerification } from "@/shared/utils/userVerification";
 import IconCross from "@/svgs/common/IconCross";
 import IconVerified from "@/svgs/common/IconVerified";
 import IconAt from "@/svgs/dashboard/IconAt";
@@ -120,9 +121,10 @@ export default function EditProfile() {
                 return;
             }
 
-            setUser(response);
+            const normalizedUser = normalizeUserVerification(response);
+            setUser(normalizedUser);
             setPickedImages({ banner: null, avatar: null });
-            dataCache.set(CACHE_KEYS.USER, response);
+            dataCache.set(CACHE_KEYS.USER, normalizedUser);
             Alert.alert("Éxito", "Perfil actualizado correctamente.");
             setIsLoading(false);
         } catch (error) {

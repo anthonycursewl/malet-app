@@ -13,6 +13,7 @@ import { useShoppingListStore } from "./useShoppingListStore";
 import { useTagStore } from "./useTagStore";
 import { useToastStore } from "./useToastStore";
 import { useWalletStore } from "./useWalletStore";
+import { normalizeUserVerification } from "../utils/userVerification";
 
 interface LoginResponse {
     access_token: string;
@@ -62,7 +63,8 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
         verification_type: null,
 
     },
-    setUser: (user: UserPrimitives) => set({ user }),
+    setUser: (user: UserPrimitives) =>
+        set({ user: normalizeUserVerification(user) }),
     isBiometricAuthenticated: false,
     setBiometricAuthenticated: (value: boolean) => set({ isBiometricAuthenticated: value }),
 
@@ -96,20 +98,21 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
+        const normalizedUser = normalizeUserVerification(response.user);
         await AsyncStorage.setItem('token', response.access_token);
         get().setToken(response.access_token);
-        get().setUser(response.user);
+        get().setUser(normalizedUser);
         get().setError(null);
         get().setBiometricAuthenticated(true);
 
         await BiometricService.askBiometricPermissionAndSave(response.access_token);
 
         // Cache user for offline access
-        await dataCache.set(CACHE_KEYS.USER, response.user);
+        await dataCache.set(CACHE_KEYS.USER, normalizedUser);
 
         // Activate the session
         await useSessionStore.getState().login({
-            userId: response.user.id,
+            userId: normalizedUser.id,
             token: response.access_token,
             hasSyncSubscription: true,
         });
@@ -130,20 +133,21 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
+        const normalizedUser = normalizeUserVerification(response.user);
         await AsyncStorage.setItem('token', response.access_token);
         get().setToken(response.access_token);
-        get().setUser(response.user);
+        get().setUser(normalizedUser);
         get().setError(null);
         get().setBiometricAuthenticated(true);
 
         await BiometricService.askBiometricPermissionAndSave(response.access_token);
 
         // Cache user for offline access
-        await dataCache.set(CACHE_KEYS.USER, response.user);
+        await dataCache.set(CACHE_KEYS.USER, normalizedUser);
 
         // Activate the session
         await useSessionStore.getState().login({
-            userId: response.user.id,
+            userId: normalizedUser.id,
             token: response.access_token,
             hasSyncSubscription: true,
         });
@@ -255,7 +259,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             if (sessionState.currentUserId && sessionState.token) {
                 const cachedUser = await dataCache.get<UserPrimitives>(CACHE_KEYS.USER);
                 if (cachedUser) {
-                    set({ user: cachedUser });
+                    set({ user: normalizeUserVerification(cachedUser) });
                 }
                 setAuthTokenCache(token);
                 set({
@@ -289,20 +293,21 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
             return false;
         }
 
+        const normalizedUser = normalizeUserVerification(response);
         setAuthTokenCache(token);
         set({
             token,
             error: null,
-            user: response,
+            user: normalizedUser,
             isBiometricAuthenticated: true
         })
 
         // Cache user for offline access
-        await dataCache.set(CACHE_KEYS.USER, response);
+        await dataCache.set(CACHE_KEYS.USER, normalizedUser);
 
         // Update session
         await useSessionStore.getState().login({
-            userId: response.id,
+            userId: normalizedUser.id,
             token,
             hasSyncSubscription: true,
         });

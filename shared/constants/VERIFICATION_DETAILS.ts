@@ -174,6 +174,13 @@ const VERIFICATION_TYPES_NORMALIZED: Record<string, VerificationInfo> = Object.f
     Object.entries(VERIFICATION_TYPES).map(([key, value]) => [key.toLowerCase(), value])
 );
 
+/** Un tipo válido es la única fuente de verdad para pintar el badge. */
+export function isKnownVerificationType(typeKey?: string | null): boolean {
+    const key = typeKey?.trim();
+    if (!key) return false;
+    return !!VERIFICATION_TYPES[key] || !!VERIFICATION_TYPES_NORMALIZED[key.toLowerCase()];
+}
+
 /**
  * Resuelve la información de un tipo de verificación por su clave.
  * Busca primero un match exacto y luego case-insensitive (con trim).
@@ -195,12 +202,11 @@ export function getVerificationInfo(typeKey?: string | null): UserVerification {
 }
 
 /**
- * Resuelve la verificación del usuario logueado de forma tolerante a fallos.
+ * Resuelve la verificación del usuario logueado.
  *
- * Devuelve `null` SOLO si el usuario no está verificado. Si `verified` es true
- * siempre devuelve un resultado (con fallbacks si `verification_type` no viene
- * cargado del backend o el `type` no existe en `VERIFICATION_TYPES`), de modo
- * que el badge se renderice siempre que la persona esté verificada.
+ * El badge solo existe si la cuenta está verificada **y** tiene un tipo de
+ * verificación conocido. Si falta el tipo, viene un valor desconocido o el
+ * flag está apagado, devuelve `null` y no se muestra ningún badge.
  */
 export function getUserVerification(
     user?: {
@@ -212,6 +218,8 @@ export function getUserVerification(
 
     const rawType = user.verification_type;
     const typeKey = typeof rawType === 'string' ? rawType : (rawType?.type ?? null);
+
+    if (!isKnownVerificationType(typeKey)) return null;
 
     return getVerificationInfo(typeKey);
 }
