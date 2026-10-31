@@ -380,7 +380,7 @@ const HELP_ROWS: HelpRow[] = [
         key: 'map-in',
         icon: Plus,
         title: 'Acercar',
-        body: 'El botón `+` del mapa aumenta el zoom. Al acercarte se muestran solo los nodos visibles.',
+        body: 'El botón `+` del mapa aumenta el zoom. Al acercarte aparecen más etiquetas y los nodos mantienen un tamaño legible.',
     },
     {
         kind: 'item',

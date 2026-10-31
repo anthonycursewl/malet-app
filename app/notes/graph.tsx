@@ -145,8 +145,8 @@ export default function NotesGraphScreen() {
                         <TextMalet style={styles.hint}>
                             Arrastra para mover, pellizca para zoom y toca un
                             nodo para ver sus conexiones. Toca otra vez para
-                            abrirlo. Al acercarte se muestran solo los nodos
-                            visibles.
+                            abrirlo. Al acercarte aparecen más etiquetas y los
+                            nodos mantienen un tamaño legible.
                         </TextMalet>
                         {graph.edges.length === 0 && (
                             <TextMalet style={styles.hint}>

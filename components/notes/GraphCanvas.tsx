@@ -10,19 +10,27 @@ import {
     GestureDetector,
     GestureHandlerRootView,
 } from 'react-native-gesture-handler';
-import Animated, {
+import {
     runOnJS,
-    useAnimatedStyle,
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
-import { useState, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Platform,
+    StyleSheet,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import KnowledgeGraph, {
     graphStructureKey,
 } from './KnowledgeGraph';
+import SkiaGraph, { ScreenNode } from './graph/SkiaGraph';
+import { useGraphLayout } from './graph/useGraphLayout';
+import { nodeScreenRadius } from './graph/graphMath';
 import { NoteGraph } from '@/shared/entities/Note';
 
 interface GraphCanvasProps {
@@ -40,10 +48,11 @@ interface Viewport {
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
+const USE_SKIA_GRAPH = Platform.OS !== 'web';
 
 /**
- * Canvas del mapa: fondo de puntos fijo + grafo con pan y pinch-zoom.
- * Los botones permiten acercar/alejar/centrar sin gestos.
+ * Lienzo del mapa. En nativo dibuja con Skia (GPU); en web conserva el
+ * renderer SVG como fallback.
  */
 export default function GraphCanvas({
     graph,
@@ -58,12 +67,33 @@ export default function GraphCanvas({
         y: 0,
     });
     const structureKey = useMemo(() => graphStructureKey(graph), [graph]);
+    const graphLayout = useGraphLayout(graph, USE_SKIA_GRAPH);
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const savedX = useSharedValue(0);
     const savedY = useSharedValue(0);
+
+    const screenNodes = useMemo<ScreenNode[]>(() => {
+        if (!graphLayout || !width || !height) return [];
+        const fit = Math.min(width, height) / graphLayout.layoutSize;
+        const offsetX = (width - graphLayout.layoutSize * fit) / 2;
+        const offsetY = (height - graphLayout.layoutSize * fit) / 2;
+        const currentById = new Map(
+            graph.nodes.map((node) => [node.id, node])
+        );
+
+        return graphLayout.nodes.map((node) => {
+            const current = currentById.get(node.id);
+            return {
+                ...node,
+                ...(current ?? {}),
+                baseX: node.x * fit + offsetX,
+                baseY: node.y * fit + offsetY,
+            };
+        });
+    }, [graphLayout, graph.nodes, width, height]);
 
     const pinch = Gesture.Pinch()
         .onUpdate((event) => {
@@ -96,15 +126,66 @@ export default function GraphCanvas({
             });
         });
 
-    const composed = Gesture.Simultaneous(pinch, pan);
+    const selectAt = useCallback(
+        (
+            screenX: number,
+            screenY: number,
+            currentScale: number,
+            currentX: number,
+            currentY: number
+        ) => {
+            if (!screenNodes.length) return;
 
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [
-            { translateX: translateX.value },
-            { translateY: translateY.value },
-            { scale: scale.value },
-        ],
-    }));
+            const centerX = width / 2;
+            const centerY = height / 2;
+            let best: { id: string; distance: number } | null = null;
+
+            for (const node of screenNodes) {
+                const nodeX =
+                    centerX +
+                    (node.baseX - centerX) * currentScale +
+                    currentX;
+                const nodeY =
+                    centerY +
+                    (node.baseY - centerY) * currentScale +
+                    currentY;
+                const hitRadius =
+                    nodeScreenRadius(
+                        node.degree,
+                        currentScale,
+                        node.id === selectedId
+                    ) + 10;
+                const distance = Math.hypot(screenX - nodeX, screenY - nodeY);
+                if (distance <= hitRadius && (!best || distance < best.distance)) {
+                    best = { id: node.id, distance };
+                }
+            }
+
+            if (!best) return;
+            if (best.id === selectedId) {
+                onOpen(best.id);
+            } else {
+                setSelectedId(best.id);
+            }
+        },
+        [screenNodes, width, height, selectedId, onOpen]
+    );
+
+    const tap = Gesture.Tap()
+        .maxDistance(10)
+        .onEnd((event) => {
+            runOnJS(selectAt)(
+                event.x,
+                event.y,
+                scale.value,
+                translateX.value,
+                translateY.value
+            );
+        });
+
+    const composed = USE_SKIA_GRAPH
+        ? Gesture.Simultaneous(pinch, pan, tap)
+        : Gesture.Simultaneous(pinch, pan);
 
     const zoom = (factor: number) => {
         const next = Math.min(
@@ -177,19 +258,43 @@ export default function GraphCanvas({
 
             <GestureHandlerRootView style={StyleSheet.absoluteFill}>
                 <GestureDetector gesture={composed}>
-                    <Animated.View
-                        style={[StyleSheet.absoluteFill, animatedStyle]}
-                    >
-                        <KnowledgeGraph
-                            key={structureKey}
-                            graph={graph}
-                            viewport={viewport}
-                            viewportWidth={width}
-                            viewportHeight={height}
-                            selectedId={selectedId}
-                            onSelect={handleSelect}
-                        />
-                    </Animated.View>
+                    <View style={StyleSheet.absoluteFill}>
+                        {USE_SKIA_GRAPH ? (
+                            graphLayout ? (
+                                <SkiaGraph
+                                    nodes={screenNodes}
+                                    edges={graphLayout.edges}
+                                    width={width}
+                                    height={height}
+                                    scale={scale}
+                                    translateX={translateX}
+                                    translateY={translateY}
+                                    viewport={viewport}
+                                    selectedId={selectedId}
+                                />
+                            ) : (
+                                <View style={styles.loading}>
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#6b6b6b"
+                                    />
+                                    <TextMalet style={styles.loadingText}>
+                                        Calculando mapa…
+                                    </TextMalet>
+                                </View>
+                            )
+                        ) : (
+                            <KnowledgeGraph
+                                key={structureKey}
+                                graph={graph}
+                                viewport={viewport}
+                                viewportWidth={width}
+                                viewportHeight={height}
+                                selectedId={selectedId}
+                                onSelect={handleSelect}
+                            />
+                        )}
+                    </View>
                 </GestureDetector>
             </GestureHandlerRootView>
 
@@ -260,6 +365,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         overflow: 'hidden',
     },
+    loading: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    loadingText: {
+        fontSize: 12,
+        color: '#6b6b6b',
+    },
     controls: {
         position: 'absolute',
         right: 10,
@@ -284,11 +399,6 @@ const styles = StyleSheet.create({
         elevation: 2,
         zIndex: 2,
     },
-    selectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#1f1f1f',
-    },
     selectionVisibility: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -302,6 +412,11 @@ const styles = StyleSheet.create({
     },
     selectionVisibilityPublic: {
         color: '#2f8f5b',
+    },
+    selectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#1f1f1f',
     },
     selectionHint: {
         fontSize: 10,
