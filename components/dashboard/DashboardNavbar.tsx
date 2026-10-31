@@ -251,9 +251,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     avatar: {
-        width: 35,
-        height: 35,
-        borderRadius: 17.5,
+        width: 37,
+        height: 37,
+        borderRadius: 18.5,
         backgroundColor: '#f1f1f1',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.9)',
