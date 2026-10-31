@@ -1,8 +1,8 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { Plus, Search } from 'lucide-react-native';
+import { BookOpen, Plus, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
 import { InputField } from '@/components/AddWallet/InputField';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
@@ -11,6 +11,10 @@ import { ListRowsSkeleton } from '@/components/cuaderno/Skeletons';
 import { notify } from '@/components/cuaderno/format';
 import NoteCard from '@/components/notes/NoteCard';
 import NotesHeader from '@/components/notes/NotesHeader';
+import {
+    TUTORIAL_NOTE_CONTENT,
+    TUTORIAL_NOTE_TITLE,
+} from '@/components/notes/tutorialNote';
 import { NoteSummary } from '@/shared/entities/Note';
 import { useNotesStore } from '@/shared/stores/useNotesStore';
 
@@ -23,8 +27,10 @@ export default function NotesListScreen() {
     const loadNotes = useNotesStore((s) => s.loadNotes);
     const setSearch = useNotesStore((s) => s.setSearch);
     const clearNotesError = useNotesStore((s) => s.clearNotesError);
+    const createNote = useNotesStore((s) => s.createNote);
 
     const [searchText, setSearchText] = useState(search);
+    const [creatingTutorial, setCreatingTutorial] = useState(false);
 
     // Al volver del editor, la lista se refresca (título/extracto/orden).
     useFocusEffect(
@@ -52,6 +58,35 @@ export default function NotesListScreen() {
         router.push({ pathname: '/notes/note', params: { id: note.id } } as any);
     }, []);
 
+    /** Crea la nota tutorial una vez; si ya existe, la abre. */
+    const openTutorial = async () => {
+        if (creatingTutorial) return;
+
+        const existing = useNotesStore
+            .getState()
+            .notes.find((note) => note.title === TUTORIAL_NOTE_TITLE);
+        if (existing) {
+            openNote(existing);
+            return;
+        }
+
+        setCreatingTutorial(true);
+        const { note, error } = await createNote({
+            title: TUTORIAL_NOTE_TITLE,
+            content: TUTORIAL_NOTE_CONTENT,
+            pinned: true,
+        });
+        setCreatingTutorial(false);
+
+        if (error || !note) {
+            notify('error', error ?? 'No se pudo crear la nota tutorial.');
+            return;
+        }
+
+        notify('success', 'Nota tutorial creada.');
+        router.push({ pathname: '/notes/note', params: { id: note.id } } as any);
+    };
+
     const renderItem = useCallback(
         ({ item }: { item: NoteSummary }) => (
             <NoteCard note={item} onPress={openNote} />
@@ -78,6 +113,26 @@ export default function NotesListScreen() {
                 <NotesHeader
                     title="Notas"
                     subtitle="Markdown, ideas y apuntes"
+                    right={
+                        <TouchableOpacity
+                            style={styles.tutorialButton}
+                            onPress={openTutorial}
+                            disabled={creatingTutorial || notesLoading}
+                            activeOpacity={0.7}
+                            accessibilityLabel="Crear nota tutorial"
+                        >
+                            {creatingTutorial ? (
+                                <ActivityIndicator size="small" color="#555" />
+                            ) : (
+                                <>
+                                    <BookOpen size={16} color="#555" />
+                                    <TextMalet style={styles.tutorialText}>
+                                        Tutorial
+                                    </TextMalet>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    }
                 />
 
                 <FlashList
@@ -147,6 +202,18 @@ const styles = StyleSheet.create({
     },
     headerBlock: {
         paddingBottom: 10,
+    },
+    tutorialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+    },
+    tutorialText: {
+        fontSize: 12.5,
+        fontWeight: '600',
+        color: '#555',
     },
     listContent: {
         paddingBottom: 110,

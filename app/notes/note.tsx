@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Check, Pencil, Pin, Trash2 } from 'lucide-react-native';
+import { BookOpen, Check, Pencil, Pin, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
@@ -21,6 +21,10 @@ import { notify, notifyUndo } from '@/components/cuaderno/format';
 import MarkdownToolbar, { MarkdownAction } from '@/components/notes/MarkdownToolbar';
 import MarkdownView from '@/components/notes/MarkdownView';
 import NotesHeader from '@/components/notes/NotesHeader';
+import {
+    TUTORIAL_NOTE_CONTENT,
+    TUTORIAL_NOTE_TITLE,
+} from '@/components/notes/tutorialNote';
 import {
     formatNoteDate,
     Note,
@@ -115,6 +119,9 @@ export default function NoteScreen() {
     const persistRef = useRef<() => Promise<boolean>>(async () => false);
 
     const content = blocks.join('\n');
+
+    /** El tutorial solo se puede cargar en una nota nueva y vacía. */
+    const canFillTutorial = !id && !title.trim() && !content.trim();
 
     // Carga de la nota existente.
     useEffect(() => {
@@ -311,6 +318,28 @@ export default function NoteScreen() {
         setTimeout(() => inputsRef.current[index]?.focus(), 0);
     };
 
+    /**
+     * Rellena la nota **solo si está nueva y vacía**. Nunca sobrescribe una
+     * nota existente ni una que ya tenga contenido.
+     */
+    const applyTutorial = () => {
+        if (!canFillTutorial) {
+            notify(
+                'error',
+                'El tutorial solo está disponible en una nota nueva y vacía.'
+            );
+            return;
+        }
+
+        const parsed = parseBlocks(TUTORIAL_NOTE_CONTENT);
+        setTitle(TUTORIAL_NOTE_TITLE);
+        setBlocks(parsed);
+        setActiveBlock(0);
+        setBlockSelection({ start: 0, end: 0 });
+        markDirty();
+        notify('info', 'Tutorial cargado. Edítalo o guárdalo como nota.');
+    };
+
     const updateBlock = (index: number, text: string) => {
         setBlocks((prev) => prev.map((block, i) => (i === index ? text : block)));
         markDirty();
@@ -486,15 +515,27 @@ export default function NoteScreen() {
 
     const headerRight =
         mode === 'edit' ? (
-            <TouchableOpacity
-                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-                onPress={saveNow}
-                disabled={saving}
-                activeOpacity={0.6}
-                accessibilityLabel="Guardar nota"
-            >
-                <Check size={20} color="#111" />
-            </TouchableOpacity>
+            <View style={styles.editHeaderActions}>
+                {canFillTutorial && (
+                    <TouchableOpacity
+                        style={styles.tutorialAction}
+                        onPress={applyTutorial}
+                        activeOpacity={0.6}
+                        accessibilityLabel="Rellenar con el tutorial"
+                    >
+                        <BookOpen size={18} color="#555" />
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                    style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+                    onPress={saveNow}
+                    disabled={saving}
+                    activeOpacity={0.6}
+                    accessibilityLabel="Guardar nota"
+                >
+                    <Check size={20} color="#111" />
+                </TouchableOpacity>
+            </View>
         ) : (
             <View style={styles.actions}>
                 <TouchableOpacity style={styles.actionBtn} onPress={togglePin}>
@@ -690,6 +731,14 @@ const styles = StyleSheet.create({
     saveButton: {
         padding: 8,
         marginRight: 2,
+    },
+    editHeaderActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    tutorialAction: {
+        padding: 8,
     },
     saveButtonDisabled: {
         opacity: 0.35,
