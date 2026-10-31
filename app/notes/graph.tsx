@@ -1,27 +1,21 @@
 import { router, useFocusEffect } from 'expo-router';
 import { Network, RefreshCw } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    useWindowDimensions,
-    View,
-} from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { SkeletonBlock, SkeletonShimmer } from '@/components/cuaderno/Skeletons';
 import { notify } from '@/components/cuaderno/format';
-import KnowledgeGraph from '@/components/notes/KnowledgeGraph';
+import GraphCanvas from '@/components/notes/GraphCanvas';
 import NotesHeader from '@/components/notes/NotesHeader';
 import { NoteGraph } from '@/shared/entities/Note';
 import { notesService } from '@/shared/services/notes/notes.service';
 
 /** Mapa global de conocimiento: notas (nodos) y `[[enlaces]]` (aristas). */
 export default function NotesGraphScreen() {
-    const { width, height } = useWindowDimensions();
     const [graph, setGraph] = useState<NoteGraph | null>(null);
     const [loading, setLoading] = useState(true);
+    const [canvas, setCanvas] = useState({ width: 0, height: 0 });
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -41,9 +35,6 @@ export default function NotesGraphScreen() {
             void load();
         }, [load])
     );
-
-    const graphWidth = Math.max(240, width - 28);
-    const graphHeight = Math.max(380, Math.min(620, height - 230));
 
     const openNote = (id: string) => {
         router.push({ pathname: '/notes/note', params: { id } } as any);
@@ -75,7 +66,7 @@ export default function NotesGraphScreen() {
                 {loading ? (
                     <SkeletonShimmer>
                         <View style={styles.skeleton}>
-                            <SkeletonBlock w="100%" h={graphHeight} r={14} />
+                            <SkeletonBlock w="100%" h={420} r={14} />
                         </View>
                     </SkeletonShimmer>
                 ) : !graph || graph.nodes.length === 0 ? (
@@ -90,17 +81,28 @@ export default function NotesGraphScreen() {
                         </TextMalet>
                     </View>
                 ) : (
-                    <ScrollView
-                        contentContainerStyle={styles.content}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        <View style={styles.graphCard}>
-                            <KnowledgeGraph
-                                graph={graph}
-                                width={graphWidth}
-                                height={graphHeight}
-                                onOpen={openNote}
-                            />
+                    <View style={styles.content}>
+                        <View
+                            style={styles.graphCard}
+                            onLayout={(event) => {
+                                const { width, height } =
+                                    event.nativeEvent.layout;
+                                if (
+                                    width !== canvas.width ||
+                                    height !== canvas.height
+                                ) {
+                                    setCanvas({ width, height });
+                                }
+                            }}
+                        >
+                            {canvas.width > 0 && canvas.height > 0 && (
+                                <GraphCanvas
+                                    graph={graph}
+                                    width={canvas.width}
+                                    height={canvas.height}
+                                    onOpen={openNote}
+                                />
+                            )}
                         </View>
 
                         <View style={styles.legend}>
@@ -108,7 +110,10 @@ export default function NotesGraphScreen() {
                                 <View
                                     style={[
                                         styles.dot,
-                                        { borderColor: '#b45309', backgroundColor: '#fff7ed' },
+                                        {
+                                            borderColor: '#b45309',
+                                            backgroundColor: '#fff7ed',
+                                        },
                                     ]}
                                 />
                                 <TextMalet style={styles.legendText}>
@@ -124,17 +129,20 @@ export default function NotesGraphScreen() {
                         </View>
 
                         <TextMalet style={styles.hint}>
-                            Toca un nodo para abrir la nota.
-                            {graph.edges.length === 0
-                                ? ' Aún no hay enlaces: usa [[Título]] en el editor.'
-                                : ''}
+                            Arrastra para mover y pellizca (o usa los botones)
+                            para hacer zoom. Toca un nodo para abrir la nota.
                         </TextMalet>
+                        {graph.edges.length === 0 && (
+                            <TextMalet style={styles.hint}>
+                                Aún no hay enlaces: usa [[Título]] en el editor.
+                            </TextMalet>
+                        )}
                         {graph.truncated && (
                             <TextMalet style={styles.hint}>
                                 Mostrando las 300 notas más recientes.
                             </TextMalet>
                         )}
-                    </ScrollView>
+                    </View>
                 )}
             </View>
         </LayoutAuthenticated>
@@ -150,10 +158,12 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     content: {
-        paddingBottom: 40,
-        gap: 10,
+        flex: 1,
+        gap: 8,
+        paddingBottom: 8,
     },
     graphCard: {
+        flex: 1,
         borderWidth: 1,
         borderColor: '#ececeb',
         borderRadius: 14,
