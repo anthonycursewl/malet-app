@@ -89,7 +89,7 @@ export default function NoteLinkPickerModal({
     const canCreate = query.trim().length > 0;
 
     return (
-        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.68}>
+        <ModalOptions visible={visible} onClose={onClose} heightRatio={0.61}>
             <TextMalet style={styles.title}>Enlazar nota</TextMalet>
             <TextMalet style={styles.subtitle}>
                 Inserta un enlace a otra nota. Si no existe, puedes crearla aquí.
