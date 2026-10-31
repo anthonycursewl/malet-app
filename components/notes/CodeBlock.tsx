@@ -251,7 +251,7 @@ export default CodeBlock;
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: '#f7f6f3',
+        backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#e9e9e7',
         borderRadius: 8,
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: 10,
         paddingVertical: 6,
-        backgroundColor: '#f1f1ef',
+        backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e9e9e7',
     },
@@ -290,6 +290,7 @@ const styles = StyleSheet.create({
     },
     body: {
         flexDirection: 'row',
+        backgroundColor: '#fff',
     },
     gutter: {
         paddingTop: 10,
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
         paddingRight: 8,
         borderRightWidth: 1,
         borderRightColor: '#e9e9e7',
-        backgroundColor: '#f7f6f3',
+        backgroundColor: '#fff',
     },
     lineNumbers: {
         fontFamily: MONO,

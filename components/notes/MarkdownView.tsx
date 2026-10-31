@@ -35,7 +35,7 @@ const MarkdownView = memo(function MarkdownView({ content }: { content: string }
                     <CodeBlock
                         key={node.key}
                         code={node.content ?? ''}
-                        language={node.info}
+                        language={node.sourceInfo ?? node.info}
                     />
                 ),
                 code_block: (node: any) => (
