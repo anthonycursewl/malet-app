@@ -75,10 +75,11 @@ export const useProfileStore = create<ProfileStore>((set) => ({
         const { error, response } = await secureFetch({
             url: `${MALET_API_URL}/users/profile/update`,
             method: 'PATCH',
-            body: JSON.stringify({
+            // secureFetch se encarga de serializar el objeto y del Content-Type.
+            body: {
                 name: data.name,
-                username: data.username
-            })
+                username: data.username,
+            },
         });
 
         if (error) {
