@@ -1,4 +1,5 @@
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardNavbar from "@/components/dashboard/DashboardNavbar";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import GymEntryCard from "@/components/gym/GymEntryCard";
 import NotesEntryCard from "@/components/notes/NotesEntryCard";
@@ -22,7 +23,7 @@ import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleProp, StyleSheet, TextStyle, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Line, Path, Pattern, Rect, Stop, LinearGradient as SvgLinearGradient, Text } from 'react-native-svg';
 
 // lucide icon 
@@ -506,6 +507,7 @@ const BalanceSection = memo((({
 }));
 
 export default function Dashboard() {
+    const insets = useSafeAreaInsets();
     const user = useAuthStore(s => s.user);
     const verifySession = useAuthStore(s => s.verifySession);
     const previewTransactions = useWalletStore(s => s.previewTransactions);
@@ -1172,12 +1174,10 @@ export default function Dashboard() {
                     </View>
                 )}
 
-                <View style={{ height: 80 }} />
+                <View style={{ height: 118 + insets.bottom }} />
             </ScrollView>
 
-            <TouchableOpacity onPress={() => router.push('/wallet/add?type=expense')} style={styles.fab}>
-                <Plus size={24} color="#fff" />
-            </TouchableOpacity>
+            <DashboardNavbar />
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
             <UpdatesModal />
@@ -1437,22 +1437,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#fff',
-    },
-    fab: {
-        position: 'absolute',
-        bottom: 24,
-        right: 20,
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: '#1a1a2e',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 6,
     },
     shoppingEntry: {
         flexDirection: 'row',
