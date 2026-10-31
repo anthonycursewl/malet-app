@@ -173,6 +173,13 @@ export default function ProfileView() {
                 onPress: () => router.push("/gym" as any),
             },
             {
+                id: "notes",
+                icon: "file-text" as const,
+                title: "Notas",
+                subtitle: "Markdown estilo Notion",
+                onPress: () => router.push("/notes" as any),
+            },
+            {
                 id: "updates",
                 icon: "bell" as const,
                 title: "Novedades",
