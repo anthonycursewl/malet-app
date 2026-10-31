@@ -9,7 +9,7 @@ import LayoutAuthenticated, {
     LAYOUT_HORIZONTAL_PADDING,
 } from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
-import { ListRowsSkeleton } from '@/components/cuaderno/Skeletons';
+import NoteFeedSkeleton from '@/components/notes/NoteFeedSkeleton';
 import { notify, notifyUndo } from '@/components/cuaderno/format';
 import NoteCard from '@/components/notes/NoteCard';
 import NotesHeader from '@/components/notes/NotesHeader';
@@ -212,7 +212,7 @@ export default function NotesListScreen() {
                     refreshing={notesLoading && notes.length > 0}
                     ListEmptyComponent={
                         notesLoading ? (
-                            <ListRowsSkeleton rows={5} />
+                            <NoteFeedSkeleton rows={6} />
                         ) : search ? (
                             <View style={styles.empty}>
                                 <TextMalet style={styles.emptyTitle}>
