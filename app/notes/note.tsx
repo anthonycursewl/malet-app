@@ -3,6 +3,7 @@ import { Check, Pencil, Pin, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
+    Keyboard,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -11,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '@/components/Button/Button';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
@@ -27,14 +29,65 @@ import {
 } from '@/shared/entities/Note';
 import { useNotesStore } from '@/shared/stores/useNotesStore';
 
+const MONO = Platform.select({
+    ios: 'Menlo',
+    android: 'monospace',
+    default: 'monospace',
+});
+
+const isFence = (line: string) => /^\s*```/.test(line);
+const isTable = (line: string) => /^\s*\|/.test(line);
+const isMultilineBlock = (block: string) => isFence(block) || isTable(block);
+
 /**
- * Vista y editor de una nota. Las existentes abren en modo lectura (Markdown
- * renderizado) y las nuevas directo en edición. Al editar una existente hay
- * autosave con debounce.
+ * Divide el Markdown en bloques editables. Los cercados de código y las tablas
+ * se mantienen como un solo bloque para que el render no los rompa.
  */
+function parseBlocks(content: string): string[] {
+    const lines = content.split('\n');
+    const blocks: string[] = [];
+    let index = 0;
+
+    while (index < lines.length) {
+        const line = lines[index];
+
+        if (isFence(line)) {
+            let block = line;
+            index += 1;
+            while (index < lines.length) {
+                block += `\n${lines[index]}`;
+                const closes = isFence(lines[index]);
+                index += 1;
+                if (closes) break;
+            }
+            blocks.push(block);
+            continue;
+        }
+
+        if (isTable(line)) {
+            let block = line;
+            index += 1;
+            while (index < lines.length && isTable(lines[index])) {
+                block += `\n${lines[index]}`;
+                index += 1;
+            }
+            blocks.push(block);
+            continue;
+        }
+
+        blocks.push(line);
+        index += 1;
+    }
+
+    return blocks.length ? blocks : [''];
+}
+
+/** Vista y editor por bloques al estilo Notion. */
 export default function NoteScreen() {
     const { id } = useLocalSearchParams<{ id?: string }>();
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
 
     const fetchNote = useNotesStore((s) => s.fetchNote);
     const createNote = useNotesStore((s) => s.createNote);
@@ -46,20 +99,22 @@ export default function NoteScreen() {
     const [loading, setLoading] = useState(!!id);
     const [mode, setMode] = useState<'view' | 'edit'>(id ? 'view' : 'edit');
     const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
+    const [blocks, setBlocks] = useState<string[]>(['']);
+    const [activeBlock, setActiveBlock] = useState(0);
+    const [blockSelection, setBlockSelection] = useState({ start: 0, end: 0 });
     const [pinned, setPinned] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
-    const [preview, setPreview] = useState(false);
-    const [selection, setSelection] = useState({ start: 0, end: 0 });
 
-    const contentRef = useRef<TextInput>(null);
+    const inputsRef = useRef<Record<number, TextInput | null>>({});
     const savingRef = useRef(false);
     const pendingRef = useRef(false);
     const versionRef = useRef(0);
     const allowExit = useRef(false);
     const persistRef = useRef<() => Promise<boolean>>(async () => false);
+
+    const content = blocks.join('\n');
 
     // Carga de la nota existente.
     useEffect(() => {
@@ -73,9 +128,11 @@ export default function NoteScreen() {
                 if (router.canGoBack()) router.back();
                 return;
             }
+            const parsed = parseBlocks(fetched.content);
             setNote(fetched);
             setTitle(fetched.title);
-            setContent(fetched.content);
+            setBlocks(parsed);
+            setActiveBlock(Math.max(parsed.length - 1, 0));
             setPinned(fetched.pinned);
             setLoading(false);
             setMode('view');
@@ -84,6 +141,15 @@ export default function NoteScreen() {
             mounted = false;
         };
     }, [id, fetchNote]);
+
+    useEffect(() => {
+        const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+        const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, []);
 
     const markDirty = () => {
         versionRef.current += 1;
@@ -151,12 +217,11 @@ export default function NoteScreen() {
         }
     }, [id, title, content, pinned, updateNote, createNote]);
 
-    // El guardado pendiente siempre usa la versión más reciente del formulario.
     useEffect(() => {
         persistRef.current = persist;
     }, [persist]);
 
-    // Autosave solo para notas ya existentes y en modo edición.
+    // Autosave para notas existentes mientras se edita.
     useEffect(() => {
         if (!id || mode !== 'edit' || !dirty) return;
         const timer = setTimeout(() => {
@@ -165,7 +230,7 @@ export default function NoteScreen() {
         return () => clearTimeout(timer);
     }, [id, mode, dirty, title, content, pinned, persist]);
 
-    // Guardia al salir con cambios sin guardar (botón atrás o gesto).
+    // Guardia al salir con cambios sin guardar.
     useFocusEffect(
         useCallback(() => {
             const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
@@ -238,83 +303,116 @@ export default function NoteScreen() {
         ]);
     };
 
-    const updateContent = (
+    const startEditing = (index: number) => {
+        const block = blocks[index] ?? '';
+        setMode('edit');
+        setActiveBlock(index);
+        setBlockSelection({ start: block.length, end: block.length });
+        setTimeout(() => inputsRef.current[index]?.focus(), 0);
+    };
+
+    const updateBlock = (index: number, text: string) => {
+        setBlocks((prev) => prev.map((block, i) => (i === index ? text : block)));
+        markDirty();
+    };
+
+    const handleBlockChange = (index: number, text: string) => {
+        const current = blocks[index] ?? '';
+
+        // Código/tabla: los saltos de línea forman parte del mismo bloque.
+        if (isMultilineBlock(current)) {
+            updateBlock(index, text);
+            return;
+        }
+
+        // Al cambiar de línea, el bloque anterior se renderiza y nace uno nuevo.
+        if (text.includes('\n')) {
+            const [first, ...rest] = text.split('\n');
+            // Continúa listas y checklists automáticamente, como Notion.
+            const listPrefix =
+                first.match(/^(\s*(?:[-*+]|\d+\.)\s+(?:\[[ xX]\]\s+)?)/)?.[1] ?? '';
+            const newBlock = `${listPrefix}${rest[0] ?? ''}`;
+            setBlocks((prev) => {
+                const next = [...prev];
+                next.splice(index, 1, first, newBlock, ...rest.slice(1));
+                return next;
+            });
+            markDirty();
+            setActiveBlock(index + 1);
+            setBlockSelection({
+                start: listPrefix.length,
+                end: listPrefix.length,
+            });
+            setTimeout(() => inputsRef.current[index + 1]?.focus(), 0);
+            return;
+        }
+
+        updateBlock(index, text);
+    };
+
+    const mergeWithPrevious = (index: number) => {
+        if (index <= 0 || (blocks[index] ?? '') !== '') return;
+        const previousLength = (blocks[index - 1] ?? '').length;
+        setBlocks((prev) => {
+            const next = [...prev];
+            next.splice(index, 1);
+            return next;
+        });
+        markDirty();
+        setActiveBlock(index - 1);
+        setBlockSelection({ start: previousLength, end: previousLength });
+        setTimeout(() => inputsRef.current[index - 1]?.focus(), 0);
+    };
+
+    const replaceActiveBlock = (
         next: string,
         nextSelection?: { start: number; end: number }
     ) => {
-        setContent(next);
+        setBlocks((prev) => prev.map((block, i) => (i === activeBlock ? next : block)));
         markDirty();
-        if (nextSelection) {
-            setSelection(nextSelection);
-            requestAnimationFrame(() => contentRef.current?.focus());
-        }
+        if (nextSelection) setBlockSelection(nextSelection);
+        requestAnimationFrame(() => inputsRef.current[activeBlock]?.focus());
     };
 
     const wrapSelection = (before: string, after: string) => {
-        const { start, end } = selection;
-        const selected = content.slice(start, end);
-        const next =
-            content.slice(0, start) + before + selected + after + content.slice(end);
+        const current = blocks[activeBlock] ?? '';
+        const { start, end } = blockSelection;
+        const selected = current.slice(start, end);
+        const next = current.slice(0, start) + before + selected + after + current.slice(end);
         const cursor = start + before.length;
-        updateContent(next, { start: cursor, end: cursor + selected.length });
+        replaceActiveBlock(next, { start: cursor, end: cursor + selected.length });
     };
 
-    const toggleLinePrefix = (prefix: string) => {
-        const { start, end } = selection;
-        const lineStart = content.lastIndexOf('\n', start - 1) + 1;
-        let lineEnd = content.indexOf('\n', end);
-        if (lineEnd === -1) lineEnd = content.length;
-        const line = content.slice(lineStart, lineEnd);
+    const togglePrefix = (prefix: string, heading = false) => {
+        const current = blocks[activeBlock] ?? '';
+        const existing = heading ? current.match(/^#{1,6}\s+/) : null;
 
-        if (line.startsWith(prefix)) {
-            const next =
-                content.slice(0, lineStart) +
-                line.slice(prefix.length) +
-                content.slice(lineEnd);
-            const shift = Math.min(prefix.length, start - lineStart);
-            updateContent(next, {
-                start: Math.max(lineStart, start - shift),
-                end: Math.max(lineStart, end - prefix.length),
+        if (existing && existing[0] === prefix) {
+            const existingLength = existing[0].length;
+            replaceActiveBlock(current.slice(existingLength), {
+                start: 0,
+                end: Math.max(0, blockSelection.end - existingLength),
+            });
+            return;
+        }
+        if (!existing && current.startsWith(prefix)) {
+            replaceActiveBlock(current.slice(prefix.length), {
+                start: Math.max(0, blockSelection.start - prefix.length),
+                end: Math.max(0, blockSelection.end - prefix.length),
             });
             return;
         }
 
-        const next = content.slice(0, lineStart) + prefix + content.slice(lineStart);
-        updateContent(next, {
-            start: start + prefix.length,
-            end: end + prefix.length,
+        const existingLength = existing ? existing[0].length : 0;
+        const base = existing ? current.slice(existingLength) : current;
+        replaceActiveBlock(prefix + base, {
+            start: blockSelection.start + prefix.length - existingLength,
+            end: blockSelection.end + prefix.length - existingLength,
         });
     };
 
-    const toggleHeading = (prefix: string) => {
-        const { start, end } = selection;
-        const lineStart = content.lastIndexOf('\n', start - 1) + 1;
-        let lineEnd = content.indexOf('\n', end);
-        if (lineEnd === -1) lineEnd = content.length;
-        const line = content.slice(lineStart, lineEnd);
-        const existing = line.match(/^#{1,6}\s+/);
-
-        if (existing && existing[0] === prefix) {
-            const next =
-                content.slice(0, lineStart) +
-                line.slice(existing[0].length) +
-                content.slice(lineEnd);
-            const shift = Math.min(existing[0].length, start - lineStart);
-            updateContent(next, {
-                start: Math.max(lineStart, start - shift),
-                end: Math.max(lineStart, end - existing[0].length),
-            });
-            return;
-        }
-
-        const base = existing ? line.slice(existing[0].length) : line;
-        const next = content.slice(0, lineStart) + prefix + base + content.slice(lineEnd);
-        const delta = prefix.length - (existing ? existing[0].length : 0);
-        updateContent(next, { start: start + delta, end: end + delta });
-    };
-
     const applyFormat = (action: MarkdownAction) => {
-        const { start, end } = selection;
+        const current = blocks[activeBlock] ?? '';
 
         switch (action) {
             case 'bold':
@@ -322,39 +420,51 @@ export default function NoteScreen() {
             case 'italic':
                 return wrapSelection('_', '_');
             case 'h1':
-                return toggleHeading('# ');
+                return togglePrefix('# ', true);
             case 'h2':
-                return toggleHeading('## ');
+                return togglePrefix('## ', true);
             case 'bullet':
-                return toggleLinePrefix('- ');
+                return togglePrefix('- ');
             case 'check':
-                return toggleLinePrefix('- [ ] ');
+                return togglePrefix('- [ ] ');
             case 'quote':
-                return toggleLinePrefix('> ');
-            case 'codeblock': {
-                const insert = '\n```\n\n```\n';
-                const next =
-                    content.slice(0, start) + insert + content.slice(end);
-                const cursor = start + 5;
-                return updateContent(next, { start: cursor, end: cursor });
-            }
-            case 'divider': {
-                const insert = '\n\n---\n\n';
-                const next =
-                    content.slice(0, start) + insert + content.slice(end);
-                const cursor = start + insert.length;
-                return updateContent(next, { start: cursor, end: cursor });
-            }
+                return togglePrefix('> ');
             case 'link': {
-                const label = content.slice(start, end) || 'texto';
+                const { start, end } = blockSelection;
+                const label = current.slice(start, end) || 'texto';
                 const insert = `[${label}](https://)`;
                 const urlOffset = insert.indexOf('https://');
-                const next =
-                    content.slice(0, start) + insert + content.slice(end);
-                return updateContent(next, {
+                const next = current.slice(0, start) + insert + current.slice(end);
+                return replaceActiveBlock(next, {
                     start: start + urlOffset,
                     end: start + urlOffset + 8,
                 });
+            }
+            case 'codeblock': {
+                if (current.startsWith('```')) {
+                    const next = current
+                        .replace(/^```[^\n]*\n?/, '')
+                        .replace(/\n?```\s*$/, '');
+                    return replaceActiveBlock(next, { start: 0, end: 0 });
+                }
+                const next = `\`\`\`\n${current}\n\`\`\``;
+                return replaceActiveBlock(next, {
+                    start: 4,
+                    end: 4 + current.length,
+                });
+            }
+            case 'divider': {
+                const nextActive = activeBlock + 2;
+                setBlocks((prev) => {
+                    const next = [...prev];
+                    next.splice(activeBlock + 1, 0, '---', '');
+                    return next;
+                });
+                markDirty();
+                setActiveBlock(nextActive);
+                setBlockSelection({ start: 0, end: 0 });
+                setTimeout(() => inputsRef.current[nextActive]?.focus(), 0);
+                return;
             }
             default:
                 return;
@@ -371,19 +481,19 @@ export default function NoteScreen() {
                     ? 'Guardado'
                     : undefined
             : note
-              ? `${formatNoteDate(note.updated_at)} · ${noteWordCount(note.content)} palabras`
+              ? `${formatNoteDate(note.updated_at)} · ${noteWordCount(content)} palabras`
               : undefined;
 
     const headerRight =
         mode === 'edit' ? (
             <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
                 onPress={saveNow}
                 disabled={saving}
-                activeOpacity={0.8}
+                activeOpacity={0.6}
                 accessibilityLabel="Guardar nota"
             >
-                <Check size={18} color="#fff" />
+                <Check size={20} color="#111" />
             </TouchableOpacity>
         ) : (
             <View style={styles.actions}>
@@ -394,7 +504,7 @@ export default function NoteScreen() {
                         fill={pinned ? '#b45309' : 'transparent'}
                     />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => setMode('edit')}>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => startEditing(blocks.length - 1)}>
                     <Pencil size={18} color="#555" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={confirmDelete}>
@@ -426,7 +536,7 @@ export default function NoteScreen() {
         <LayoutAuthenticated>
             <KeyboardAvoidingView
                 style={styles.container}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
             >
                 <NotesHeader
@@ -437,6 +547,7 @@ export default function NoteScreen() {
 
                 {mode === 'view' && note ? (
                     <ScrollView
+                        style={styles.scroll}
                         contentContainerStyle={styles.viewContent}
                         showsVerticalScrollIndicator={false}
                     >
@@ -457,12 +568,13 @@ export default function NoteScreen() {
 
                         <Button
                             text="Editar nota"
-                            onPress={() => setMode('edit')}
+                            onPress={() => startEditing(blocks.length - 1)}
                             style={styles.editButton}
                         />
                     </ScrollView>
                 ) : (
                     <ScrollView
+                        style={styles.scroll}
                         contentContainerStyle={styles.editContent}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
@@ -478,68 +590,83 @@ export default function NoteScreen() {
                             placeholderTextColor="#c4c4c4"
                             autoFocus={!id}
                             maxLength={255}
+                            selectionColor="#2383e2"
+                            onSubmitEditing={() => startEditing(0)}
+                            returnKeyType="next"
+                            blurOnSubmit={false}
                         />
 
-                        <View style={styles.modeRow}>
-                            <TouchableOpacity
-                                style={[styles.modeChip, !preview && styles.modeChipActive]}
-                                onPress={() => setPreview(false)}
-                            >
-                                <TextMalet
-                                    style={[
-                                        styles.modeChipText,
-                                        !preview && styles.modeChipTextActive,
-                                    ]}
-                                >
-                                    Escribir
-                                </TextMalet>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modeChip, preview && styles.modeChipActive]}
-                                onPress={() => setPreview(true)}
-                            >
-                                <TextMalet
-                                    style={[
-                                        styles.modeChipText,
-                                        preview && styles.modeChipTextActive,
-                                    ]}
-                                >
-                                    Vista previa
-                                </TextMalet>
-                            </TouchableOpacity>
-                        </View>
-
-                        {preview ? (
-                            <View style={styles.previewBox}>
-                                <MarkdownView
-                                    content={content || '_Nada todavía. Escribe algo en Markdown._'}
-                                />
-                            </View>
-                        ) : (
-                            <>
-                                <MarkdownToolbar onAction={applyFormat} />
+                        {blocks.map((block, index) =>
+                            index === activeBlock ? (
                                 <TextInput
-                                    ref={contentRef}
-                                    style={styles.contentInput}
-                                    value={content}
-                                    onChangeText={(text) => {
-                                        setContent(text);
-                                        markDirty();
+                                    key={`input-${index}`}
+                                    ref={(ref) => {
+                                        inputsRef.current[index] = ref;
                                     }}
-                                    placeholder="Escribe en Markdown…"
-                                    placeholderTextColor="#b0b0b0"
+                                    style={[
+                                        styles.blockInput,
+                                        isMultilineBlock(block) && styles.multilineInput,
+                                    ]}
+                                    value={block}
+                                    onChangeText={(text) => handleBlockChange(index, text)}
                                     multiline
-                                    textAlignVertical="top"
                                     scrollEnabled={false}
-                                    selection={selection}
+                                    textAlignVertical="top"
+                                    selection={blockSelection}
                                     onSelectionChange={(event) =>
-                                        setSelection(event.nativeEvent.selection)
+                                        setBlockSelection(event.nativeEvent.selection)
                                     }
+                                    onKeyPress={(event) => {
+                                        if (
+                                            event.nativeEvent.key === 'Backspace' &&
+                                            block === ''
+                                        ) {
+                                            mergeWithPrevious(index);
+                                        }
+                                    }}
+                                    placeholder={
+                                        blocks.length === 1 && !title ? 'Escribe algo…' : ''
+                                    }
+                                    placeholderTextColor="#b0b0b0"
                                     maxLength={100000}
+                                    selectionColor="#2383e2"
                                 />
-                            </>
+                            ) : (
+                                <TouchableOpacity
+                                    key={`block-${index}`}
+                                    activeOpacity={0.75}
+                                    onPress={() => startEditing(index)}
+                                >
+                                    {block.trim() ? (
+                                        <MarkdownView content={block} />
+                                    ) : (
+                                        <View style={styles.emptyBlock} />
+                                    )}
+                                </TouchableOpacity>
+                            )
                         )}
                     </ScrollView>
+                )}
+
+                {mode === 'edit' && (
+                    <View
+                        style={[
+                            styles.bottomBar,
+                            {
+                                // Con el teclado abierto no hace falta el inset;
+                                // cerrado, respeta la barra de navegación del sistema.
+                                paddingBottom: keyboardVisible
+                                    ? Platform.OS === 'ios'
+                                        ? 8
+                                        : 6
+                                    : Platform.OS === 'android'
+                                      ? Math.max(insets.bottom, 6)
+                                      : 8,
+                            },
+                        ]}
+                    >
+                        <MarkdownToolbar onAction={applyFormat} />
+                    </View>
                 )}
             </KeyboardAvoidingView>
         </LayoutAuthenticated>
@@ -561,17 +688,26 @@ const styles = StyleSheet.create({
         padding: 8,
     },
     saveButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#111',
-        alignItems: 'center',
-        justifyContent: 'center',
+        padding: 8,
         marginRight: 2,
+    },
+    saveButtonDisabled: {
+        opacity: 0.35,
+    },
+    scroll: {
+        flex: 1,
+    },
+    bottomBar: {
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0ef',
+        backgroundColor: '#fff',
+        paddingTop: 5,
+        paddingBottom: Platform.OS === 'ios' ? 8 : 6,
+        paddingHorizontal: 2,
     },
     viewContent: {
         paddingBottom: 48,
-        paddingTop: 4,
+        paddingTop: 10,
     },
     noteTitle: {
         fontSize: 28,
@@ -600,8 +736,8 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     editContent: {
-        paddingBottom: 80,
-        paddingTop: 2,
+        paddingBottom: 24,
+        paddingTop: 12,
     },
     titleInput: {
         fontSize: 28,
@@ -610,53 +746,28 @@ const styles = StyleSheet.create({
         color: '#1f1f1f',
         letterSpacing: -0.6,
         padding: 0,
+        paddingTop: 4,
         marginBottom: 12,
     },
-    modeRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 12,
-    },
-    modeChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
-        backgroundColor: '#f7f6f3',
-        borderWidth: 1,
-        borderColor: '#e9e9e7',
-    },
-    modeChipActive: {
-        backgroundColor: '#111',
-        borderColor: '#111',
-    },
-    modeChipText: {
-        fontSize: 12.5,
-        fontWeight: '600',
-        color: '#6b6b6b',
-    },
-    modeChipTextActive: {
-        color: '#fff',
-    },
-    previewBox: {
-        borderWidth: 1,
-        borderColor: '#ececeb',
-        borderRadius: 12,
-        padding: 16,
-        backgroundColor: '#fff',
-        minHeight: 240,
-    },
-    contentInput: {
-        minHeight: 320,
+    blockInput: {
+        minHeight: 24,
         fontSize: 15,
-        lineHeight: 23,
+        lineHeight: 24,
         color: '#37352f',
         padding: 0,
-        marginTop: 4,
-        fontFamily: Platform.select({
-            ios: 'Menlo',
-            android: 'monospace',
-            default: 'monospace',
-        }),
+        marginBottom: 10,
+    },
+    multilineInput: {
+        fontFamily: MONO,
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#1f1f1f',
+        backgroundColor: '#f7f6f3',
+        borderRadius: 8,
+        padding: 10,
+    },
+    emptyBlock: {
+        height: 22,
     },
     skeleton: {
         gap: 12,
