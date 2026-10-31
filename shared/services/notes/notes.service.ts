@@ -2,6 +2,7 @@ import { MALET_API_URL } from '../../config/malet.config';
 import {
   Note,
   NoteDetail,
+  NoteGraph,
   NoteInput,
   NoteLinkTarget,
   NotesListResponse,
@@ -52,6 +53,13 @@ export const notesService = {
       method: 'GET',
     });
   },
+
+  /** Mapa de conocimiento: nodos y aristas. */
+  getGraph: () =>
+    secureFetch<NoteGraph>({
+      url: `${NOTES}/graph`,
+      method: 'GET',
+    }),
 
   createNote: (body: NoteInput) =>
     secureFetch<Note>({ url: NOTES, method: 'POST', body }),

@@ -21,6 +21,7 @@
     "@react-native-google-signin/google-signin": "^16.1.1",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@shopify/flash-list": "2.0.2",
+    "d3-force": "^3.0.0",
     "expo": "~57.0.31",
     "expo-asset": "~57.0.20",
     "expo-auth-session": "~57.0.16",
@@ -72,6 +73,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/d3-force": "^3.0.10",
     "@types/react": "~19.2.14",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",

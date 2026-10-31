@@ -54,6 +54,26 @@ export interface NoteLinkTarget {
     title: string;
 }
 
+/** Nodo del mapa de conocimiento. */
+export interface NoteGraphNode {
+    id: string;
+    title: string;
+    pinned: boolean;
+}
+
+/** Arista entre dos notas. */
+export interface NoteGraphEdge {
+    source: string;
+    target: string;
+}
+
+/** Grafo completo del usuario. */
+export interface NoteGraph {
+    nodes: NoteGraphNode[];
+    edges: NoteGraphEdge[];
+    truncated: boolean;
+}
+
 /** Título visible: una nota sin título se muestra como "Sin título". */
 export const noteTitle = (note: { title?: string | null }): string =>
   note.title?.trim() || 'Sin título';

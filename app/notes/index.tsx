@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { BookOpen, Plus, Search } from 'lucide-react-native';
+import { BookOpen, Network, Plus, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
@@ -162,24 +162,37 @@ export default function NotesListScreen() {
                     title="Notas"
                     subtitle="Markdown, ideas y apuntes"
                     right={
-                        <TouchableOpacity
-                            style={styles.tutorialButton}
-                            onPress={openTutorial}
-                            disabled={creatingTutorial || notesLoading}
-                            activeOpacity={0.7}
-                            accessibilityLabel="Crear nota tutorial"
-                        >
-                            {creatingTutorial ? (
-                                <ActivityIndicator size="small" color="#555" />
-                            ) : (
-                                <>
-                                    <BookOpen size={16} color="#555" />
-                                    <TextMalet style={styles.tutorialText}>
-                                        Tutorial
-                                    </TextMalet>
-                                </>
-                            )}
-                        </TouchableOpacity>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                style={styles.mapButton}
+                                onPress={() =>
+                                    router.push('/notes/graph' as any)
+                                }
+                                activeOpacity={0.7}
+                                accessibilityLabel="Mapa de notas"
+                            >
+                                <Network size={17} color="#555" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.tutorialButton}
+                                onPress={openTutorial}
+                                disabled={creatingTutorial || notesLoading}
+                                activeOpacity={0.7}
+                                accessibilityLabel="Crear nota tutorial"
+                            >
+                                {creatingTutorial ? (
+                                    <ActivityIndicator size="small" color="#555" />
+                                ) : (
+                                    <>
+                                        <BookOpen size={16} color="#555" />
+                                        <TextMalet style={styles.tutorialText}>
+                                            Tutorial
+                                        </TextMalet>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </View>
                     }
                 />
 
@@ -264,6 +277,14 @@ const styles = StyleSheet.create({
         gap: 5,
         paddingVertical: 8,
         paddingHorizontal: 6,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    mapButton: {
+        padding: 8,
     },
     tutorialText: {
         fontSize: 12.5,
