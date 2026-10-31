@@ -129,8 +129,9 @@ export default function NotesGraphScreen() {
                         </View>
 
                         <TextMalet style={styles.hint}>
-                            Arrastra para mover y pellizca (o usa los botones)
-                            para hacer zoom. Toca un nodo para abrir la nota.
+                            Arrastra para mover, pellizca para zoom y toca un
+                            nodo para ver sus conexiones. Toca otra vez para
+                            abrirlo. Al acercarte se cargan más nodos.
                         </TextMalet>
                         {graph.edges.length === 0 && (
                             <TextMalet style={styles.hint}>
@@ -139,7 +140,7 @@ export default function NotesGraphScreen() {
                         )}
                         {graph.truncated && (
                             <TextMalet style={styles.hint}>
-                                Mostrando las 300 notas más recientes.
+                                Mostrando las 500 notas más recientes.
                             </TextMalet>
                         )}
                     </View>

@@ -5,12 +5,15 @@ import {
     GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
+    runOnJS,
     useAnimatedStyle,
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
+import { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
+import TextMalet from '@/components/TextMalet/TextMalet';
 import KnowledgeGraph from './KnowledgeGraph';
 import { NoteGraph } from '@/shared/entities/Note';
 
@@ -34,6 +37,8 @@ export default function GraphCanvas({
     height,
     onOpen,
 }: GraphCanvasProps) {
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [zoomLevel, setZoomLevel] = useState(1);
     const scale = useSharedValue(1);
     const savedScale = useSharedValue(1);
     const translateX = useSharedValue(0);
@@ -50,6 +55,7 @@ export default function GraphCanvas({
         })
         .onEnd(() => {
             savedScale.value = scale.value;
+            runOnJS(setZoomLevel)(scale.value);
         });
 
     const pan = Gesture.Pan()
@@ -79,6 +85,7 @@ export default function GraphCanvas({
         );
         scale.set(withTiming(next, { duration: 180 }));
         savedScale.set(next);
+        setZoomLevel(next);
     };
 
     const reset = () => {
@@ -88,7 +95,19 @@ export default function GraphCanvas({
         savedX.set(0);
         savedY.set(0);
         savedScale.set(1);
+        setZoomLevel(1);
+        setSelectedId(null);
     };
+
+    const handleSelect = (id: string) => {
+        if (selectedId === id) {
+            onOpen(id);
+            return;
+        }
+        setSelectedId(id);
+    };
+
+    const selectedNode = graph.nodes.find((node) => node.id === selectedId);
 
     return (
         <View style={[styles.canvas, { width, height }]}>
@@ -131,13 +150,29 @@ export default function GraphCanvas({
                     >
                         <KnowledgeGraph
                             graph={graph}
-                            width={width}
-                            height={height}
-                            onOpen={onOpen}
+                            zoomLevel={zoomLevel}
+                            selectedId={selectedId}
+                            onSelect={handleSelect}
                         />
                     </Animated.View>
                 </GestureDetector>
             </GestureHandlerRootView>
+
+            {selectedNode && (
+                <View
+                    style={[styles.selectionCard, { maxWidth: width - 70 }]}
+                >
+                    <TextMalet
+                        style={styles.selectionTitle}
+                        numberOfLines={1}
+                    >
+                        {selectedNode.title.trim() || 'Sin título'}
+                    </TextMalet>
+                    <TextMalet style={styles.selectionHint}>
+                        Toca otra vez para abrir
+                    </TextMalet>
+                </View>
+            )}
 
             <View style={styles.controls}>
                 <TouchableOpacity
@@ -180,6 +215,33 @@ const styles = StyleSheet.create({
         bottom: 10,
         gap: 6,
         zIndex: 2,
+    },
+    selectionCard: {
+        position: 'absolute',
+        left: 10,
+        bottom: 10,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e5e5e5',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+        elevation: 2,
+        zIndex: 2,
+    },
+    selectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#1f1f1f',
+    },
+    selectionHint: {
+        fontSize: 10,
+        color: '#9a9a9a',
+        marginTop: 1,
     },
     control: {
         width: 34,
