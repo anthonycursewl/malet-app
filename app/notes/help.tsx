@@ -224,6 +224,13 @@ const HELP_ROWS: HelpRow[] = [
     },
     {
         kind: 'item',
+        key: 'wiki-backlinks-more',
+        icon: ArrowDown,
+        title: 'Ver más menciones',
+        body: 'Las notas que te mencionan se muestran de 10 en 10. Pulsa `Ver más` para cargar otras 10.',
+    },
+    {
+        kind: 'item',
         key: 'wiki-rename',
         icon: Pencil,
         title: 'Renombrar',

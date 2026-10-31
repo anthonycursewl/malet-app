@@ -108,6 +108,7 @@ export const TUTORIAL_NOTE_CONTENT = [
     '- `[[Título|texto visible]]` cambia el texto del enlace.',
     '- Si la nota no existe, el enlace se ve gris; tócalo para crearla.',
     '- Cada nota muestra **Mencionada en** (las notas que la enlazan).',
+    '- Las menciones se muestran de 10 en 10; pulsa **Ver más** para ampliar.',
     '- El **mapa local** aparece al final de cada nota.',
     '- El icono de red en Notas abre el **mapa global** con todos los nodos.',
     '- Al renombrar una nota, los enlaces se actualizan automáticamente.',

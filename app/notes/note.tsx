@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'exp
 import { BookOpen, Check, Globe, Lock, Pencil, Pin, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Keyboard,
     KeyboardAvoidingView,
@@ -100,6 +101,7 @@ export default function NoteScreen() {
     const updateNote = useNotesStore((s) => s.updateNote);
     const deleteNote = useNotesStore((s) => s.deleteNote);
     const restoreNote = useNotesStore((s) => s.restoreNote);
+    const setNoteVisibility = useNotesStore((s) => s.setNoteVisibility);
 
     const [note, setNote] = useState<NoteDetail | null>(null);
     const [loading, setLoading] = useState(!!id);
@@ -110,7 +112,14 @@ export default function NoteScreen() {
     const [blockSelection, setBlockSelection] = useState({ start: 0, end: 0 });
     const [pinned, setPinned] = useState(false);
     const [isPublic, setIsPublic] = useState(false);
-    const [visibilityUpdating, setVisibilityUpdating] = useState(false);
+    const [visibilityStatus, setVisibilityStatus] = useState<
+        'idle' | 'pending' | 'saving'
+    >('idle');
+    const [backlinksPage, setBacklinksPage] = useState({
+        noteId: id,
+        limit: 10,
+    });
+    const backlinksLimit = backlinksPage.noteId === id ? backlinksPage.limit : 10;
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -125,6 +134,11 @@ export default function NoteScreen() {
     const persistRef = useRef<() => Promise<boolean>>(async () => false);
     const firstFocus = useRef(true);
     const linkInsertRef = useRef<{ blockIndex: number; start: number } | null>(
+        null
+    );
+    const desiredPublicRef = useRef(false);
+    const savedPublicRef = useRef(false);
+    const visibilityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
         null
     );
 
@@ -189,6 +203,9 @@ export default function NoteScreen() {
             setActiveBlock(Math.max(parsed.length - 1, 0));
             setPinned(fetched.pinned);
             setIsPublic(fetched.is_public);
+            desiredPublicRef.current = fetched.is_public;
+            savedPublicRef.current = fetched.is_public;
+            setVisibilityStatus('idle');
             setLoading(false);
             setMode('view');
         })();
@@ -243,6 +260,8 @@ export default function NoteScreen() {
                         ? { ...prev, ...updated }
                         : { ...updated, links: [], backlinks: [] }
                 );
+                desiredPublicRef.current = isPublic;
+                savedPublicRef.current = isPublic;
                 if (versionRef.current === version) setDirty(false);
                 setSavedAt(new Date());
                 return true;
@@ -259,6 +278,8 @@ export default function NoteScreen() {
                 return false;
             }
             setNote({ ...created, links: [], backlinks: [] });
+            desiredPublicRef.current = isPublic;
+            savedPublicRef.current = isPublic;
             setDirty(false);
             setSavedAt(new Date());
             router.replace({
@@ -310,6 +331,8 @@ export default function NoteScreen() {
                 setBlocks(parsed);
                 setPinned(refreshed.pinned);
                 setIsPublic(refreshed.is_public);
+                desiredPublicRef.current = refreshed.is_public;
+                savedPublicRef.current = refreshed.is_public;
                 setActiveBlock((current) =>
                     Math.min(current, Math.max(parsed.length - 1, 0))
                 );
@@ -369,38 +392,86 @@ export default function NoteScreen() {
         notify('success', next ? 'Nota fijada.' : 'Nota desfijada.');
     };
 
-    /**
-     * La visibilidad se guarda al instante en lectura. En edición se marca
-     * `dirty` y viaja con el autosave/check para no pisar el contenido abierto.
-     */
-    const toggleVisibility = async () => {
-        if (visibilityUpdating) return;
-        const next = !isPublic;
+    /** Persiste el último estado elegido; solo se llama tras el debounce. */
+    const commitVisibility = useCallback(async () => {
+        if (!id) return;
 
-        if (!id || mode === 'edit') {
-            setIsPublic(next);
-            markDirty();
+        const target = desiredPublicRef.current;
+        if (target === savedPublicRef.current) {
+            setVisibilityStatus('idle');
             return;
         }
 
-        setVisibilityUpdating(true);
-        setIsPublic(next);
+        setVisibilityStatus('saving');
         const { note: updated, error } = await updateNote(id, {
-            is_public: next,
+            is_public: target,
         });
-        setVisibilityUpdating(false);
 
         if (error) {
-            setIsPublic(!next);
+            desiredPublicRef.current = savedPublicRef.current;
+            setIsPublic(savedPublicRef.current);
+            setNoteVisibility(id, savedPublicRef.current);
+            setVisibilityStatus('idle');
             notify('error', error);
             return;
         }
 
+        savedPublicRef.current = target;
+        desiredPublicRef.current = target;
+        setVisibilityStatus('idle');
         if (updated) {
             setNote((prev) => (prev ? { ...prev, ...updated } : prev));
         }
-        notify('success', next ? 'Nota pública.' : 'Nota privada.');
+        notify('success', target ? 'Nota pública.' : 'Nota privada.');
+    }, [id, updateNote, setNoteVisibility]);
+
+    /**
+     * Lectura: los taps se agrupan 650 ms para no saturar la API. Edición:
+     * el cambio se guarda con el autosave/check para no pisar el contenido.
+     */
+    const toggleVisibility = () => {
+        if (visibilityStatus === 'saving') return;
+
+        const next = !isPublic;
+        setIsPublic(next);
+        desiredPublicRef.current = next;
+        if (id && mode !== 'edit') {
+            setNoteVisibility(id, next);
+        }
+
+        if (!id || mode === 'edit') {
+            markDirty();
+            return;
+        }
+
+        setVisibilityStatus('pending');
+        if (visibilityTimerRef.current) {
+            clearTimeout(visibilityTimerRef.current);
+        }
+        visibilityTimerRef.current = setTimeout(() => {
+            visibilityTimerRef.current = null;
+            void commitVisibility();
+        }, 650);
     };
+
+    // Si se sale de la nota durante el debounce, guarda el último estado.
+    useEffect(() => {
+        return () => {
+            if (!visibilityTimerRef.current) return;
+            clearTimeout(visibilityTimerRef.current);
+            visibilityTimerRef.current = null;
+            const target = desiredPublicRef.current;
+            if (id && target !== savedPublicRef.current) {
+                void updateNote(id, { is_public: target }).then(
+                    ({ error }) => {
+                        if (error) {
+                            setNoteVisibility(id, savedPublicRef.current);
+                        }
+                    }
+                );
+            }
+        };
+    }, [id, updateNote, setNoteVisibility]);
 
     const confirmDelete = () => {
         if (!note) return;
@@ -746,7 +817,7 @@ export default function NoteScreen() {
             <View style={styles.editHeaderActions}>
                 <TouchableOpacity
                     style={styles.tutorialAction}
-                    onPress={() => void toggleVisibility()}
+                    onPress={toggleVisibility}
                     activeOpacity={0.6}
                     accessibilityLabel={
                         isPublic
@@ -784,16 +855,23 @@ export default function NoteScreen() {
             <View style={styles.actions}>
                 <TouchableOpacity
                     style={styles.actionBtn}
-                    onPress={() => void toggleVisibility()}
-                    disabled={visibilityUpdating}
+                    onPress={toggleVisibility}
+                    disabled={visibilityStatus === 'saving'}
                     activeOpacity={0.6}
                     accessibilityLabel={
-                        isPublic
-                            ? 'Nota pública, tocar para hacerla privada'
-                            : 'Nota privada, tocar para hacerla pública'
+                        visibilityStatus === 'saving'
+                            ? 'Guardando visibilidad'
+                            : isPublic
+                              ? 'Nota pública, tocar para hacerla privada'
+                              : 'Nota privada, tocar para hacerla pública'
                     }
                 >
-                    {isPublic ? (
+                    {visibilityStatus !== 'idle' ? (
+                        <ActivityIndicator
+                            size={18}
+                            color={isPublic ? '#2f8f5b' : '#555'}
+                        />
+                    ) : isPublic ? (
                         <Globe size={18} color="#2f8f5b" />
                     ) : (
                         <Lock size={18} color="#555" />
@@ -863,16 +941,25 @@ export default function NoteScreen() {
                                 styles.visibilityPill,
                                 isPublic && styles.visibilityPillPublic,
                             ]}
-                            onPress={() => void toggleVisibility()}
-                            disabled={visibilityUpdating}
+                            onPress={toggleVisibility}
+                            disabled={visibilityStatus === 'saving'}
                             activeOpacity={0.75}
                             accessibilityLabel={
-                                isPublic
-                                    ? 'Nota pública, tocar para hacerla privada'
-                                    : 'Nota privada, tocar para hacerla pública'
+                                visibilityStatus === 'saving'
+                                    ? 'Guardando visibilidad'
+                                    : isPublic
+                                      ? 'Nota pública, tocar para hacerla privada'
+                                      : 'Nota privada, tocar para hacerla pública'
                             }
                         >
-                            {isPublic ? (
+                            {visibilityStatus !== 'idle' ? (
+                                <ActivityIndicator
+                                    size={13}
+                                    color={
+                                        isPublic ? '#2f8f5b' : '#6b6b6b'
+                                    }
+                                />
+                            ) : isPublic ? (
                                 <Globe size={13} color="#2f8f5b" />
                             ) : (
                                 <Lock size={13} color="#6b6b6b" />
@@ -883,9 +970,15 @@ export default function NoteScreen() {
                                     isPublic && styles.visibilityPillTextPublic,
                                 ]}
                             >
-                                {isPublic
-                                    ? 'Pública · visible en la web'
-                                    : 'Privada · solo tú puedes verla'}
+                                {visibilityStatus === 'pending'
+                                    ? isPublic
+                                        ? 'Guardando pública…'
+                                        : 'Guardando privada…'
+                                    : visibilityStatus === 'saving'
+                                      ? 'Guardando…'
+                                      : isPublic
+                                        ? 'Pública · visible en la web'
+                                        : 'Privada · solo tú puedes verla'}
                             </TextMalet>
                         </TouchableOpacity>
                         <View style={styles.rule} />
@@ -952,29 +1045,61 @@ export default function NoteScreen() {
                                 <TextMalet style={styles.sectionTitle}>
                                     Mencionada en
                                 </TextMalet>
-                                {note.backlinks.map((backlink) => (
+                                {note.backlinks
+                                    .slice(0, backlinksLimit)
+                                    .map((backlink) => (
+                                        <TouchableOpacity
+                                            key={backlink.id}
+                                            style={styles.backlinkRow}
+                                            onPress={() =>
+                                                openLinkedNote(backlink.id)
+                                            }
+                                            activeOpacity={0.75}
+                                        >
+                                            <TextMalet
+                                                style={styles.backlinkTitle}
+                                                numberOfLines={1}
+                                            >
+                                                {noteTitle(backlink)}
+                                            </TextMalet>
+                                            <TextMalet
+                                                style={styles.backlinkExcerpt}
+                                                numberOfLines={1}
+                                            >
+                                                {backlink.excerpt ||
+                                                    'Sin contenido'}
+                                            </TextMalet>
+                                        </TouchableOpacity>
+                                    ))}
+                                {note.backlinks.length > backlinksLimit && (
                                     <TouchableOpacity
-                                        key={backlink.id}
-                                        style={styles.backlinkRow}
+                                        style={styles.moreBacklinks}
                                         onPress={() =>
-                                            openLinkedNote(backlink.id)
+                                            setBacklinksPage({
+                                                noteId: id,
+                                                limit: Math.min(
+                                                    backlinksLimit + 10,
+                                                    note.backlinks.length
+                                                ),
+                                            })
                                         }
-                                        activeOpacity={0.75}
+                                        activeOpacity={0.7}
                                     >
                                         <TextMalet
-                                            style={styles.backlinkTitle}
-                                            numberOfLines={1}
+                                            style={styles.moreBacklinksText}
                                         >
-                                            {noteTitle(backlink)}
-                                        </TextMalet>
-                                        <TextMalet
-                                            style={styles.backlinkExcerpt}
-                                            numberOfLines={1}
-                                        >
-                                            {backlink.excerpt || 'Sin contenido'}
+                                            Ver{' '}
+                                            {Math.min(
+                                                10,
+                                                note.backlinks.length -
+                                                    backlinksLimit
+                                            )}{' '}
+                                            más · quedan{' '}
+                                            {note.backlinks.length -
+                                                backlinksLimit}
                                         </TextMalet>
                                     </TouchableOpacity>
-                                ))}
+                                )}
                             </View>
                         )}
 
@@ -1254,6 +1379,15 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: '#1f1f1f',
+    },
+    moreBacklinks: {
+        alignSelf: 'flex-start',
+        paddingVertical: 4,
+    },
+    moreBacklinksText: {
+        fontSize: 12.5,
+        fontWeight: '600',
+        color: '#0b6e99',
     },
     backlinkExcerpt: {
         fontSize: 11.5,

@@ -91,6 +91,8 @@ interface NotesStore {
     body: NoteInput
   ) => Promise<{ note: Note | null; error: string | null }>;
   togglePin: (note: NoteSummary) => Promise<string | null>;
+  /** Actualización optimista del feed al cambiar visibilidad. */
+  setNoteVisibility: (id: string, is_public: boolean) => void;
   deleteNote: (id: string) => Promise<string | null>;
   restoreNote: (id: string) => Promise<string | null>;
   hardDeleteNote: (id: string) => Promise<string | null>;
@@ -277,6 +279,14 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       }));
       return e?.message ?? 'Error al fijar la nota';
     }
+  },
+
+  setNoteVisibility: (id, is_public) => {
+    set((s) => ({
+      notes: s.notes.map((n) =>
+        n.id === id ? { ...n, is_public } : n
+      ),
+    }));
   },
 
   deleteNote: async (id) => {
