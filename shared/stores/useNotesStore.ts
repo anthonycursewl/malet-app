@@ -9,7 +9,8 @@ interface NotesPagination {
   isEnd: boolean;
 }
 
-const freshPagination = (take = 20): NotesPagination => ({
+// Página inicial más liviana: el feed carga el resto al hacer scroll.
+const freshPagination = (take = 12): NotesPagination => ({
   cursor: null,
   take,
   isEnd: false,
@@ -73,6 +74,8 @@ const invalidateNotesCache = (): void => {
 interface NotesStore {
   notes: NoteSummary[];
   notesLoading: boolean;
+  /** Ya se intentó cargar al menos una página (evita el flash de "vacío"). */
+  notesLoaded: boolean;
   /** Carga de una página siguiente (no es refresh ni carga inicial). */
   notesLoadingMore: boolean;
   notesPagination: NotesPagination;
@@ -101,6 +104,7 @@ interface NotesStore {
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   notesLoading: false,
+  notesLoaded: false,
   notesLoadingMore: false,
   notesPagination: freshPagination(),
   search: '',
@@ -132,6 +136,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
             isEnd: cached.nextCursor === null || cached.data.length === 0,
           },
           notesLoading: false,
+          notesLoaded: true,
           notesLoadingMore: false,
           notesError: null,
         });
@@ -169,6 +174,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           isEnd: nextCursor === null || data.length === 0,
         },
         notesLoading: false,
+        notesLoaded: true,
         notesLoadingMore: false,
         notesError: null,
       }));
@@ -176,6 +182,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       if (requestId !== notesRequestSeq) return;
       set((s) => ({
         notesLoading: false,
+        notesLoaded: true,
         notesLoadingMore: false,
         notesPagination: { ...s.notesPagination, isEnd: true },
         notesError: e?.message ?? 'Error al cargar las notas',

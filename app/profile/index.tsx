@@ -5,6 +5,7 @@ import VerificationBadge from "@/components/shared/VerificationBadge";
 import { useAccountStore } from "@/shared/stores/useAccountStore";
 import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
+import { useNotesPrefetch } from "@/shared/hooks/useNotesPrefetch";
 import { spacing } from "@/shared/theme";
 import IconAt from "@/svgs/dashboard/IconAt";
 import { Feather } from "@expo/vector-icons";
@@ -77,6 +78,7 @@ const OptionBlock = ({
 };
 
 export default function ProfileView() {
+    useNotesPrefetch();
     const user = useAuthStore(s => s.user);
     const logout = useAuthStore(s => s.logout);
     const logoutAccount = useAccountStore(s => s.logoutAccount);

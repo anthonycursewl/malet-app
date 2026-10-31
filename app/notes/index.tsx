@@ -1,10 +1,9 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { BookOpen, CircleHelp, Network, Plus, Search } from 'lucide-react-native';
+import { BookOpen, CircleHelp, Network, Plus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
-import { InputField } from '@/components/AddWallet/InputField';
 import LayoutAuthenticated, {
     LAYOUT_HORIZONTAL_PADDING,
 } from '@/components/Layout/LayoutAuthenticated';
@@ -13,6 +12,7 @@ import NoteFeedSkeleton from '@/components/notes/NoteFeedSkeleton';
 import { notify, notifyUndo } from '@/components/cuaderno/format';
 import NoteCard from '@/components/notes/NoteCard';
 import NotesHeader from '@/components/notes/NotesHeader';
+import NotesSearchBar from '@/components/notes/NotesSearchBar';
 import {
     TUTORIAL_NOTE_CONTENT,
     TUTORIAL_NOTE_TITLE,
@@ -25,6 +25,7 @@ import { useNotesStore } from '@/shared/stores/useNotesStore';
 export default function NotesListScreen() {
     const notes = useNotesStore((s) => s.notes);
     const notesLoading = useNotesStore((s) => s.notesLoading);
+    const notesLoaded = useNotesStore((s) => s.notesLoaded);
     const notesLoadingMore = useNotesStore((s) => s.notesLoadingMore);
     const notesError = useNotesStore((s) => s.notesError);
     const search = useNotesStore((s) => s.search);
@@ -37,29 +38,24 @@ export default function NotesListScreen() {
     const restoreNote = useNotesStore((s) => s.restoreNote);
     const author = useAuthStore((s) => s.user);
 
-    const [searchText, setSearchText] = useState(search);
     const [creatingTutorial, setCreatingTutorial] = useState(false);
 
     // Al volver del editor, la lista se refresca (título/extracto/orden).
     useFocusEffect(
         useCallback(() => {
-            void loadNotes({ refresh: true });
+            // Si el prefetch desde dashboard sigue en curso, no dupliques la
+            // petición: el store ya está cargando la primera página.
+            if (!useNotesStore.getState().notesLoading) {
+                void loadNotes({ refresh: true });
+            }
         }, [loadNotes])
     );
 
-    // Carga la ruta de ayuda en segundo plano para que el tap sea inmediato.
+    // Deja listas las rutas secundarias mientras el usuario lee el feed.
     useEffect(() => {
         router.prefetch('/notes/help' as any);
+        router.prefetch('/notes/graph' as any);
     }, []);
-
-    // Búsqueda con debounce para no pedir en cada tecla.
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            const trimmed = searchText.trim();
-            if (trimmed !== search) void setSearch(trimmed);
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [searchText, search, setSearch]);
 
     useEffect(() => {
         if (!notesError) return;
@@ -135,6 +131,13 @@ export default function NotesListScreen() {
         router.push({ pathname: '/notes/note', params: { id: note.id } } as any);
     };
 
+    const handleSearch = useCallback(
+        (value: string) => {
+            void setSearch(value);
+        },
+        [setSearch]
+    );
+
     const renderItem = useCallback(
         ({ item }: { item: NoteSummary }) => (
             <NoteCard
@@ -146,19 +149,6 @@ export default function NotesListScreen() {
             />
         ),
         [author, openNote, handleTogglePin, handleArchive]
-    );
-
-    const header = (
-        <View style={styles.headerBlock}>
-            <InputField
-                label="Buscar"
-                placeholder="Buscar en tus notas..."
-                value={searchText}
-                onChangeText={setSearchText}
-                icon={<Search size={16} color="#666" />}
-                autoCapitalize="none"
-            />
-        </View>
     );
 
     return (
@@ -213,17 +203,25 @@ export default function NotesListScreen() {
                     }
                 />
 
+                <View style={styles.searchBlock}>
+                    <NotesSearchBar
+                        initialValue={search}
+                        onSearch={handleSearch}
+                    />
+                </View>
+
                 <FlashList
                     style={styles.list}
                     data={notes}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
-                    ListHeaderComponent={header}
                     contentContainerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                     onEndReachedThreshold={0.4}
+                    drawDistance={480}
+                    maxItemsInRecyclePool={20}
                     onEndReached={() => {
                         if (
                             notes.length > 0 &&
@@ -246,7 +244,7 @@ export default function NotesListScreen() {
                         ) : null
                     }
                     ListEmptyComponent={
-                        notesLoading ? (
+                        !notesLoaded || notesLoading ? (
                             <NoteFeedSkeleton rows={6} />
                         ) : search ? (
                             <View style={styles.empty}>
@@ -302,8 +300,8 @@ const styles = StyleSheet.create({
         // ocupa todo el ancho y el padding queda dentro de cada post.
         marginHorizontal: -LAYOUT_HORIZONTAL_PADDING,
     },
-    headerBlock: {
-        paddingHorizontal: 12,
+    searchBlock: {
+        paddingHorizontal: 6,
         paddingBottom: 10,
     },
     tutorialButton: {

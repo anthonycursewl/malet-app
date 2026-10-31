@@ -2,9 +2,12 @@ import { router } from 'expo-router';
 import { FileText } from 'lucide-react-native';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import TextMalet from '@/components/TextMalet/TextMalet';
+import { useNotesPrefetch } from '@/shared/hooks/useNotesPrefetch';
 
 /** Acceso rápido a Notas en el dashboard (mismo formato que las demás). */
 export default function NotesEntryCard() {
+    useNotesPrefetch();
+
     return (
         <TouchableOpacity
             onPress={() => router.push('/notes' as any)}
