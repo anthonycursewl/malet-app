@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
         zIndex: 200,
     },
     shadow: {
-        borderRadius: 22,
+        borderRadius: 28,
         backgroundColor: 'rgba(255,255,255,0.01)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
@@ -174,8 +174,8 @@ const styles = StyleSheet.create({
         elevation: 16,
     },
     glass: {
-        height: 74,
-        borderRadius: 22,
+        height: 66,
+        borderRadius: 28,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.78)',

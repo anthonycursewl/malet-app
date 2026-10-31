@@ -1174,7 +1174,7 @@ export default function Dashboard() {
                     </View>
                 )}
 
-                <View style={{ height: 118 + insets.bottom }} />
+                <View style={{ height: 110 + insets.bottom }} />
             </ScrollView>
 
             <DashboardNavbar />
