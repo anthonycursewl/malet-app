@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Note, NoteInput, NoteSummary } from '../entities/Note';
 import { notesService } from '../services/notes/notes.service';
+import { useAuthStore } from './useAuthStore';
 
 interface NotesPagination {
   cursor: string | null;
@@ -17,6 +18,58 @@ const freshPagination = (take = 20): NotesPagination => ({
 /** Descarta respuestas viejas cuando cambia la búsqueda. */
 let notesRequestSeq = 0;
 
+interface SearchCacheEntry {
+  data: NoteSummary[];
+  nextCursor: string | null;
+  timestamp: number;
+}
+
+/**
+ * Caché en memoria de la **primera página** por búsqueda. Evita repetir la
+ * petición al alternar entre búsquedas dentro de la misma sesión. No usa Redis:
+ * es un dato personal y la fuente de verdad sigue siendo PostgreSQL.
+ */
+const SEARCH_CACHE_TTL_MS = 30_000;
+const SEARCH_CACHE_MAX = 20;
+const searchCache = new Map<string, SearchCacheEntry>();
+
+const searchCacheKey = (search: string): string => {
+  const userId = useAuthStore.getState().user?.id ?? 'anon';
+  return `${userId}:${search.trim().toLowerCase()}`;
+};
+
+const readSearchCache = (search: string): SearchCacheEntry | null => {
+  const key = searchCacheKey(search);
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > SEARCH_CACHE_TTL_MS) {
+    searchCache.delete(key);
+    return null;
+  }
+  // LRU: la entrada usada pasa al final.
+  searchCache.delete(key);
+  searchCache.set(key, entry);
+  return entry;
+};
+
+const writeSearchCache = (
+  search: string,
+  data: NoteSummary[],
+  nextCursor: string | null
+): void => {
+  const key = searchCacheKey(search);
+  if (searchCache.size >= SEARCH_CACHE_MAX) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest) searchCache.delete(oldest);
+  }
+  searchCache.set(key, { data, nextCursor, timestamp: Date.now() });
+};
+
+/** Cualquier cambio en notas invalida las búsquedas cacheadas. */
+const invalidateNotesCache = (): void => {
+  searchCache.clear();
+};
+
 interface NotesStore {
   notes: NoteSummary[];
   notesLoading: boolean;
@@ -24,7 +77,7 @@ interface NotesStore {
   search: string;
   notesError: string | null;
 
-  loadNotes: (opts?: { refresh?: boolean }) => Promise<void>;
+  loadNotes: (opts?: { refresh?: boolean; useCache?: boolean }) => Promise<void>;
   refreshNotes: () => Promise<void>;
   setSearch: (search: string) => Promise<void>;
   clearNotesError: () => void;
@@ -56,6 +109,25 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
     const requestId = ++notesRequestSeq;
     const search = state.search.trim();
+
+    // Primera página desde caché (al volver a la lista o repetir una búsqueda).
+    if (refresh && opts?.useCache !== false) {
+      const cached = readSearchCache(search);
+      if (cached) {
+        set({
+          notes: cached.data,
+          notesPagination: {
+            ...state.notesPagination,
+            cursor: cached.nextCursor,
+            isEnd: cached.nextCursor === null || cached.data.length === 0,
+          },
+          notesLoading: false,
+          notesError: null,
+        });
+        return;
+      }
+    }
+
     set({ notesLoading: true });
 
     try {
@@ -70,6 +142,8 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
       const data = response?.data ?? [];
       const nextCursor = response?.nextCursor ?? null;
+      if (refresh) writeSearchCache(search, data, nextCursor);
+
       set((s) => ({
         notes: refresh
           ? data
@@ -80,6 +154,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           isEnd: nextCursor === null || data.length === 0,
         },
         notesLoading: false,
+        notesError: null,
       }));
     } catch (e: any) {
       if (requestId !== notesRequestSeq) return;
@@ -123,6 +198,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       if (error || !response) {
         return { note: null, error: error ?? 'Error al crear la nota' };
       }
+      invalidateNotesCache();
       await get().refreshNotes();
       return { note: response, error: null };
     } catch (e: any) {
@@ -136,6 +212,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       if (error || !response) {
         return { note: null, error: error ?? 'Error al guardar la nota' };
       }
+      invalidateNotesCache();
       // Mantiene el listado coherente sin recargarlo en cada autosave.
       set((s) => ({
         notes: s.notes.map((n) =>
@@ -172,6 +249,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         return error;
       }
       // Reordena (fijadas primero) sin esperar a volver a la pantalla.
+      invalidateNotesCache();
       await get().refreshNotes();
       return null;
     } catch (e: any) {
@@ -193,6 +271,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         set({ notes: previous });
         return error;
       }
+      invalidateNotesCache();
       return null;
     } catch (e: any) {
       set({ notes: previous });
@@ -204,6 +283,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     try {
       const { error } = await notesService.restoreNote(id);
       if (error) return error;
+      invalidateNotesCache();
       await get().refreshNotes();
       return null;
     } catch (e: any) {
@@ -215,6 +295,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     try {
       const { error } = await notesService.hardDeleteNote(id);
       if (error) return error;
+      invalidateNotesCache();
       await get().refreshNotes();
       return null;
     } catch (e: any) {

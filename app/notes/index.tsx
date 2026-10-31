@@ -1,15 +1,10 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
-import { Plus, Search, X } from 'lucide-react-native';
+import { Plus, Search } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import {
-    Keyboard,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Button from '@/components/Button/Button';
+import { InputField } from '@/components/AddWallet/InputField';
 import LayoutAuthenticated from '@/components/Layout/LayoutAuthenticated';
 import TextMalet from '@/components/TextMalet/TextMalet';
 import { ListRowsSkeleton } from '@/components/cuaderno/Skeletons';
@@ -66,28 +61,14 @@ export default function NotesListScreen() {
 
     const header = (
         <View style={styles.headerBlock}>
-            <View style={styles.searchBox}>
-                <Search size={16} color="#9a9a9a" />
-                <TextInput
-                    style={styles.searchInput}
-                    value={searchText}
-                    onChangeText={setSearchText}
-                    placeholder="Buscar en tus notas..."
-                    placeholderTextColor="#a0a0a0"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="search"
-                    onBlur={Keyboard.dismiss}
-                />
-                {searchText.length > 0 && (
-                    <TouchableOpacity
-                        onPress={() => setSearchText('')}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                        <X size={15} color="#9a9a9a" />
-                    </TouchableOpacity>
-                )}
-            </View>
+            <InputField
+                label="Buscar"
+                placeholder="Buscar en tus notas..."
+                value={searchText}
+                onChangeText={setSearchText}
+                icon={<Search size={16} color="#666" />}
+                autoCapitalize="none"
+            />
         </View>
     );
 
@@ -110,7 +91,7 @@ export default function NotesListScreen() {
                     keyboardDismissMode="on-drag"
                     onEndReachedThreshold={0.4}
                     onEndReached={() => loadNotes({ refresh: false })}
-                    onRefresh={() => loadNotes({ refresh: true })}
+                    onRefresh={() => loadNotes({ refresh: true, useCache: false })}
                     refreshing={notesLoading && notes.length > 0}
                     ListEmptyComponent={
                         notesLoading ? (
@@ -166,23 +147,6 @@ const styles = StyleSheet.create({
     },
     headerBlock: {
         paddingBottom: 10,
-    },
-    searchBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#f7f6f3',
-        borderWidth: 1,
-        borderColor: '#e9e9e7',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 13.5,
-        color: '#37352f',
-        paddingVertical: 0,
     },
     listContent: {
         paddingBottom: 110,

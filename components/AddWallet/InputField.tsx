@@ -88,6 +88,7 @@ export const InputField = memo(function InputField({
         <>
           <TextMalet style={styles.fieldLabel}>{label}</TextMalet>
           <View style={styles.fieldRow}>
+            {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
             {inputContent}
             {rightIcon &&
               (onRightIconPress ? (
