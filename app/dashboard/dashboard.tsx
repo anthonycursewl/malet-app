@@ -19,7 +19,7 @@ import IconAt from "@/svgs/dashboard/IconAt";
 import VerificationBadge from "@/components/shared/VerificationBadge";
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import { BlurTargetView, BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Easing, Image, ScrollView, StyleProp, StyleSheet, TextStyle, TouchableOpacity, View } from "react-native";
@@ -508,6 +508,7 @@ const BalanceSection = memo((({
 
 export default function Dashboard() {
     const insets = useSafeAreaInsets();
+    const blurTargetRef = useRef<View | null>(null);
     const user = useAuthStore(s => s.user);
     const verifySession = useAuthStore(s => s.verifySession);
     const previewTransactions = useWalletStore(s => s.previewTransactions);
@@ -744,13 +745,14 @@ export default function Dashboard() {
                 </SafeAreaView>
             </Animated.View>
 
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-            >
+            <BlurTargetView ref={blurTargetRef} style={{ flex: 1 }}>
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
+                >
                 {/* Spacer for status bar */}
                 <View style={{ height: 16 }} />
 
@@ -1174,10 +1176,11 @@ export default function Dashboard() {
                     </View>
                 )}
 
-                <View style={{ height: 110 + insets.bottom }} />
-            </ScrollView>
+                    <View style={{ height: 104 + insets.bottom }} />
+                </ScrollView>
+            </BlurTargetView>
 
-            <DashboardNavbar />
+            <DashboardNavbar blurTarget={blurTargetRef} />
 
             <ModalAccounts visible={modalAccountsVisible} onClose={handleCloseModalAccounts} />
             <UpdatesModal />

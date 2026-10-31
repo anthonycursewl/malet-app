@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowLeftRight, FileText, Plus, ShoppingCart } from 'lucide-react-native';
 import { memo } from 'react';
+import type { RefObject } from 'react';
 import {
     Image,
     Platform,
@@ -52,11 +53,18 @@ const ITEMS: NavItem[] = [
     },
 ];
 
+interface DashboardNavbarProps {
+    /** En Android, expo-blur necesita el View que hay detrás para difuminarlo. */
+    blurTarget?: RefObject<View | null>;
+}
+
 /**
  * Barra inferior flotante con efecto liquid glass. El botón central de crear
  * transacción queda elevado y el resto funciona como accesos rápidos.
  */
-const DashboardNavbar = memo(function DashboardNavbar() {
+const DashboardNavbar = memo(function DashboardNavbar({
+    blurTarget,
+}: DashboardNavbarProps) {
     const insets = useSafeAreaInsets();
     const user = useAuthStore((s) => s.user);
 
@@ -68,30 +76,54 @@ const DashboardNavbar = memo(function DashboardNavbar() {
             <View style={styles.shadow}>
                 <View style={styles.glass}>
                     <BlurView
-                        intensity={72}
-                        tint="systemChromeMaterialLight"
+                        blurTarget={blurTarget}
+                        intensity={88}
+                        tint="systemUltraThinMaterialLight"
                         blurMethod={
                             Platform.OS === 'android'
                                 ? 'dimezisBlurViewSdk31Plus'
                                 : undefined
                         }
-                        blurReductionFactor={5}
+                        blurReductionFactor={3}
                         style={StyleSheet.absoluteFill}
                         pointerEvents="none"
                     />
                     <LinearGradient
                         colors={[
-                            'rgba(255,255,255,0.76)',
                             'rgba(255,255,255,0.34)',
-                            'rgba(255,255,255,0.58)',
+                            'rgba(255,255,255,0.04)',
+                            'rgba(255,255,255,0.19)',
                         ]}
-                        locations={[0, 0.48, 1]}
+                        locations={[0, 0.5, 1]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={StyleSheet.absoluteFill}
                         pointerEvents="none"
                     />
+                    <LinearGradient
+                        colors={[
+                            'rgba(198,220,255,0.14)',
+                            'rgba(255,255,255,0.01)',
+                            'rgba(255,214,235,0.08)',
+                        ]}
+                        locations={[0, 0.5, 1]}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                        pointerEvents="none"
+                    />
+                    <LinearGradient
+                        colors={[
+                            'rgba(0,0,0,0)',
+                            'rgba(0,0,0,0.075)',
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={styles.bottomShade}
+                        pointerEvents="none"
+                    />
                     <View style={styles.highlight} pointerEvents="none" />
+                    <View style={styles.rim} pointerEvents="none" />
 
                     <View style={styles.items}>
                         {ITEMS.map((item) => {
@@ -165,29 +197,46 @@ const styles = StyleSheet.create({
         zIndex: 200,
     },
     shadow: {
-        borderRadius: 28,
+        borderRadius: 30,
         backgroundColor: 'rgba(255,255,255,0.01)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.16,
-        shadowRadius: 22,
-        elevation: 16,
+        shadowOpacity: 0.2,
+        shadowRadius: 24,
+        elevation: 18,
     },
     glass: {
-        height: 66,
-        borderRadius: 28,
+        height: 60,
+        borderRadius: 30,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.78)',
-        backgroundColor: 'rgba(255,255,255,0.28)',
+        borderColor: 'rgba(255,255,255,0.64)',
+        backgroundColor: 'rgba(255,255,255,0.1)',
     },
     highlight: {
         position: 'absolute',
         top: 0,
-        left: 18,
-        right: 18,
+        left: 22,
+        right: 22,
         height: 1.5,
-        backgroundColor: 'rgba(255,255,255,0.88)',
+        backgroundColor: 'rgba(255,255,255,0.92)',
+    },
+    rim: {
+        position: 'absolute',
+        top: 1,
+        left: 1,
+        right: 1,
+        bottom: 1,
+        borderRadius: 29,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.18)',
+    },
+    bottomShade: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 12,
     },
     items: {
         flex: 1,
@@ -202,17 +251,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     avatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 35,
+        height: 35,
+        borderRadius: 17.5,
         backgroundColor: '#f1f1f1',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.9)',
     },
     createButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
