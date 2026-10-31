@@ -128,15 +128,12 @@ const LastTransactions = memo(({ item }: LastTransactionsProps) => {
       }
     >
       {transactionsHidden && (
-        <>
-          <BlurView
-            intensity={38}
-            tint="default"
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-          <View style={styles.glassHighlight} pointerEvents="none" />
-        </>
+        <BlurView
+          intensity={38}
+          tint="default"
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
       )}
       <View style={styles.content}>
         <TransactionIcon type={item.type} />
@@ -201,23 +198,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   containerHidden: {
-    overflow: 'hidden',
     backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderColor: 'rgba(255,255,255,0.92)',
     shadowColor: '#64748b',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.14,
     shadowRadius: 10,
     elevation: 2,
-  },
-  glassHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 14,
-    right: 14,
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   content: {
     flexDirection: 'row',
