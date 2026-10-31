@@ -73,6 +73,8 @@ const invalidateNotesCache = (): void => {
 interface NotesStore {
   notes: NoteSummary[];
   notesLoading: boolean;
+  /** Carga de una página siguiente (no es refresh ni carga inicial). */
+  notesLoadingMore: boolean;
   notesPagination: NotesPagination;
   search: string;
   notesError: string | null;
@@ -97,6 +99,7 @@ interface NotesStore {
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   notesLoading: false,
+  notesLoadingMore: false,
   notesPagination: freshPagination(),
   search: '',
   notesError: null,
@@ -104,7 +107,12 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   loadNotes: async (opts) => {
     const refresh = opts?.refresh ?? false;
     const state = get();
+    const isPagination = !refresh && state.notes.length > 0;
+
+    // Evita solapar la carga inicial/refresh con otra paginación. Un refresh
+    // sí puede reemplazar una petición en curso (el seq descarta la vieja).
     if (state.notesLoading && !refresh) return;
+    if (isPagination && state.notesLoadingMore) return;
     if (!refresh && state.notesPagination.isEnd) return;
 
     const requestId = ++notesRequestSeq;
@@ -122,13 +130,18 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
             isEnd: cached.nextCursor === null || cached.data.length === 0,
           },
           notesLoading: false,
+          notesLoadingMore: false,
           notesError: null,
         });
         return;
       }
     }
 
-    set({ notesLoading: true });
+    set(
+      isPagination
+        ? { notesLoadingMore: true }
+        : { notesLoading: true, notesLoadingMore: false }
+    );
 
     try {
       const cursor = refresh ? null : state.notesPagination.cursor;
@@ -154,12 +167,14 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
           isEnd: nextCursor === null || data.length === 0,
         },
         notesLoading: false,
+        notesLoadingMore: false,
         notesError: null,
       }));
     } catch (e: any) {
       if (requestId !== notesRequestSeq) return;
       set((s) => ({
         notesLoading: false,
+        notesLoadingMore: false,
         notesPagination: { ...s.notesPagination, isEnd: true },
         notesError: e?.message ?? 'Error al cargar las notas',
       }));
@@ -175,6 +190,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   setSearch: async (search) => {
     set({
       search,
+      notesLoadingMore: false,
       notesPagination: { ...get().notesPagination, cursor: null, isEnd: false },
     });
     await get().loadNotes({ refresh: true });
