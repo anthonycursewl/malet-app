@@ -1,7 +1,9 @@
 import { MALET_API_URL } from '../../config/malet.config';
 import {
   Note,
+  NoteDetail,
   NoteInput,
+  NoteLinkTarget,
   NotesListResponse,
 } from '../../entities/Note';
 import { secureFetch } from '../../http/secureFetch';
@@ -32,7 +34,24 @@ export const notesService = {
     }),
 
   getNote: (id: string) =>
-    secureFetch<Note>({ url: `${NOTES}/${id}`, method: 'GET' }),
+    secureFetch<NoteDetail>({ url: `${NOTES}/${id}`, method: 'GET' }),
+
+  /** Destinos livianos para el autocompletado de `[[`. */
+  getLinkTargets: (query?: {
+    search?: string;
+    take?: number;
+    exclude_id?: string;
+  }) => {
+    const search = new URLSearchParams();
+    if (query?.search) search.append('search', query.search);
+    if (query?.take) search.append('take', String(query.take));
+    if (query?.exclude_id) search.append('exclude_id', query.exclude_id);
+    const qs = search.toString();
+    return secureFetch<{ data: NoteLinkTarget[] }>({
+      url: `${NOTES}/link-targets${qs ? `?${qs}` : ''}`,
+      method: 'GET',
+    });
+  },
 
   createNote: (body: NoteInput) =>
     secureFetch<Note>({ url: NOTES, method: 'POST', body }),

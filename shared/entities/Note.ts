@@ -33,6 +33,26 @@ export interface NotesListResponse {
   nextCursor: string | null;
 }
 
+/** Enlace saliente guardado por el backend. */
+export interface NoteLink {
+    source_note_id: string;
+    target_note_id: string | null;
+    raw_title: string;
+    alias: string | null;
+}
+
+/** Detalle de nota con enlaces salientes y backlinks. */
+export interface NoteDetail extends Note {
+    links: NoteLink[];
+    backlinks: NoteSummary[];
+}
+
+/** Resultado liviano para el picker de `[[`. */
+export interface NoteLinkTarget {
+    id: string;
+    title: string;
+}
+
 /** Título visible: una nota sin título se muestra como "Sin título". */
 export const noteTitle = (note: { title?: string | null }): string =>
   note.title?.trim() || 'Sin título';

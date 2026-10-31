@@ -5,6 +5,7 @@ import {
     Heading2,
     Italic,
     Link,
+    Link2,
     List,
     ListChecks,
     Minus,
@@ -22,6 +23,7 @@ export type MarkdownAction =
     | 'quote'
     | 'codeblock'
     | 'link'
+    | 'wikilink'
     | 'divider';
 
 interface ToolAction {
@@ -47,14 +49,15 @@ const GROUPS: ToolAction[][] = [
     ],
     [
         { action: 'codeblock', Icon: Code, label: 'Código' },
-        { action: 'link', Icon: Link, label: 'Enlace' },
+        { action: 'link', Icon: Link, label: 'Enlace web' },
+        { action: 'wikilink', Icon: Link2, label: 'Enlazar nota' },
         { action: 'divider', Icon: Minus, label: 'Divisor' },
     ],
 ];
 
 /**
- * Barra minimalista de formato: iconos sin cajas, agrupados y por encima del
- * contenido (no se desplaza con el editor).
+ * Barra minimalista de formato: iconos sin cajas, agrupados y fija en la parte
+ * inferior (se mantiene sobre el teclado).
  */
 export default function MarkdownToolbar({
     onAction,

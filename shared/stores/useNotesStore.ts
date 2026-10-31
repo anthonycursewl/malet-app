@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Note, NoteInput, NoteSummary } from '../entities/Note';
+import { Note, NoteDetail, NoteInput, NoteSummary } from '../entities/Note';
 import { notesService } from '../services/notes/notes.service';
 import { useAuthStore } from './useAuthStore';
 
@@ -82,7 +82,7 @@ interface NotesStore {
   setSearch: (search: string) => Promise<void>;
   clearNotesError: () => void;
 
-  fetchNote: (id: string) => Promise<{ note: Note | null; error: string | null }>;
+  fetchNote: (id: string) => Promise<{ note: NoteDetail | null; error: string | null }>;
   createNote: (body: NoteInput) => Promise<{ note: Note | null; error: string | null }>;
   updateNote: (
     id: string,

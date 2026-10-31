@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { BookOpen, Check, Pencil, Pin, Trash2 } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Keyboard,
@@ -21,13 +21,15 @@ import { notify, notifyUndo } from '@/components/cuaderno/format';
 import MarkdownToolbar, { MarkdownAction } from '@/components/notes/MarkdownToolbar';
 import MarkdownView from '@/components/notes/MarkdownView';
 import NotesHeader from '@/components/notes/NotesHeader';
+import LocalGraph, { LocalGraphNode } from '@/components/notes/LocalGraph';
+import NoteLinkPickerModal from '@/components/notes/NoteLinkPickerModal';
 import {
     TUTORIAL_NOTE_CONTENT,
     TUTORIAL_NOTE_TITLE,
 } from '@/components/notes/tutorialNote';
 import {
     formatNoteDate,
-    Note,
+    NoteDetail,
     noteTitle,
     noteWordCount,
 } from '@/shared/entities/Note';
@@ -99,7 +101,7 @@ export default function NoteScreen() {
     const deleteNote = useNotesStore((s) => s.deleteNote);
     const restoreNote = useNotesStore((s) => s.restoreNote);
 
-    const [note, setNote] = useState<Note | null>(null);
+    const [note, setNote] = useState<NoteDetail | null>(null);
     const [loading, setLoading] = useState(!!id);
     const [mode, setMode] = useState<'view' | 'edit'>(id ? 'view' : 'edit');
     const [title, setTitle] = useState('');
@@ -110,6 +112,8 @@ export default function NoteScreen() {
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
+    const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+    const [linkQuery, setLinkQuery] = useState('');
 
     const inputsRef = useRef<Record<number, TextInput | null>>({});
     const savingRef = useRef(false);
@@ -117,11 +121,52 @@ export default function NoteScreen() {
     const versionRef = useRef(0);
     const allowExit = useRef(false);
     const persistRef = useRef<() => Promise<boolean>>(async () => false);
+    const firstFocus = useRef(true);
+    const linkInsertRef = useRef<{ blockIndex: number; start: number } | null>(
+        null
+    );
 
     const content = blocks.join('\n');
 
     /** El tutorial solo se puede cargar en una nota nueva y vacía. */
     const canFillTutorial = !id && !title.trim() && !content.trim();
+
+    /** Título (minúsculas) → id, para resolver `[[...]]` en el render. */
+    const linkMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        for (const link of note?.links ?? []) {
+            if (link.target_note_id) {
+                map[link.raw_title.trim().toLowerCase()] = link.target_note_id;
+            }
+        }
+        return map;
+    }, [note?.links]);
+
+    const graphNodes = useMemo<LocalGraphNode[]>(() => {
+        const map = new Map<string, LocalGraphNode>();
+
+        for (const link of note?.links ?? []) {
+            if (!link.target_note_id || link.target_note_id === note?.id) {
+                continue;
+            }
+            map.set(link.target_note_id, {
+                id: link.target_note_id,
+                title: link.alias || link.raw_title,
+                kind: 'out',
+            });
+        }
+
+        for (const backlink of note?.backlinks ?? []) {
+            if (map.has(backlink.id) || backlink.id === note?.id) continue;
+            map.set(backlink.id, {
+                id: backlink.id,
+                title: noteTitle(backlink),
+                kind: 'in',
+            });
+        }
+
+        return [...map.values()];
+    }, [note?.links, note?.backlinks, note?.id]);
 
     // Carga de la nota existente.
     useEffect(() => {
@@ -189,7 +234,11 @@ export default function NoteScreen() {
                     notify('error', error ?? 'No se pudo guardar la nota.');
                     return false;
                 }
-                setNote(updated);
+                setNote((prev) =>
+                    prev
+                        ? { ...prev, ...updated }
+                        : { ...updated, links: [], backlinks: [] }
+                );
                 if (versionRef.current === version) setDirty(false);
                 setSavedAt(new Date());
                 return true;
@@ -204,7 +253,7 @@ export default function NoteScreen() {
                 notify('error', error ?? 'No se pudo crear la nota.');
                 return false;
             }
-            setNote(created);
+            setNote({ ...created, links: [], backlinks: [] });
             setDirty(false);
             setSavedAt(new Date());
             router.replace({
@@ -236,6 +285,31 @@ export default function NoteScreen() {
         }, 900);
         return () => clearTimeout(timer);
     }, [id, mode, dirty, title, content, pinned, persist]);
+
+    // Refresca enlaces/backlinks al volver de una nota enlazada o al guardar.
+    useFocusEffect(
+        useCallback(() => {
+            if (firstFocus.current) {
+                firstFocus.current = false;
+                return;
+            }
+            if (!id || mode !== 'view') return;
+
+            void (async () => {
+                const { note: refreshed } = await fetchNote(id);
+                if (!refreshed) return;
+
+                const parsed = parseBlocks(refreshed.content);
+                setNote(refreshed);
+                setTitle(refreshed.title);
+                setBlocks(parsed);
+                setPinned(refreshed.pinned);
+                setActiveBlock((current) =>
+                    Math.min(current, Math.max(parsed.length - 1, 0))
+                );
+            })();
+        }, [id, mode, fetchNote])
+    );
 
     // Guardia al salir con cambios sin guardar.
     useFocusEffect(
@@ -283,7 +357,9 @@ export default function NoteScreen() {
             notify('error', error);
             return;
         }
-        if (updated) setNote(updated);
+        if (updated) {
+            setNote((prev) => (prev ? { ...prev, ...updated } : prev));
+        }
         notify('success', next ? 'Nota fijada.' : 'Nota desfijada.');
     };
 
@@ -316,6 +392,105 @@ export default function NoteScreen() {
         setActiveBlock(index);
         setBlockSelection({ start: block.length, end: block.length });
         setTimeout(() => inputsRef.current[index]?.focus(), 0);
+    };
+
+    const openLinkedNote = (targetId: string) => {
+        if (!targetId || targetId === note?.id) return;
+        router.push({
+            pathname: '/notes/note',
+            params: { id: targetId },
+        } as any);
+    };
+
+    const createLinkedNote = (rawTitle: string) => {
+        const clean = rawTitle.trim();
+        if (!clean) return;
+
+        Alert.alert(
+            'Crear nota',
+            `¿Quieres crear la nota «${clean}» y enlazarla?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Crear',
+                    onPress: async () => {
+                        const { note: created, error } = await createNote({
+                            title: clean,
+                        });
+                        if (error || !created) {
+                            notify(
+                                'error',
+                                error ?? 'No se pudo crear la nota.'
+                            );
+                            return;
+                        }
+                        openLinkedNote(created.id);
+                    },
+                },
+            ]
+        );
+    };
+
+    const openLinkPicker = (initialQuery = '') => {
+        linkInsertRef.current = {
+            blockIndex: activeBlock,
+            start: blockSelection.start,
+        };
+        setLinkQuery(initialQuery);
+        setLinkPickerOpen(true);
+    };
+
+    const insertWikiLink = (rawTitle: string) => {
+        const context = linkInsertRef.current;
+        if (!context) {
+            setLinkPickerOpen(false);
+            return;
+        }
+
+        const title = rawTitle.trim();
+        if (!title) {
+            setLinkPickerOpen(false);
+            return;
+        }
+
+        const block = blocks[context.blockIndex] ?? '';
+        const tail = block.slice(context.start);
+        // Si venimos de escribir `[[`, reemplaza el parcial.
+        const cleanedTail = tail.startsWith('[[')
+            ? tail.replace(/^\[\[[^\]\n]*$/, '')
+            : tail;
+
+        const insertion = `[[${title}]]`;
+        const next = block.slice(0, context.start) + insertion + cleanedTail;
+        setBlocks((prev) =>
+            prev.map((value, index) =>
+                index === context.blockIndex ? next : value
+            )
+        );
+        markDirty();
+        linkInsertRef.current = null;
+        setLinkPickerOpen(false);
+
+        const cursor = context.start + insertion.length;
+        setActiveBlock(context.blockIndex);
+        setBlockSelection({ start: cursor, end: cursor });
+        setTimeout(
+            () => inputsRef.current[context.blockIndex]?.focus(),
+            0
+        );
+    };
+
+    const createAndInsertLink = async (rawTitle: string) => {
+        const clean = rawTitle.trim();
+        if (!clean) return;
+
+        const { note: created, error } = await createNote({ title: clean });
+        if (error || !created) {
+            notify('error', error ?? 'No se pudo crear la nota.');
+            return;
+        }
+
+        insertWikiLink(created.title);
     };
 
     /**
@@ -377,6 +552,17 @@ export default function NoteScreen() {
         }
 
         updateBlock(index, text);
+
+        // Al escribir exactamente `[[`, abre el buscador de notas. Si el
+        // usuario cierra el picker, no se vuelve a abrir hasta otro `[[`.
+        if (text.endsWith('[[')) {
+            linkInsertRef.current = {
+                blockIndex: index,
+                start: text.length - 2,
+            };
+            setLinkQuery('');
+            setLinkPickerOpen(true);
+        }
     };
 
     const mergeWithPrevious = (index: number) => {
@@ -469,6 +655,9 @@ export default function NoteScreen() {
                     end: start + urlOffset + 8,
                 });
             }
+            case 'wikilink':
+                openLinkPicker('');
+                return;
             case 'codeblock': {
                 if (current.startsWith('```')) {
                     const next = current
@@ -600,11 +789,103 @@ export default function NoteScreen() {
                         <View style={styles.rule} />
 
                         {content.trim() ? (
-                            <MarkdownView content={content} />
+                            <MarkdownView
+                                content={content}
+                                linkMap={linkMap}
+                                onOpenNote={openLinkedNote}
+                                onCreateNote={createLinkedNote}
+                            />
                         ) : (
                             <TextMalet style={styles.emptyNote}>
                                 Esta nota está vacía. Toca el lápiz para empezar a escribir.
                             </TextMalet>
+                        )}
+
+                        {note.links.length > 0 && (
+                            <View style={styles.section}>
+                                <TextMalet style={styles.sectionTitle}>
+                                    Enlaces
+                                </TextMalet>
+                                <View style={styles.chips}>
+                                    {note.links.map((link) => {
+                                        const resolved = !!link.target_note_id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={`${link.raw_title}-${link.alias ?? ''}`}
+                                                style={[
+                                                    styles.chip,
+                                                    !resolved && styles.chipPending,
+                                                ]}
+                                                onPress={() => {
+                                                    if (link.target_note_id) {
+                                                        openLinkedNote(
+                                                            link.target_note_id
+                                                        );
+                                                    } else {
+                                                        createLinkedNote(
+                                                            link.raw_title
+                                                        );
+                                                    }
+                                                }}
+                                                activeOpacity={0.75}
+                                            >
+                                                <TextMalet
+                                                    style={[
+                                                        styles.chipText,
+                                                        !resolved &&
+                                                            styles.chipTextPending,
+                                                    ]}
+                                                >
+                                                    {link.alias || link.raw_title}
+                                                </TextMalet>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
+
+                        {note.backlinks.length > 0 && (
+                            <View style={styles.section}>
+                                <TextMalet style={styles.sectionTitle}>
+                                    Mencionada en
+                                </TextMalet>
+                                {note.backlinks.map((backlink) => (
+                                    <TouchableOpacity
+                                        key={backlink.id}
+                                        style={styles.backlinkRow}
+                                        onPress={() =>
+                                            openLinkedNote(backlink.id)
+                                        }
+                                        activeOpacity={0.75}
+                                    >
+                                        <TextMalet
+                                            style={styles.backlinkTitle}
+                                            numberOfLines={1}
+                                        >
+                                            {noteTitle(backlink)}
+                                        </TextMalet>
+                                        <TextMalet
+                                            style={styles.backlinkExcerpt}
+                                            numberOfLines={1}
+                                        >
+                                            {backlink.excerpt || 'Sin contenido'}
+                                        </TextMalet>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+
+                        {graphNodes.length > 0 && (
+                            <View style={styles.section}>
+                                <TextMalet style={styles.sectionTitle}>
+                                    Mapa local
+                                </TextMalet>
+                                <LocalGraph
+                                    nodes={graphNodes}
+                                    onOpen={openLinkedNote}
+                                />
+                            </View>
                         )}
 
                         <Button
@@ -679,7 +960,12 @@ export default function NoteScreen() {
                                     onPress={() => startEditing(index)}
                                 >
                                     {block.trim() ? (
-                                        <MarkdownView content={block} />
+                                        <MarkdownView
+                                            content={block}
+                                            linkMap={linkMap}
+                                            onOpenNote={openLinkedNote}
+                                            onCreateNote={createLinkedNote}
+                                        />
                                     ) : (
                                         <View style={styles.emptyBlock} />
                                     )}
@@ -710,6 +996,17 @@ export default function NoteScreen() {
                     </View>
                 )}
             </KeyboardAvoidingView>
+
+            {linkPickerOpen && (
+                <NoteLinkPickerModal
+                    visible
+                    initialQuery={linkQuery}
+                    excludeId={id}
+                    onClose={() => setLinkPickerOpen(false)}
+                    onSelect={(target) => insertWikiLink(target.title)}
+                    onCreate={(title) => void createAndInsertLink(title)}
+                />
+            )}
         </LayoutAuthenticated>
     );
 }
@@ -783,6 +1080,60 @@ const styles = StyleSheet.create({
     editButton: {
         marginTop: 28,
         alignSelf: 'flex-start',
+    },
+    section: {
+        marginTop: 24,
+        gap: 8,
+    },
+    sectionTitle: {
+        fontSize: 11.5,
+        fontWeight: '700',
+        color: 'rgba(0,0,0,0.45)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.7,
+    },
+    chips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    chip: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 14,
+        backgroundColor: '#f7f6f3',
+        borderWidth: 1,
+        borderColor: '#e9e9e7',
+    },
+    chipPending: {
+        borderStyle: 'dashed',
+        borderColor: '#cfcfcf',
+        backgroundColor: '#fafafa',
+    },
+    chipText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#0b6e99',
+    },
+    chipTextPending: {
+        color: '#8a8a8a',
+    },
+    backlinkRow: {
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.07)',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        gap: 2,
+    },
+    backlinkTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#1f1f1f',
+    },
+    backlinkExcerpt: {
+        fontSize: 11.5,
+        color: '#8a8a8a',
     },
     editContent: {
         paddingBottom: 24,

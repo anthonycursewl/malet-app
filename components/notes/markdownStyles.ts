@@ -84,6 +84,9 @@ export const markdownStyles = StyleSheet.create({
         color: '#0b6e99',
         textDecorationLine: 'underline',
     },
+    pendingLink: {
+        color: '#9a9a9a',
+    },
     blockquote: {
         backgroundColor: 'transparent',
         borderLeftWidth: 3,

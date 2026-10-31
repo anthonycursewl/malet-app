@@ -18,6 +18,7 @@ interface InputFieldProps {
   onRightIconPress?: () => void;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoFocus?: boolean;
 }
 
 export const InputField = memo(function InputField({
@@ -34,6 +35,7 @@ export const InputField = memo(function InputField({
   onRightIconPress,
   keyboardType,
   autoCapitalize,
+  autoFocus,
 }: InputFieldProps) {
   const inputContent = (
     <TextInput
@@ -47,6 +49,7 @@ export const InputField = memo(function InputField({
       secureTextEntry={secureTextEntry}
       keyboardType={keyboardType || 'default'}
       autoCapitalize={autoCapitalize}
+      autoFocus={autoFocus}
     />
   );
 
