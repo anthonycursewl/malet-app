@@ -9,6 +9,7 @@ import { Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, 
 import Button from "../Button/Button";
 import ModalOptions from "../shared/ModalOptions";
 import VerificationBadge from "../shared/VerificationBadge";
+import PrivacyToggle from "./PrivacyToggle";
 
 const PLACEHOLDER_AVATAR = require("@/assets/images/placeholders/placeholder_avatar.png");
 
@@ -91,9 +92,18 @@ interface DashboardHeaderProps {
     userAvatar?: string | null;
     userBanner?: string | null;
     username: string;
+    transactionsHidden?: boolean;
+    onToggleTransactionsHidden?: () => void;
 }
 
-const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: DashboardHeaderProps) => {
+const DashboardHeader = memo(({
+    name,
+    userAvatar,
+    userBanner,
+    username,
+    transactionsHidden = false,
+    onToggleTransactionsHidden,
+}: DashboardHeaderProps) => {
     const { width } = Dimensions.get('window');
     const user = useAuthStore(s => s.user);
     const [showVerificationModal, setShowVerificationModal] = useState(false);
@@ -153,12 +163,21 @@ const DashboardHeader = memo(({ name, userAvatar, userBanner, username }: Dashbo
                     </View>
                 </View>
 
-                <TouchableOpacity onPress={() => router.push('/profile')}>
-                    <Image
-                        source={userAvatar ? { uri: userAvatar } : PLACEHOLDER_AVATAR}
-                        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f0f0' }}
-                    />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {onToggleTransactionsHidden && (
+                        <PrivacyToggle
+                            hidden={transactionsHidden}
+                            onPress={onToggleTransactionsHidden}
+                        />
+                    )}
+
+                    <TouchableOpacity onPress={() => router.push('/profile')}>
+                        <Image
+                            source={userAvatar ? { uri: userAvatar } : PLACEHOLDER_AVATAR}
+                            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#f0f0f0' }}
+                        />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {verification && (

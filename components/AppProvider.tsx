@@ -3,6 +3,7 @@ import { useWalletStore } from '../shared/stores/useWalletStore';
 import { useAccountStore } from '../shared/stores/useAccountStore';
 import { useAuthStore } from '../shared/stores/useAuthStore';
 import { useAppStore } from '../shared/stores/useAppStore';
+import { usePrivacyStore } from '../shared/stores/usePrivacyStore';
 import { ToastProvider } from './Toast/ToastProvider';
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -10,6 +11,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const logoutAccount = useAccountStore(s => s.logoutAccount);
   const logoutAuth = useAuthStore(s => s.logout);
   const setState = useAppStore(s => s.setState);
+  const hydratePrivacy = usePrivacyStore(s => s.hydrate);
+
+  useEffect(() => {
+    void hydratePrivacy();
+  }, [hydratePrivacy]);
 
   useEffect(() => {
     setState({

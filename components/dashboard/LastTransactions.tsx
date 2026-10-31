@@ -1,7 +1,9 @@
 import { getCurrencyIcon } from "@/shared/services/currency/currencyService";
 import { TransactionItem } from "@/shared/entities/TransactionItem";
+import { usePrivacyStore } from "@/shared/stores/usePrivacyStore";
 import { colors, spacing } from "@/shared/theme";
 import { MaterialIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import { memo, useCallback, useMemo } from "react";
 import { Image, StyleSheet, TextStyle, TouchableOpacity, View } from "react-native";
@@ -36,9 +38,13 @@ const TransactionIcon = memo(({ type }: { type: 'expense' | 'saving' | 'pending_
     </View>
   );
 });
+TransactionIcon.displayName = 'TransactionIcon';
 
 const LastTransactions = memo(({ item }: LastTransactionsProps) => {
   const router = useRouter();
+  const hiddenPreference = usePrivacyStore((s) => s.transactionsHidden);
+  const privacyHydrated = usePrivacyStore((s) => s.hydrated);
+  const transactionsHidden = !privacyHydrated || hiddenPreference;
   const isExpense = item.type === 'expense';
   const isPending = item.type === 'pending_payment';
 
@@ -68,10 +74,17 @@ const LastTransactions = memo(({ item }: LastTransactionsProps) => {
     return new Date(item.issued_at).toLocaleDateString();
   }, [item.issued_at]);
 
-  const transactionName = useMemo(() => returnName(item.name), [item.name, returnName]);
-  const amountText = useMemo(() => returnAmount(item.amount), [item.amount, returnAmount]);
+  const transactionName = useMemo(
+    () => (transactionsHidden ? '••••••' : returnName(item.name)),
+    [item.name, returnName, transactionsHidden]
+  );
+  const amountText = useMemo(
+    () => (transactionsHidden ? '$••••' : returnAmount(item.amount)),
+    [item.amount, returnAmount, transactionsHidden]
+  );
 
   const renderTags = useMemo(() => {
+    if (transactionsHidden) return null;
     const tags = item.tags || [];
     if (tags.length === 0) return null;
 
@@ -103,14 +116,28 @@ const LastTransactions = memo(({ item }: LastTransactionsProps) => {
         )}
       </View >
     );
-  }, [item.tags]);
+  }, [item.tags, transactionsHidden]);
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, transactionsHidden && styles.containerHidden]}
       onPress={handlePress}
       activeOpacity={0.9}
+      accessibilityLabel={
+        transactionsHidden ? 'Transacción oculta' : undefined
+      }
     >
+      {transactionsHidden && (
+        <>
+          <BlurView
+            intensity={38}
+            tint="default"
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View style={styles.glassHighlight} pointerEvents="none" />
+        </>
+      )}
       <View style={styles.content}>
         <TransactionIcon type={item.type} />
 
@@ -157,6 +184,7 @@ const LastTransactions = memo(({ item }: LastTransactionsProps) => {
     JSON.stringify(prevProps.item.tags) === JSON.stringify(nextProps.item.tags)
   );
 });
+LastTransactions.displayName = 'LastTransactions';
 
 export default LastTransactions;
 
@@ -171,6 +199,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(207, 207, 207, 1)',
     borderStyle: 'dashed',
     width: '100%',
+  },
+  containerHidden: {
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  glassHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 14,
+    right: 14,
+    height: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
   content: {
     flexDirection: 'row',

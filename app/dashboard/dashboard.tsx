@@ -1,5 +1,6 @@
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardNavbar from "@/components/dashboard/DashboardNavbar";
+import PrivacyToggle from "@/components/dashboard/PrivacyToggle";
 import LastTransactions from "@/components/dashboard/LastTransactions";
 import GymEntryCard from "@/components/gym/GymEntryCard";
 import NotesEntryCard from "@/components/notes/NotesEntryCard";
@@ -12,6 +13,7 @@ import { useAuthStore } from "@/shared/stores/useAuthStore";
 import { useTagStore } from "@/shared/stores/useTagStore";
 import { useToastStore } from "@/shared/stores/useToastStore";
 import { useWalletStore } from "@/shared/stores/useWalletStore";
+import { usePrivacyStore } from "@/shared/stores/usePrivacyStore";
 import { useAnalyticsStore } from "@/shared/stores/useAnalyticsStore";
 import { useSharedAccountStore } from "@/shared/stores/useSharedAccountStore";
 import IconArrow from "@/svgs/dashboard/IconArrow";
@@ -509,6 +511,14 @@ const BalanceSection = memo((({
 export default function Dashboard() {
     const insets = useSafeAreaInsets();
     const blurTargetRef = useRef<View | null>(null);
+    const hiddenPreference = usePrivacyStore(
+        (state) => state.transactionsHidden
+    );
+    const privacyHydrated = usePrivacyStore((state) => state.hydrated);
+    const transactionsHidden = !privacyHydrated || hiddenPreference;
+    const toggleTransactionsHidden = usePrivacyStore(
+        (state) => state.toggleTransactionsHidden
+    );
     const user = useAuthStore(s => s.user);
     const verifySession = useAuthStore(s => s.verifySession);
     const previewTransactions = useWalletStore(s => s.previewTransactions);
@@ -609,6 +619,18 @@ export default function Dashboard() {
     const handleViewAllTransactions = useCallback(() => {
         router.push('/wallet/transactions/getAllTransaction');
     }, []);
+
+    const handleToggleTransactionsHidden = useCallback(() => {
+        const next = !transactionsHidden;
+        void toggleTransactionsHidden();
+        useToastStore.getState().add({
+            type: 'info',
+            message: next
+                ? 'Datos de transacciones ocultos.'
+                : 'Datos de transacciones visibles.',
+            duration: 1800,
+        });
+    }, [transactionsHidden, toggleTransactionsHidden]);
 
     const formattedBalance = useMemo(() => {
         return selectedAccount
@@ -735,12 +757,21 @@ export default function Dashboard() {
                                 @{user?.username || ''}
                             </TextMalet>
                         </View>
-                        <TouchableOpacity onPress={() => router.push('/profile')}>
-                            <Image
-                                source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/placeholders/placeholder_avatar.png')}
-                                style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#f0f0f0' }}
+                        <View style={styles.stickyHeaderRight}>
+                            <PrivacyToggle
+                                hidden={transactionsHidden}
+                                onPress={handleToggleTransactionsHidden}
                             />
-                        </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => router.push('/profile')}
+                            >
+                                <Image
+                                    source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/placeholders/placeholder_avatar.png')}
+                                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#f0f0f0' }}
+                                />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </SafeAreaView>
             </Animated.View>
@@ -757,7 +788,14 @@ export default function Dashboard() {
                 <View style={{ height: 16 }} />
 
                 {/* Original header - visible at top, hidden when scrolling */}
-                <DashboardHeader name={user?.name || ''} userAvatar={user?.avatar_url} userBanner={user?.banner_url} username={user.username} />
+                <DashboardHeader
+                    name={user?.name || ''}
+                    userAvatar={user?.avatar_url}
+                    userBanner={user?.banner_url}
+                    username={user.username}
+                    transactionsHidden={transactionsHidden}
+                    onToggleTransactionsHidden={handleToggleTransactionsHidden}
+                />
 
                 <BalanceSection
                     balance={formattedBalance}
@@ -1005,19 +1043,23 @@ export default function Dashboard() {
                                 <View style={styles.analyticsMetric}>
                                     <TextMalet style={[styles.analyticsMetricLabel, { color: '#ef4444' }]}>Egreso</TextMalet>
                                     <TextMalet style={[styles.analyticsMetricValue, { color: '#ef4444' }]}>
-                                        ${analyticsSummary.total_spent.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {transactionsHidden
+                                            ? '$••••'
+                                            : `$${analyticsSummary.total_spent.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                     </TextMalet>
                                 </View>
                                 <View style={styles.analyticsDivider} />
                                 <View style={styles.analyticsMetric}>
                                     <TextMalet style={[styles.analyticsMetricLabel, { color: '#22c55e' }]}>Ingreso</TextMalet>
                                     <TextMalet style={[styles.analyticsMetricValue, { color: '#22c55e' }]}>
-                                        ${analyticsSummary.total_saved.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {transactionsHidden
+                                            ? '$••••'
+                                            : `$${analyticsSummary.total_saved.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                     </TextMalet>
                                 </View>
                             </View>
 
-                            {analyticsSummary.by_type.length > 0 && (
+                            {!transactionsHidden && analyticsSummary.by_type.length > 0 && (
                                 <View style={styles.analyticsTypeBar}>
                                     {analyticsSummary.by_type.map((t, i) => {
                                         const total = analyticsSummary.total_spent + analyticsSummary.total_saved;
@@ -1272,6 +1314,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
+    },
+    stickyHeaderRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     scrollContent: {
         padding: 12,

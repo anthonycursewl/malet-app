@@ -14,6 +14,7 @@ import { BadgeDollarSign, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useToastStore } from '@/shared/stores/useToastStore';
+import { usePrivacyStore } from '@/shared/stores/usePrivacyStore';
 
 export default function TransactionDetail() {
   const { transaction_id } = useLocalSearchParams();
@@ -26,6 +27,9 @@ export default function TransactionDetail() {
   const accounts = useAccountStore(s => s.accounts);
   const getAllAccountsByUserId = useAccountStore(s => s.getAllAccountsByUserId);
   const updateBalanceInMemory = useAccountStore(s => s.updateBalanceInMemory);
+  const hiddenPreference = usePrivacyStore(s => s.transactionsHidden);
+  const privacyHydrated = usePrivacyStore(s => s.hydrated);
+  const transactionsHidden = !privacyHydrated || hiddenPreference;
   const transaction = transactions.find(t => t.id.toString() === transaction_id);
   const account = accounts.find(a => a.id === transaction?.account_id);
 
@@ -82,6 +86,7 @@ export default function TransactionDetail() {
   };
 
   const formatAccountInfo = () => {
+    if (transactionsHidden) return '••••••';
     if (!account) return 'Desconocida';
     const maskedId = account.id.slice(0, 4) + ' ****';
     return `${account.name} • ${maskedId}`;
@@ -90,7 +95,7 @@ export default function TransactionDetail() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Comprobante de transacción Malet\n\nMonto: $${transaction.amount}\nFecha: ${formatDate(transaction.issued_at)}\nRef: ${transaction.id}`,
+        message: `Comprobante de transacción Malet\n\nMonto: ${transactionsHidden ? '$••••' : `$${transaction.amount}`}\nFecha: ${formatDate(transaction.issued_at)}\nRef: ${transaction.id}`,
       });
     } catch (error) {
       useToastStore.getState().add({ type: 'error', message: 'No se pudo compartir la transacción' });
@@ -192,13 +197,19 @@ export default function TransactionDetail() {
             </TextMalet>
 
             <View style={styles.amountContainer}>
-              <TextMalet style={styles.currencySymbol}>$</TextMalet>
-              <TextMalet style={styles.amountInteger}>{amountInteger}</TextMalet>
-              <TextMalet style={styles.amountDecimal}>.{amountDecimal}</TextMalet>
+              {transactionsHidden ? (
+                <TextMalet style={styles.amountInteger}>••••••</TextMalet>
+              ) : (
+                <>
+                  <TextMalet style={styles.currencySymbol}>$</TextMalet>
+                  <TextMalet style={styles.amountInteger}>{amountInteger}</TextMalet>
+                  <TextMalet style={styles.amountDecimal}>.{amountDecimal}</TextMalet>
+                </>
+              )}
             </View>
 
             <TextMalet style={styles.subtitle}>
-              {transaction.name}
+              {transactionsHidden ? '••••••' : transaction.name}
             </TextMalet>
 
             <View style={styles.securityContainer}>
@@ -276,7 +287,9 @@ export default function TransactionDetail() {
             <View style={styles.detailRow}>
               <TextMalet style={styles.detailLabel}>Etiquetas</TextMalet>
               <View style={styles.tagsContainer}>
-                {transaction.tags && transaction.tags.length > 0 ? (
+                {transactionsHidden ? (
+                  <TextMalet style={styles.detailValue}>••••••</TextMalet>
+                ) : transaction.tags && transaction.tags.length > 0 ? (
                   transaction.tags.map(tag => {
                     const color = tag.color || '#999';
                     const name = tag.name.startsWith('#') ? tag.name : '#' + tag.name;
