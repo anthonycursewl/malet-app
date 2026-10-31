@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Linking } from 'react-native';
 import Markdown, { MarkdownIt } from 'react-native-markdown-display';
+import CodeBlock from './CodeBlock';
 import { markdownStyles } from './markdownStyles';
 
 /** Parser estable: GFM (tablas, tachado), autolinks y comillas tipográficas. */
@@ -29,6 +30,18 @@ const MarkdownView = memo(function MarkdownView({ content }: { content: string }
         <Markdown
             markdownit={markdownit}
             style={markdownStyles}
+            rules={{
+                fence: (node: any) => (
+                    <CodeBlock
+                        key={node.key}
+                        code={node.content ?? ''}
+                        language={node.info}
+                    />
+                ),
+                code_block: (node: any) => (
+                    <CodeBlock key={node.key} code={node.content ?? ''} />
+                ),
+            }}
             onLinkPress={(url) => {
                 if (/^(https?:|mailto:)/i.test(url)) {
                     Linking.openURL(url).catch(() => undefined);
