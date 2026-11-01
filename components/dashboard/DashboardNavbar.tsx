@@ -14,6 +14,25 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/shared/stores/useAuthStore';
 
+type GlassModule = typeof import('expo-glass-effect');
+
+let glassModule: GlassModule | null = null;
+let canUseNativeGlass = false;
+
+// El módulo nativo solo existe en iOS 26+ y en binarios que lo incluyan.
+// Si falla, se mantiene el fallback de BlurView + gradientes.
+if (Platform.OS === 'ios') {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        glassModule = require('expo-glass-effect') as GlassModule;
+        canUseNativeGlass =
+            glassModule.isLiquidGlassAvailable() &&
+            glassModule.isGlassEffectAPIAvailable();
+    } catch {
+        canUseNativeGlass = false;
+    }
+}
+
 interface NavItem {
     key: string;
     accessibilityLabel: string;
@@ -67,6 +86,8 @@ const DashboardNavbar = memo(function DashboardNavbar({
 }: DashboardNavbarProps) {
     const insets = useSafeAreaInsets();
     const user = useAuthStore((s) => s.user);
+    const NativeGlassView =
+        canUseNativeGlass && glassModule ? glassModule.GlassView : null;
 
     return (
         <View
@@ -74,56 +95,73 @@ const DashboardNavbar = memo(function DashboardNavbar({
             style={[styles.wrapper, { bottom: Math.max(insets.bottom, 10) + 8 }]}
         >
             <View style={styles.shadow}>
-                <View style={styles.glass}>
-                    <BlurView
-                        blurTarget={blurTarget}
-                        intensity={88}
-                        tint="systemUltraThinMaterialLight"
-                        blurMethod={
-                            Platform.OS === 'android'
-                                ? 'dimezisBlurViewSdk31Plus'
-                                : undefined
-                        }
-                        blurReductionFactor={3}
-                        style={StyleSheet.absoluteFill}
-                        pointerEvents="none"
-                    />
-                    <LinearGradient
-                        colors={[
-                            'rgba(255,255,255,0.34)',
-                            'rgba(255,255,255,0.04)',
-                            'rgba(255,255,255,0.19)',
-                        ]}
-                        locations={[0, 0.5, 1]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFill}
-                        pointerEvents="none"
-                    />
-                    <LinearGradient
-                        colors={[
-                            'rgba(198,220,255,0.14)',
-                            'rgba(255,255,255,0.01)',
-                            'rgba(255,214,235,0.08)',
-                        ]}
-                        locations={[0, 0.5, 1]}
-                        start={{ x: 1, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={StyleSheet.absoluteFill}
-                        pointerEvents="none"
-                    />
-                    <LinearGradient
-                        colors={[
-                            'rgba(0,0,0,0)',
-                            'rgba(0,0,0,0.075)',
-                        ]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 0, y: 1 }}
-                        style={styles.bottomShade}
-                        pointerEvents="none"
-                    />
-                    <View style={styles.highlight} pointerEvents="none" />
-                    <View style={styles.rim} pointerEvents="none" />
+                <View
+                    style={[
+                        styles.glass,
+                        canUseNativeGlass && styles.nativeGlass,
+                    ]}
+                >
+                    {NativeGlassView ? (
+                        <NativeGlassView
+                            glassEffectStyle="regular"
+                            colorScheme="light"
+                            isInteractive
+                            style={StyleSheet.absoluteFill}
+                            pointerEvents="none"
+                        />
+                    ) : (
+                        <>
+                            <BlurView
+                                blurTarget={blurTarget}
+                                intensity={88}
+                                tint="systemUltraThinMaterialLight"
+                                blurMethod={
+                                    Platform.OS === 'android'
+                                        ? 'dimezisBlurViewSdk31Plus'
+                                        : undefined
+                                }
+                                blurReductionFactor={3}
+                                style={StyleSheet.absoluteFill}
+                                pointerEvents="none"
+                            />
+                            <LinearGradient
+                                colors={[
+                                    'rgba(255,255,255,0.34)',
+                                    'rgba(255,255,255,0.04)',
+                                    'rgba(255,255,255,0.19)',
+                                ]}
+                                locations={[0, 0.5, 1]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={StyleSheet.absoluteFill}
+                                pointerEvents="none"
+                            />
+                            <LinearGradient
+                                colors={[
+                                    'rgba(198,220,255,0.14)',
+                                    'rgba(255,255,255,0.01)',
+                                    'rgba(255,214,235,0.08)',
+                                ]}
+                                locations={[0, 0.5, 1]}
+                                start={{ x: 1, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={StyleSheet.absoluteFill}
+                                pointerEvents="none"
+                            />
+                            <LinearGradient
+                                colors={[
+                                    'rgba(0,0,0,0)',
+                                    'rgba(0,0,0,0.075)',
+                                ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 0, y: 1 }}
+                                style={styles.bottomShade}
+                                pointerEvents="none"
+                            />
+                            <View style={styles.highlight} pointerEvents="none" />
+                            <View style={styles.rim} pointerEvents="none" />
+                        </>
+                    )}
 
                     <View style={styles.items}>
                         {ITEMS.map((item) => {
@@ -212,6 +250,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.64)',
         backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    nativeGlass: {
+        backgroundColor: 'transparent',
+        borderColor: 'transparent',
     },
     highlight: {
         position: 'absolute',
