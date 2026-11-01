@@ -199,11 +199,6 @@ const styles = StyleSheet.create({
   },
   containerHidden: {
     backgroundColor: 'transparent',
-    shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 2,
   },
   content: {
     flexDirection: 'row',
